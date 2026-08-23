@@ -46,7 +46,7 @@ import { useFonts, fontCssUrl, FontDef, FontRole, ROLE_LABEL, FOLLOW_MENU, FOLLO
 import { useToast } from '@/components/ui/Toast';
 import { PageTitle, EditableDesc, getPageText, setPageText } from '@/components/ui/PageText';
 import { putBlob } from '@/lib/blobStore';
-import { getSetting, setSetting, pushLocalSettings, unsyncedSettingKeys } from '@/lib/settingStore';
+import { getSetting, setSetting, pushLocalSettings, unsyncedSettingKeys, SETTING_KEYS } from '@/lib/settingStore';
 import { isServerMode, createBackend, backend } from '@/lib/backend';
 import type { BackendConfig, BackendKind } from '@/lib/backend/types';
 import { validateConfig, configFileText, saveLocalConfig, parseFirebaseSnippet } from '@/lib/serverConfig';
@@ -1183,8 +1183,8 @@ function DataPane() {
   const doPush = async () => {
     setPushing(true);
     try {
-      const keys = Object.keys(localStorage).filter(k => k.startsWith('ohome.'));
-      const n = await pushLocalSettings(keys);
+      // 콘텐츠 키(글 목록 등)가 설정 테이블로 들어가지 않게 설정 키 목록만 올린다
+      const n = await pushLocalSettings(SETTING_KEYS);
       toast(n > 0 ? `설정 ${n}건을 서버에 올렸습니다 — 방문자에게도 같은 모습으로 보입니다` : '올릴 설정이 없습니다');
       setUnsynced(unsyncedSettingKeys());
     } catch {

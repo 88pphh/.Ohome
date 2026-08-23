@@ -9,7 +9,7 @@
 import { backend, COLLECTION_OF, CONTENT_COLLECTIONS } from './backend';
 import type { Backend, ListItem } from './backend';
 import { allBlobs, getBlob, putBlobAs, putBlob } from './blobStore';
-import { getSetting, setSetting } from './settingStore';
+import { getSetting, setSetting, SETTING_KEYS } from './settingStore';
 
 export interface Snapshot {
   version: 2;
@@ -21,14 +21,7 @@ export interface Snapshot {
 
 export type Progress = (msg: string, done?: number, total?: number) => void;
 
-/** 사이트 설정으로 다루는 키 — 백업·이전 대상 */
-const SETTING_KEYS = [
-  'ohome.theme.v2', 'ohome.themePresets.v1', 'ohome.fonts.v2', 'ohome.menuset.v1', 'ohome.site.v1',
-  'ohome.pagetext.v1', 'ohome.cursor.v1', 'ohome.bgm.v1', 'ohome.boardset.v1', 'ohome.boards.v1',
-  'ohome.commset.v1', 'ohome.memoset.v1', 'ohome.threadset.v1', 'ohome.trpgset.v1',
-  'ohome.relqsets.v1', 'ohome.main.v1', 'ohome.sched.v1', 'ohome.notifset.v1',
-  'ohome.membertags.v1', 'ohome.invite.v1', 'ohome.roadnext.v1',
-];
+/* 사이트 설정 키 목록(SETTING_KEYS)은 settingStore가 갖는다 — 백업·이전도 같은 목록을 쓴다 */
 
 /* ---------- 이미지 참조 ---------- */
 

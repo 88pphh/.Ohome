@@ -21,6 +21,20 @@ const LOCAL_ONLY = new Set<string>([
   'ohome.notif.v1',      // 알림 목록은 사람별
 ]);
 
+/**
+ * 서버로 올라가는 사이트 설정 키 — **이 목록에 있는 것만 설정으로 취급한다.**
+ * `ohome.*` 전체를 훑으면 글 목록 같은 콘텐츠 키(ohome.board.v1 등)까지 설정으로 오인해
+ * 「서버에 올리지 않은 설정」이 헛되이 뜨고, 올리기를 누르면 글 배열이 설정 테이블에 들어간다.
+ * 백업(lib/transfer)도 같은 목록을 쓴다.
+ */
+export const SETTING_KEYS = [
+  'ohome.theme.v2', 'ohome.themePresets.v1', 'ohome.fonts.v2', 'ohome.menuset.v1', 'ohome.site.v1',
+  'ohome.pagetext.v1', 'ohome.cursor.v1', 'ohome.bgm.v1', 'ohome.boardset.v1', 'ohome.boards.v1',
+  'ohome.commset.v1', 'ohome.memoset.v1', 'ohome.threadset.v1', 'ohome.trpgset.v1',
+  'ohome.relqsets.v1', 'ohome.main.v1', 'ohome.sched.v1', 'ohome.notifset.v1',
+  'ohome.membertags.v1', 'ohome.invite.v1', 'ohome.roadnext.v1',
+];
+
 /** 앱 시작 시 1회 — 서버에 저장된 설정을 전부 받아 캐시 */
 export async function primeSettings(): Promise<void> {
   primed = true;
@@ -117,9 +131,9 @@ export function unsyncedSettingKeys(): string[] {
   if (!isServerMode()) return [];
   const out: string[] = [];
   try {
-    for (const k of Object.keys(localStorage)) {
-      if (!k.startsWith('ohome.') || LOCAL_ONLY.has(k)) continue;
-      if (!cache.has(k)) out.push(k);
+    for (const k of SETTING_KEYS) {
+      if (LOCAL_ONLY.has(k) || cache.has(k)) continue;
+      if (localStorage.getItem(k) != null) out.push(k);
     }
   } catch { /* 무시 */ }
   return out;
