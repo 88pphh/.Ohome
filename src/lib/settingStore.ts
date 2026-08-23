@@ -43,6 +43,13 @@ export async function primeSettings(): Promise<void> {
   try {
     const all = await be.fetchAllSettings();
     Object.entries(all).forEach(([k, v]) => {
+      // null = 지워진 값(초기화가 그렇게 저장한다). 캐시에 담으면 화면이 기본값 대신
+      // null을 받아 깨지므로 아예 없는 것으로 둔다.
+      if (v == null) {
+        cache.delete(k);
+        try { localStorage.removeItem(k); } catch { /* 무시 */ }
+        return;
+      }
       cache.set(k, v);
       // 첫 페인트를 위해 로컬에도 사본을 둔다 (다음 방문 때 깜빡임 감소)
       try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 무시 */ }
@@ -56,11 +63,18 @@ export function settingsPrimed(): boolean { return primed; }
 
 /** 동기 읽기 — 서버 캐시 > localStorage > 기본값 */
 export function getSetting<T>(key: string, fallback: T): T {
-  if (cache.has(key)) return cache.get(key) as T;
+  // null·undefined는 "지워진 값"으로 보고 기본값으로 돌아간다 —
+  // 초기화가 설정을 null로 저장하는데 그대로 돌려주면 화면이 기본값 대신 null을 받아 깨진다.
+  // (false·0·''은 정상값이므로 != null 로만 거른다)
+  const cached = cache.get(key);
+  if (cached != null) return cached as T;
   try {
     const raw = localStorage.getItem(key);
     if (raw == null) return fallback;
-    try { return JSON.parse(raw) as T; } catch {
+    try {
+      const parsed = JSON.parse(raw);
+      return (parsed == null ? fallback : parsed) as T;   // 예전에 저장된 "null" 문자열도 방어
+    } catch {
       // 예전에 문자열을 그대로 저장한 값(가입코드 등) 호환
       return (typeof fallback === 'string' ? raw : fallback) as T;
     }
@@ -70,11 +84,12 @@ export function getSetting<T>(key: string, fallback: T): T {
 
 /** 문자열 그대로 저장된 값(구버전 호환)용 — JSON이 아니어도 읽는다 */
 export function getRawSetting(key: string): string | null {
-  if (cache.has(key)) {
-    const v = cache.get(key);
-    return typeof v === 'string' ? v : JSON.stringify(v);
-  }
-  try { return localStorage.getItem(key); } catch { return null; }
+  const v = cache.get(key);
+  if (v != null) return typeof v === 'string' ? v : JSON.stringify(v);
+  try {
+    const raw = localStorage.getItem(key);
+    return raw === 'null' ? null : raw;   // 지워진 값이 "null" 문자열로 남아 있던 경우 방어
+  } catch { return null; }
 }
 
 /** 저장 — 캐시·로컬 사본·DB 순. DB 저장 실패는 조용히 무시(로컬은 남는다) */

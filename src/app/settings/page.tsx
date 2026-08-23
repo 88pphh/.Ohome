@@ -1479,9 +1479,18 @@ function DataPane() {
             setResetAsk(false);
             toast('초기화하는 중…');
             void resetGroups(picked)
-              .then(() => { toast('선택한 항목을 초기화했습니다 — 새로고침합니다'); })
-              .catch(() => { toast('일부 항목을 지우지 못했습니다 — 권한을 확인해 주세요'); })
-              .finally(() => setTimeout(() => window.location.reload(), 700));
+              .then(r => {
+                // 실패를 숨기면 "지웠다"고 나오는데 서버에는 그대로 남는다 — 건수를 그대로 알린다
+                if (r.failed.length) {
+                  toast(`${r.failed.length}건을 서버에서 지우지 못했습니다 — 로그인·보안 규칙을 확인해 주세요`);
+                } else if (serverOn) {
+                  toast(`서버에서 글 ${r.rows}건${r.files ? ` · 이미지 ${r.files}개` : ''}를 지웠습니다 — 새로고침합니다`);
+                } else {
+                  toast('선택한 항목을 초기화했습니다 — 새로고침합니다');
+                }
+              })
+              .catch(() => { toast('초기화에 실패했습니다 — 로그인 상태를 확인해 주세요'); })
+              .finally(() => setTimeout(() => window.location.reload(), 1400));
           } },
           { label: 'CANCEL', kind: 'ghost', onClick: () => setResetAsk(false) },
         ]} />

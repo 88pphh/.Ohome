@@ -159,7 +159,10 @@ export async function importBackup(file: File): Promise<{ dataCount: number; blo
 
 /* ---------- 초기화 ---------- */
 
-export async function resetGroups(selected: string[]): Promise<void> {
+/** 초기화 결과 — 실패를 조용히 삼키면 "지웠다"고 나오는데 DB에는 그대로 남는다 */
+export interface ResetReport { rows: number; files: number; failed: string[] }
+
+export async function resetGroups(selected: string[]): Promise<ResetReport> {
   const all = [...RESET_CONTENT, ...RESET_EXTRA];
   const keys = new Set<string>();
   for (const g of all) {
@@ -167,6 +170,7 @@ export async function resetGroups(selected: string[]): Promise<void> {
     g.keys.forEach(k => keys.add(k));
   }
 
+  const report: ResetReport = { rows: 0, files: 0, failed: [] };
   const be = backend();
   if (be) {
     // 서버 모드 — 고른 콘텐츠 컬렉션을 비우고, 설정 키는 지운다
@@ -175,17 +179,26 @@ export async function resetGroups(selected: string[]): Promise<void> {
       if (coll) {
         try {
           const rows = await be.fetchList(coll);
-          if (rows.length) await be.syncList(coll, rows, [], null);
-        } catch { /* 권한 없으면 건너뜀 */ }
+          if (rows.length) { await be.syncList(coll, rows, [], null); report.rows += rows.length; }
+        } catch { report.failed.push(coll); }
       } else {
-        try { await be.saveSetting(key, null); } catch { /* 무시 */ }
+        try { await be.saveSetting(key, null); } catch { report.failed.push(key); }
       }
+    }
+    // 업로드 이미지 전체 — 저장소 파일까지 실제로 지운다 (예전에는 참조만 사라지고 용량은 그대로였다)
+    if (selected.includes('images')) {
+      try {
+        const files = await be.listFiles();
+        for (const f of files) {
+          try { await be.deleteFile(f.ref); report.files += 1; } catch { report.failed.push(f.ref); }
+        }
+      } catch { report.failed.push('storage'); }
     }
   }
 
   keys.forEach(k => { removeSetting(k); try { localStorage.removeItem(k); } catch { /* 무시 */ } });
   if (selected.includes('images')) {
     try { indexedDB.deleteDatabase('ohome-blobs'); } catch { /* 무시 */ }
-    // 서버 Storage의 파일은 남는다 — 참조가 사라지면 보이지 않지만, 용량은 콘솔에서 정리해야 함
   }
+  return report;
 }
