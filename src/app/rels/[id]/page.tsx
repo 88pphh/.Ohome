@@ -24,6 +24,7 @@ import { ColorField } from '@/components/ui/ColorField';
 import { DragList } from '@/components/ui/DragList';
 import { BlobImg, useBlobUrl } from '@/lib/blobStore';
 import { CroppedBlobImg } from '@/components/ui/CropEditor';
+import { Lightbox } from '@/components/ui/Lightbox';
 import { useToast } from '@/components/ui/Toast';
 import { PageTitle } from '@/components/ui/PageText';
 
@@ -52,6 +53,12 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
   member: RelMember; char?: Character; isAdmin: boolean; onGo: () => void; onRemove: () => void;
   auUnregistered?: boolean;   // AU 선택 중인데 이 캐릭터의 AU 프로필이 미등록 (v1.9)
 }) {
+  const [lb, setLb] = useState<number | null>(null);
+  // 대표 이미지 = 프로필 사진 · 나머지 아트 = 아래 썸네일 줄 (없으면 줄 자체를 만들지 않는다)
+  const arts = char?.arts ?? [];
+  const rep = char?.thumbId ?? arts[0];
+  const rest = arts.filter(a => a !== rep);
+  const gallery = (rep ? [rep, ...rest] : rest).filter(Boolean);
   if (!char) return null;
   if (auUnregistered) {
     return (
@@ -64,7 +71,15 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
   return (
     <div className="panel mini-prof" onClick={onGo} style={{ cursor: 'var(--cur-pointer,pointer)' }}>
       <div className="hd">
-        <div className={`face ph ${char.thumbClass}`} />
+        {rep ? (
+          <div className="face" data-tip="클릭하면 원본 보기"
+            style={{ position: 'relative', overflow: 'hidden', cursor: 'zoom-in' }}
+            onClick={e => { e.stopPropagation(); setLb(0); }}>
+            <CroppedBlobImg fileRef={rep} crop={char.thumbCrop} />
+          </div>
+        ) : (
+          <div className={`face ph ${char.thumbClass}`} />
+        )}
         <div>
           <b>{char.name}</b>
           <small>{char.sub}{member.linkedNote ? ` · ${member.linkedNote}` : ''}</small>
@@ -84,11 +99,19 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
         {member.keywords.map(k => <span key={k} className="pill">{k}</span>)}
       </div>
       {member.desc && <div className="rel-desc">{member.desc}</div>}
-      <div className="card-thumbs">
-        {[0, 1, 2, 3].map(i => (
-          <div key={i} className={`t ph ${char.thumbClass}`}>{i === 0 && <span style={{ fontSize: 8 }}>SD</span>}</div>
-        ))}
-      </div>
+      {/* 대표를 뺀 나머지 아트 — 없으면 줄 자체를 만들지 않는다 (빈 칸이 자리를 먹지 않게) */}
+      {rest.length > 0 && (
+        <div className="card-thumbs">
+          {rest.map((r, i) => (
+            <div key={r} className="t" data-tip="클릭하면 원본 보기"
+              style={{ position: 'relative', overflow: 'hidden', cursor: 'zoom-in' }}
+              onClick={e => { e.stopPropagation(); setLb((rep ? 1 : 0) + i); }}>
+              <BlobImg fileRef={r} ph="" label="" />
+            </div>
+          ))}
+        </div>
+      )}
+      {lb !== null && <Lightbox srcs={gallery} index={lb} onClose={() => setLb(null)} />}
       <div className="foot">
         <span>{char.name}</span>
         <span>
@@ -204,7 +227,12 @@ export default function RelDetailPage() {
   const auCpTag: RelCpTag | undefined = au?.cp ?? rel?.cp;
   const qaOn = (isBaseAu ? rel?.qaEnabled : au?.qaEnabled) ?? auQuestions.length > 0;
   const curQa: QaEntry | undefined = auQuestions.find(q => q.no === (qaNo ?? auQuestions[0]?.no));
-  const single = oneMode ?? rel?.illustMode === 'one';
+  // 전신이 하나도 등록되지 않았으면 전신 모드를 두지 않는다 —
+  // 빈 자리에 「○○ 전신」 자리표시자를 세우는 대신 대표 일러스트만 보여 준다 (사용자 확정)
+  const fullRefOf = (cid: string) =>
+    (isBaseAu ? rel?.members.find(x => x.charId === cid)?.fullImgId : au?.fulls?.[cid]);
+  const hasFull = !!rel?.members.some(m => fullRefOf(m.charId));
+  const single = hasFull ? (oneMode ?? rel?.illustMode === 'one') : true;
 
   // 멤버 캐릭터 — AU 선택 시 그 캐릭터의 AU 프로필(이름·사진 등)로 합성해 표시 (v1.9)
   const auCharKey = rel && !isBaseAu && au ? `${rel.id}:${au.id}` : null;
@@ -490,13 +518,12 @@ export default function RelDetailPage() {
               const m = rel.members.find(x => x.charId === cid);
               // AU는 자기 전신만 — base 전신을 물려받지 않음 (v1.9 사용자 확정)
               const fullRef = isBaseAu ? m?.fullImgId : au?.fulls?.[cid];
+              if (!fullRef) return null;   // 등록 안 된 전신은 자리도 만들지 않는다
               const front = (rel.fullFront ?? pairSlots[1]?.charId) === cid;
               return (
-                <div key={i} className={`fb fb-${i === 0 ? 'l' : 'r'} ${fullRef ? '' : `ph ${charOf(cid)?.thumbClass ?? (i === 0 ? '' : 'warm')}`}`}
-                  style={fullRef ? { background: 'transparent', zIndex: front ? 3 : 2 } : undefined}>
-                  {fullRef
-                    ? <FullImg refId={fullRef} scale={m?.fullScale ?? 90} offX={m?.fullOffX ?? 0} offY={m?.fullOffY ?? 0} />
-                    : <span>{charOf(cid)?.name ?? (i === 0 ? 'A' : 'B')} 전신</span>}
+                <div key={i} className={`fb fb-${i === 0 ? 'l' : 'r'}`}
+                  style={{ background: 'transparent', zIndex: front ? 3 : 2 }}>
+                  <FullImg refId={fullRef} scale={m?.fullScale ?? 90} offX={m?.fullOffX ?? 0} offY={m?.fullOffY ?? 0} />
                 </div>
               );
             })}
@@ -517,14 +544,17 @@ export default function RelDetailPage() {
                 <div className="ph" style={{ position: 'absolute', inset: 0 }}><span>MAIN ILLUST</span></div>
               )}
             </div>
-            {/* 스위치 색 — 자관별 지정(EDIT) 없으면 테마·포인트색 (v1.9) */}
-            <div className="illu-toggle seg" style={{
-              ['--illu-bg' as string]: rel.illuBg,
-              ['--illu-on' as string]: rel.illuOn,
-            } as React.CSSProperties}>
-              <button className={!single ? 'on' : ''} onClick={() => setOneMode(false)}>전신</button>
-              <button className={single ? 'on' : ''} onClick={() => setOneMode(true)}>일러스트</button>
-            </div>
+            {/* 스위치 색 — 자관별 지정(EDIT) 없으면 테마·포인트색 (v1.9).
+                전신이 하나도 없으면 고를 것이 없으므로 스위치 자체를 숨긴다 */}
+            {hasFull && (
+              <div className="illu-toggle seg" style={{
+                ['--illu-bg' as string]: rel.illuBg,
+                ['--illu-on' as string]: rel.illuOn,
+              } as React.CSSProperties}>
+                <button className={!single ? 'on' : ''} onClick={() => setOneMode(false)}>전신</button>
+                <button className={single ? 'on' : ''} onClick={() => setOneMode(true)}>일러스트</button>
+              </div>
+            )}
           </div>
           {pairSlots[1]
             ? <MiniProf member={pairSlots[1]} char={charOf(pairSlots[1].charId)} isAdmin={isAdmin}
@@ -798,7 +828,8 @@ export default function RelDetailPage() {
           <h4>로그 <span className="more" onClick={() => router.push('/trpg')}>더보기 ›</span></h4>
           {relLogs.length > 0 ? relLogs.map(l => (
             <div key={l.id} className="dday-row" style={{ cursor: 'var(--cur-pointer,pointer)' }} onClick={() => router.push(`/trpg/${l.id}`)}>
-              <span>№{l.no} {l.title}</span>
+              {/* 번호 없이 제목만 — 연동 리스트에서는 순번이 의미가 없다 (사용자 확정) */}
+              <span>{l.title}</span>
               <b style={{ fontSize: 11, color: 'var(--faint)' }}>{l.date?.replace(/-/g, '.') ?? ''}</b>
             </div>
           )) : <p className="hint" style={{ margin: 0 }}>연동된 로그가 없습니다 — 로그 등록 시 자관을 선택하면 여기에 표시</p>}
