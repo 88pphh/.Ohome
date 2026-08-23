@@ -49,7 +49,7 @@ import { putBlob } from '@/lib/blobStore';
 import { getSetting, setSetting, pushLocalSettings, unsyncedSettingKeys, SETTING_KEYS } from '@/lib/settingStore';
 import { isServerMode, createBackend, backend } from '@/lib/backend';
 import type { BackendConfig, BackendKind } from '@/lib/backend/types';
-import { validateConfig, configFileText, saveLocalConfig, parseFirebaseSnippet } from '@/lib/serverConfig';
+import { validateConfig, configFileText, saveLocalConfig, parseFirebaseSnippet, serverConfig } from '@/lib/serverConfig';
 import { migrateTo, findOrphanFiles } from '@/lib/transfer';
 
 const CATEGORIES = [
@@ -808,6 +808,17 @@ function MemberPane() {
 
   const members = useMembers();
   const serverOn2 = isServerMode();
+  // 계정 삭제는 서비스 콘솔에서만 가능 — 바로 열 수 있게 이 홈의 프로젝트 주소를 만들어 둔다
+  const authConsoleUrl = (() => {
+    const c = serverConfig();
+    if (c?.kind === 'firebase') return `https://console.firebase.google.com/project/${c.projectId}/authentication/users`;
+    if (c?.kind === 'supabase') {
+      const m = c.url.match(/^https:\/\/([a-z0-9-]+)\.supabase\.co/i);
+      return m ? `https://supabase.com/dashboard/project/${m[1]}/auth/users` : '';
+    }
+    return '';
+  })();
+  const [delMember, setDelMember] = useState<{ id: string; nickname: string } | null>(null);
   const registry = (() => {
     try { return JSON.parse(localStorage.getItem('ohome.mockreg.v1') ?? '{}') as Record<string, unknown>; } catch { return {}; }
   })();
@@ -831,6 +842,7 @@ function MemberPane() {
     });
   };
   const allTags = [...new Set(Object.values(mTags).flat())];
+  const isAdminOf = (m: { id: string; role?: string }) => m.role === 'admin' || m.id === 'admin';
   const filteredMembers = members.filter(m => {
     if (removedIds.includes(m.id)) return false;   // 방금 지운 회원 (목록은 한 번만 받아 온다)
     const k = mq.trim().toLowerCase();
@@ -838,7 +850,9 @@ function MemberPane() {
     if (filterTag && !tags.includes(filterTag)) return false;
     return !k || m.nickname.toLowerCase().includes(k) || m.id.toLowerCase().includes(k)
       || tags.some(t => t.toLowerCase().includes(k));
-  });
+  })
+    // 관리자를 맨 위로 (사용자 요청) — 그 다음은 이름순
+    .sort((a, b) => (isAdminOf(a) ? 0 : 1) - (isAdminOf(b) ? 0 : 1) || a.nickname.localeCompare(b.nickname));
   const pageMembers = filteredMembers.slice((mPage - 1) * PER_MEMBERS, mPage * PER_MEMBERS);
 
   return (
@@ -914,33 +928,21 @@ function MemberPane() {
               <span className="fx" style={{ fontSize: 10 }} data-tip="태그 추가"
                 onClick={() => { setTagFor(m.id); setTagInput(''); }}>＋</span>
             )}
-            <span className="pill" style={{ marginLeft: 'auto' }}>{m.id === 'admin' ? '관리자' : '회원'}</span>
-            {!isBase && (
+            <span className="pill" style={{ marginLeft: 'auto' }}>{isAdminOf(m) ? '관리자' : '회원'}</span>
+            {!isBase && !isAdminOf(m) && (
               // 회원 뱃지(.pill)와 같은 규격 — padding·글씨·radius 동일 (v1.9)
               <button className="btn btn-ghost" style={{ padding: '4px 11px', fontSize: 10.5, borderRadius: 20, lineHeight: 'normal', letterSpacing: '.04em' }}
-                onClick={() => del.ask(
-                  serverOn2 ? `회원 「${m.nickname}」를 목록에서 지우시겠습니까?` : `회원 「${m.nickname}」 계정을 삭제하시겠습니까?`,
-                  () => {
-                    // 서버 모드 — 회원 목록(profiles)에서 지운다. 로그인 계정은 서비스 소관이라 못 지운다.
-                    if (serverOn2) {
-                      void backend()?.deleteMember(m.id)
-                        .then(() => {
-                          setRemovedIds(v => [...v, m.id]);
-                          toast('회원 목록에서 지웠습니다 — 로그인 계정은 서비스 콘솔에서 지워 주세요');
-                        })
-                        .catch(() => toast('지우지 못했습니다 — 관리자 계정으로 로그인했는지 확인해 주세요'));
-                      return;
-                    }
+                onClick={() => {
+                  // 서버 모드는 계정 삭제가 콘솔 소관이라 안내를 거치는 모달로 (사용자 확정)
+                  if (serverOn2) { setDelMember({ id: m.id, nickname: m.nickname }); return; }
+                  del.ask(`회원 「${m.nickname}」 계정을 삭제하시겠습니까?`, () => {
                     const reg = { ...registry };
                     delete reg[m.id];
                     try { localStorage.setItem('ohome.mockreg.v1', JSON.stringify(reg)); } catch { /* 무시 */ }
                     setRegVer(v => v + 1);
                     toast('계정이 삭제되었습니다');
-                  },
-                  serverOn2
-                    ? '홈의 회원 목록에서만 사라집니다. 로그인 계정 자체는 Firebase Authentication(또는 Supabase Auth) 콘솔에서 지워야 하고, 지우지 않으면 그 사람은 계속 로그인할 수 있습니다. 작성한 글은 그대로 남습니다.'
-                    : '이 계정으로 다시 로그인할 수 없게 됩니다. 작성한 글은 그대로 남습니다.',
-                )}>DELETE</button>
+                  }, '이 계정으로 다시 로그인할 수 없게 됩니다. 작성한 글은 그대로 남습니다.');
+                }}>DELETE</button>
             )}
           </div>
         );
@@ -953,6 +955,43 @@ function MemberPane() {
           <Pager page={mPage} total={Math.ceil(filteredMembers.length / PER_MEMBERS)} onChange={setMPage} />
         </div>
       )}
+      {/* 회원 내보내기 — 계정 삭제는 콘솔에서만 되므로 두 단계를 한 흐름으로 안내 (v2.0 사용자 확정) */}
+      <ConfirmModal open={delMember !== null} title={`회원 「${delMember?.nickname ?? ''}」 내보내기`}
+        wide
+        body={
+          <div style={{ display: 'grid', gap: 10 }}>
+            <p style={{ margin: 0 }}>
+              <b>① 먼저 로그인 계정을 지웁니다.</b><br />
+              계정 삭제는 관리자 권한이 필요한 작업이라 홈에서는 할 수 없습니다
+              (그럴 수 있게 만들면 홈에 넣은 관리자 키가 공개돼 누구나 남의 계정을 지울 수 있게 됩니다).
+              아래 버튼으로 콘솔을 열어 <b>{delMember?.nickname}</b> 계정을 지워 주세요.
+            </p>
+            <p style={{ margin: 0 }}>
+              <b>② 그다음 목록에서 지웁니다.</b><br />
+              계정을 지우지 않고 목록에서만 지우면 <b>그 사람은 계속 로그인할 수 있습니다.</b>
+              작성한 글은 어느 쪽이든 그대로 남습니다.
+            </p>
+          </div>
+        }
+        onClose={() => setDelMember(null)}
+        buttons={[
+          ...(authConsoleUrl ? [{
+            label: '① 콘솔에서 계정 지우기 ↗', kind: 'dark' as const,
+            onClick: () => window.open(authConsoleUrl, '_blank', 'noopener'),
+          }] : []),
+          {
+            label: '② 목록에서 지우기', kind: 'accent' as const,
+            onClick: () => {
+              const t = delMember;
+              setDelMember(null);
+              if (!t) return;
+              void backend()?.deleteMember(t.id)
+                .then(() => { setRemovedIds(v => [...v, t.id]); toast('회원 목록에서 지웠습니다'); })
+                .catch(() => toast('지우지 못했습니다 — 관리자 계정으로 로그인했는지 확인해 주세요'));
+            },
+          },
+          { label: 'CANCEL', kind: 'ghost' as const, onClick: () => setDelMember(null) },
+        ]} />
       {del.element}
     </div>
   );
@@ -1353,7 +1392,7 @@ function DataPane() {
       {/* Firebase Storage는 다른 주소에서 파일을 읽는 것을 기본적으로 막는다 —
           홈에서 보는 데는 지장이 없지만 백업·이전은 파일을 직접 받아와야 해서 한 번 열어 줘야 한다 */}
       {serverOn && backend()?.kind === 'firebase' && (
-        <p className="hint" style={{ margin: '-2px 0 12px' }}>
+        <p className="hint" style={{ margin: '10px 0 16px' }}>
           Firebase는 <b>저장소 CORS를 한 번 열어야</b> 백업 zip에 이미지가 담깁니다 — 안 하면 글·설정만 담깁니다.
           설치 가이드의 「백업」 항목에 브라우저에서 끝내는 방법이 있습니다.
         </p>

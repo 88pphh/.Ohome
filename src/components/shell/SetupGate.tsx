@@ -77,6 +77,12 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
       }
     : { kind: 'supabase', url: sbUrl.trim(), anonKey: sbKey.trim() });
 
+  // 저장소 CORS 열기 명령 — 입력한 버킷 이름을 그대로 넣어 준다 (백업에 이미지가 담기려면 필요)
+  const corsCmd = [
+    `echo '[{"origin":["*"],"method":["GET"],"maxAgeSeconds":3600}]' > cors.json`,
+    `gcloud storage buckets update gs://${fb.storageBucket.trim() || `${fb.projectId.trim() || '내프로젝트'}.firebasestorage.app`} --cors-file=cors.json`,
+  ].join('\n');
+
   const restore = async (f: File) => {
     setErr(''); setBusy(true);
     try {
@@ -293,6 +299,21 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
                       <b>4. 웹 앱 등록</b> → ⚙️ <b>프로젝트 설정 → 일반 → 맨 아래 「내 앱」 → 앱 추가 → 웹</b>
                       <em className="warn">왼쪽 메뉴의 「App Hosting(앱 호스팅)」이 아닙니다.</em>
                       <em>그건 홈을 Firebase에서 직접 굴리는 기능인데, 이 홈은 이미 Vercel에 올라가 있어 쓰지 않습니다.</em>
+                    </li>
+                    <li>
+                      <b>5. 저장소 CORS 열기</b> <span className="warn">(백업을 쓰려면 필요 — 지금 해 두면 편합니다)</span>
+                      <em>Firebase Storage는 다른 주소에서 파일을 <b>읽어 가는 것</b>을 기본적으로 막습니다. 홈에서 그림 보는 데는 지장이 없지만, <b>백업 zip을 만들 때 이미지가 통째로 빠집니다.</b></em>
+                      <em>
+                        <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer">Google Cloud Console</a>
+                        에서 이 프로젝트를 고르고 오른쪽 위 <b>{'>_'} (Cloud Shell)</b>을 연 뒤, 아래 두 줄을 붙여넣고 Enter — 설치할 프로그램은 없습니다.
+                      </em>
+                      <div className="setup-row" style={{ marginTop: 6 }}>
+                        <button className="btn btn-ghost" onClick={() => copy(corsCmd, 'cors')}>
+                          {copied === 'cors' ? '복사됨 ✓' : '명령어 복사'}
+                        </button>
+                      </div>
+                      <pre className="setup-sql" style={{ maxHeight: 92, marginTop: 6 }}>{corsCmd}</pre>
+                      <em>여는 것은 <b>읽기(GET)뿐</b>이고, 이미 공개된 이미지라 새로 위험해지는 것은 없습니다. 나중에 해도 되지만 그때까지의 백업에는 이미지가 빠집니다.</em>
                     </li>
                   </ul>
                 </li>

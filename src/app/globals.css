@@ -671,7 +671,7 @@ a{color:inherit;text-decoration:none}
 .setup-box.wide{width:min(620px,100%)}
 /* 단계 목록 — 실제 순서가 있는 절차라 번호를 붙인다 */
 .setup-steps{list-style:none;counter-reset:st;margin:22px 0 0;padding:0;display:grid;gap:22px}
-.setup-steps > li{counter-increment:st;position:relative;padding-left:38px}
+.setup-steps > li{counter-increment:st;position:relative;padding-left:38px;min-width:0}
 .setup-steps > li::before{
   content:counter(st);position:absolute;left:0;top:0;width:25px;height:25px;border-radius:50%;
   display:grid;place-items:center;font-size:calc(11.5px*var(--fs,1));font-weight:700;
@@ -691,6 +691,7 @@ a{color:inherit;text-decoration:none}
   padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius-s);
   background:var(--panel-solid,rgba(255,255,255,.03));
   font-size:calc(12px*var(--fs,1));line-height:1.6;
+  min-width:0;   /* 그리드 칸은 기본이 내용 너비 — 안 주면 안쪽 명령어 블록이 카드를 밀어 넓힌다 */
 }
 .setup-picks em{
   display:block;font-style:normal;margin-top:3px;
