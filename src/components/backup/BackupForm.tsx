@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLocalList, newId, FoldType } from '@/lib/postStore';
 import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
 import { useBoardSettings, DEFAULT_GALLERY_CATS } from '@/lib/boardStore';
+import { useConfirmDelete } from '@/components/ui/Modal';
 import { Visibility } from '@/lib/charStore';
 import { KInput, KSelect, KRadio, KCheck, KDate } from '@/components/ui/Kit';
 import { RichEditor } from '@/components/ui/RichEditor';
@@ -55,6 +56,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
       crop: i === 0 ? initial?.thumbCrop : undefined,
     })));
   const [desc, setDesc] = useState(initial?.desc ?? '');
+  const del = useConfirmDelete();   // 이미지 제거도 되돌릴 수 없어 경고를 거친다
   // 갤러리 말머리 — 환경설정 > 게시판 관리에서 관리 (v2.0)
   const { st: boardSet } = useBoardSettings();
   const galleryCats = boardSet.galleryCats.length ? boardSet.galleryCats : DEFAULT_GALLERY_CATS;
@@ -177,7 +179,8 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
                 <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 10, whiteSpace: 'nowrap' }}
                   onClick={() => setCropFor(f)}>✂ 썸네일</button>
                 <span className="fx" data-tip="제거"
-                  onClick={() => setFiles(l => l.filter(x => x.id !== f.id))}>✕</span>
+                  onClick={() => del.ask('이 이미지를 목록에서 빼시겠습니까?',
+                    () => setFiles(l => l.filter(x => x.id !== f.id)), f.name)}>✕</span>
               </div>
             )}
           />
@@ -230,6 +233,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
         </div>
       </div>
 
+      {del.element}
       {cropFor && (
         <CropModal f={cropFor}
           onClose={() => setCropFor(null)}

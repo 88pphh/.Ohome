@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { CharGrant } from '@/lib/charStore';
 import { useMembers } from '@/lib/members';
 import { KInput } from '@/components/ui/Kit';
+import { useConfirmDelete } from '@/components/ui/Modal';
 
 // 드롭다운 예상 높이 — 위/아래 자동 판정용 (maxHeight 180 + 패딩)
 const POP_H = 192;
@@ -16,6 +17,7 @@ export function GrantsEditor({ value, onChange }: {
   onChange: (next: CharGrant[]) => void;
 }) {
   const pool = useMembers().filter(p => p.id !== 'admin'); // 관리자는 항상 전권
+  const del = useConfirmDelete();   // 권한 해제도 되돌릴 수 없는 동작이라 경고를 거친다
   const [q, setQ] = useState('');
   // 드롭다운은 body 포털(fixed) — 카드 overflow에 잘리지 않고, 아래 공간이 없으면 위로 (v1.9 수정)
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -93,13 +95,16 @@ export function GrantsEditor({ value, onChange }: {
               <button className={g.level === 'edit' ? 'on' : ''} onClick={() => setLevel(g.userId, 'edit')}>편집까지</button>
             </div>
             <span className="fx" style={{ cursor: 'var(--cur-pointer,pointer)' }} data-tip="권한 해제"
-              onClick={() => remove(g.userId)}>✕</span>
+              onClick={() => del.ask(`「${g.member!.nickname}」의 권한을 해제하시겠습니까?`,
+                () => remove(g.userId),
+                '이 회원은 더 이상 이 캐릭터로 역극에 참여하거나 편집할 수 없습니다.')}>✕</span>
           </div>
         </div>
       ))}
       {granted.length === 0 && (
         <p className="hint" style={{ margin: 0 }}>권한을 준 회원이 없습니다 — 위에서 검색해 추가</p>
       )}
+      {del.element}
     </div>
   );
 }

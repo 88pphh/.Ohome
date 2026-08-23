@@ -6,6 +6,7 @@ import { Visibility } from '@/lib/charStore';
 import { newId } from '@/lib/postStore';
 import { KInput, KTextarea, KSelect, KDate } from '@/components/ui/Kit';
 import { DragList } from '@/components/ui/DragList';
+import { useConfirmDelete } from '@/components/ui/Modal';
 import { putBlob, useBlobUrl } from '@/lib/blobStore';
 import { useToast } from '@/components/ui/Toast';
 
@@ -39,6 +40,7 @@ export function DiaryForm({ initial, moods, onSave, onCancel }: {
   const [body, setBody] = useState(initial?.body ?? '');
   const [imgs, setImgs] = useState<ImgItem[]>(() => (initial?.imgIds ?? []).map(r => ({ id: newId(), ref: r })));
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? 'public');
+  const del = useConfirmDelete();   // 이미지 제거도 경고를 거친다
 
   const save = async () => {
     if (!title.trim()) { toast('제목을 입력해 주세요'); return; }
@@ -84,7 +86,8 @@ export function DiaryForm({ initial, moods, onSave, onCancel }: {
                 <span className="drag-h">⠿</span>
                 <ImgThumb item={i} />
                 <span className="fx" style={{ marginLeft: 'auto' }}
-                  onClick={() => setImgs(l => l.filter(x => x.id !== i.id))}>✕</span>
+                  onClick={() => del.ask('이 이미지를 빼시겠습니까?',
+                    () => setImgs(l => l.filter(x => x.id !== i.id)))}>✕</span>
               </div>
             )} />
         )}
@@ -116,6 +119,7 @@ export function DiaryForm({ initial, moods, onSave, onCancel }: {
           </button>
         </div>
       </div>
+      {del.element}
     </div>
   );
 }
