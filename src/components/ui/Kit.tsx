@@ -53,12 +53,16 @@ export function FitText({ children, min, minRatio = 0.85, className, style }: {
   className?: string; style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const baseRef = useRef<number | null>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const fit = () => {
-      el.style.fontSize = '';                       // 기준 크기에서 다시 계산
-      const base = parseFloat(getComputedStyle(el).fontSize) || 14;
+      // 기준 크기는 처음 한 번만 잰다. 인라인 크기를 지우고 다시 재면
+      // 호출한 쪽이 style로 준 크기까지 날아가 상속값(작은 값)을 기준으로 삼게 된다.
+      if (baseRef.current == null) baseRef.current = parseFloat(getComputedStyle(el).fontSize) || 14;
+      const base = baseRef.current;
+      el.style.fontSize = `${base}px`;              // 기준 크기에서 다시 계산
       const floor = min ?? base * minRatio;
       let size = base;
       while (size > floor && el.scrollWidth > el.clientWidth + 1) {

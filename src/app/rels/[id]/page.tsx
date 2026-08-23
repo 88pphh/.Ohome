@@ -18,7 +18,7 @@ import { GrantsEditor } from '@/components/chars/GrantsEditor';
 import { TrpgLog, TRPG_SEED } from '@/lib/galleryStore';
 import { RpRoom, RP_SEED } from '@/lib/rpStore';
 import { useFonts } from '@/lib/fontStore';
-import { Tip, KInput, KTextarea, KSelect, KRadio, FitText } from '@/components/ui/Kit';
+import { Tip, KInput, KTextarea, KSelect, KRadio } from '@/components/ui/Kit';
 import { Modal, ConfirmModal, useConfirmDelete } from '@/components/ui/Modal';
 import { ColorField } from '@/components/ui/ColorField';
 import { DragList } from '@/components/ui/DragList';
@@ -125,9 +125,11 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side,
           <div className={`face ph ${char.thumbClass}`} />
         )}
         <div>
-          {/* 이름 폰트는 캐릭터 프로필에서 지정한 것을 그대로 쓴다.
-              긴 이름이 두 줄로 갈라지지 않게 한 줄에 맞춰 줄인다 (사용자 요청) */}
-          <b><FitText style={{ fontFamily: familyOf(char.fontId) }}>{char.name}</FitText></b>
+          {/* 이름 폰트는 캐릭터 프로필에서 지정한 것을 그대로 쓰고,
+              크기는 이 자관에서 정한 값 (자관 수정의 「이름 크기」 — 기본 17px, v2.0) */}
+          <b style={{ fontFamily: familyOf(char.fontId), fontSize: member.nameSize ?? undefined }}>
+            {char.name}
+          </b>
           <small>{char.sub}{member.linkedNote ? ` · ${member.linkedNote}` : ''}</small>
         </div>
       </div>

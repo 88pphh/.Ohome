@@ -10,7 +10,7 @@ import { CP_LABEL } from '@/lib/relqStore';
 import { newId } from '@/lib/postStore';
 import { useFonts } from '@/lib/fontStore';
 import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
-import { KInput, KSelect, KCheck } from '@/components/ui/Kit';
+import { KInput, KSelect, KCheck, KStep } from '@/components/ui/Kit';
 import { CropEditor, CropValue, CropImg } from '@/components/ui/CropEditor';
 import { DragList } from '@/components/ui/DragList';
 import { Lightbox } from '@/components/ui/Lightbox';
@@ -44,6 +44,7 @@ export interface RelFormValue {
   fullScales?: Record<string, number>;         // 전신 크기 % (휠 조절)
   fullOffsets?: Record<string, { x: number; y: number }>; // 전신 위치 오프셋 % (드래그, v1.9)
   quotes?: Record<string, string>;                              // 히어로 좌/우 한마디 문구 (v2.0)
+  nameSizes?: Record<string, number>;                           // 멤버 카드 이름 크기 px (v2.0)
   quoteColors?: Record<string, { fg?: string; mark?: string }>; // 히어로 대사 글씨/따옴표색 (페어, v1.9)
   fullFront?: string;                          // 앞에 보일 캐릭터 id
   pickedCharIds: string[];   // 등록 시 연동할 내 캐릭터 (수정 모드에선 빈 배열)
@@ -214,6 +215,9 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
   // 히어로 좌/우 한마디 — 색만 정할 수 있고 문구를 고칠 곳이 없었다 (v2.0 사용자 발견)
   const [quotes, setQuotes] = useState<Record<string, string>>(
     () => Object.fromEntries(pairMembers.map(m => [m.charId, m.quote ?? ''])));
+  // 멤버 카드 이름 크기 (v2.0) — 카드 폭이 좁아 이름마다 알맞은 크기가 다르다
+  const [nameSizes, setNameSizes] = useState<Record<string, number>>(
+    () => Object.fromEntries(pairMembers.map(m => [m.charId, m.nameSize ?? 17])));
   // 히어로 대사 글씨/따옴표색 (페어, v1.9)
   const [quoteColors, setQuoteColors] = useState<Record<string, { fg?: string; mark?: string }>>(
     () => Object.fromEntries(pairMembers.map(m => [m.charId, { fg: m.quoteColor, mark: m.quoteMarkColor }])));
@@ -285,6 +289,7 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
       fullScales: pairMembers.length ? fullScales : undefined,
       fullOffsets: pairMembers.length ? fullOffsets : undefined,
       quotes: pairMembers.length ? quotes : undefined,
+      nameSizes: pairMembers.length ? nameSizes : undefined,
       quoteColors: pairMembers.length ? quoteColors : undefined,
       fullFront,
       pickedCharIds: picked,
@@ -460,6 +465,17 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                 <KInput value={quotes[m.charId] ?? ''}
                   onChange={e => setQuotes(s => ({ ...s, [m.charId]: e.target.value }))}
                   placeholder="비우면 표시하지 않습니다" style={{ flex: 1 }} />
+              </div>
+            ))}
+
+            {/* 멤버 카드 이름 크기 (v2.0 사용자 확정) — 자동으로 줄이지 않고 직접 정한다 */}
+            <label className="k-label" style={{ margin: '10px 0 0' }}>이름 크기 — 멤버 카드</label>
+            {pairMembers.map((m, i) => (
+              <div key={m.charId} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <b style={{ fontSize: 12, width: 92, flexShrink: 0 }}>{i === 0 ? '왼쪽' : '오른쪽'} · {memberNames?.[m.charId] ?? m.charId}</b>
+                <KStep value={nameSizes[m.charId] ?? 17}
+                  onChange={(v: number) => setNameSizes(s => ({ ...s, [m.charId]: v }))}
+                  min={10} max={32} step={1} suffix="px" />
               </div>
             ))}
 

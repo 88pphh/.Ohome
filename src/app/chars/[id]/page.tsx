@@ -14,7 +14,6 @@ import { useTheme } from '@/lib/ThemeProvider';
 import { createPortal } from 'react-dom';
 import { BlobImg, useBlobUrl } from '@/lib/blobStore';
 import { CroppedBlobImg, CropEditor, type CropValue } from '@/components/ui/CropEditor';
-import { FitText } from '@/components/ui/Kit';
 
 import { EditableDesc, PageTitle } from '@/components/ui/PageText';
 import { ConfirmModal } from '@/components/ui/Modal';
@@ -242,11 +241,12 @@ function CharDetailInner() {
 
         {/* 우측 정보 패널 — 최상단 캐릭터 이름 크게 (v1.6) · AU면 그 AU의 이름·폰트 */}
         <div className="panel profile-info" ref={infoRef} style={{ fontFamily: familyOf(eff.bodyFontId) }}>
-          {/* 긴 이름이 두 줄로 갈라지지 않게 한 줄에 맞춰 줄인다 (사용자 요청) */}
-          <FitText style={{
-            fontFamily: familyOf(eff.fontId) ?? 'var(--serif)', fontSize: 38,
+          {/* 크기는 캐릭터마다 직접 정한다 (등록·수정의 「이름 크기」) — 자동으로 줄이면
+              이름 길이에 따라 어중간해져서, 정한 크기를 그대로 쓴다 (v2.0 사용자 확정) */}
+          <div style={{
+            fontFamily: familyOf(eff.fontId) ?? 'var(--serif)', fontSize: eff.nameSize ?? 38,
             fontWeight: 600, letterSpacing: '.2em', lineHeight: 1.1,
-          }}>{eff.name}</FitText>
+          }}>{eff.name}</div>
           <div className="sub" style={{ marginBottom: 14 }}>{eff.sub}</div>
 
           {tab === 'basic' ? (

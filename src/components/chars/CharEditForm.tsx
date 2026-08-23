@@ -8,7 +8,7 @@ import { GrantsEditor } from '@/components/chars/GrantsEditor';
 import { newId } from '@/lib/postStore';
 import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
 import { useFonts } from '@/lib/fontStore';
-import { KInput, KSelect } from '@/components/ui/Kit';
+import { KInput, KSelect, KStep } from '@/components/ui/Kit';
 import { RichEditor } from '@/components/ui/RichEditor';
 import { ColorField } from '@/components/ui/ColorField';
 import { CropEditor, CropValue, CropImg } from '@/components/ui/CropEditor';
@@ -49,6 +49,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [themeMode, setThemeMode] = useState<'default' | 'custom'>(initial?.themeMode ?? 'default');
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? 'public');
   const [fontId, setFontId] = useState(initial?.fontId ?? 'serif');
+  const [nameSize, setNameSize] = useState(initial?.nameSize ?? 38);   // 상세 큰 이름 크기 (v2.0)
   const [bodyFontId, setBodyFontId] = useState(initial?.bodyFontId ?? 'default');
   const [specs, setSpecs] = useState<SpecRow[]>(
     (initial?.specs ?? [{ label: '성별', value: '' }, { label: '키', value: '' }]).map(s => ({ ...s, id: newId() })));
@@ -98,6 +99,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       basicHtml,
       visibility,
       fontId,
+      nameSize,
       bodyFontId,
       thumbClass: initial?.thumbClass ?? '',
       arts: artIds,
@@ -298,6 +300,11 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
                 label: <span style={{ fontFamily: f.family }}>{f.name}</span>,
               }))} />
             <p className="hint" style={{ margin: 0 }}>이름 폰트 — 리스트·상세 이름에 적용</p>
+            {/* 이름 길이가 제각각이라 자동으로 줄이면 어중간해진다 — 캐릭터마다 직접 정한다 (v2.0) */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span className="k-label" style={{ margin: 0, flex: 1 }}>상세 이름 크기</span>
+              <KStep value={nameSize} onChange={setNameSize} min={14} max={72} step={1} suffix="px" />
+            </div>
             <KSelect value={bodyFontId} onChange={setBodyFontId}
               options={fonts.map(f => ({
                 value: f.id,
