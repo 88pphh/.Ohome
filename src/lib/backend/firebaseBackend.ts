@@ -32,7 +32,18 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
   const auth = authMod.getAuth(app);
   // 콘솔에서 데이터베이스를 (default)가 아닌 이름으로 만든 경우를 위해 ID를 받는다
   const dbId = (cfg.databaseId ?? '').trim();
-  const db = dbId && dbId !== '(default)' ? fsMod.getFirestore(app, dbId) : fsMod.getFirestore(app);
+  const named = !!dbId && dbId !== '(default)';
+  // ignoreUndefinedProperties — 화면 데이터에는 값이 없는 필드가 undefined로 남는데(grants 등),
+  // JSON 저장에서는 자동으로 빠지지만 Firestore는 거부한다. 같은 동작이 되도록 건너뛰게 한다.
+  const db = (() => {
+    const opts = { ignoreUndefinedProperties: true };
+    try {
+      return named ? fsMod.initializeFirestore(app, opts, dbId) : fsMod.initializeFirestore(app, opts);
+    } catch {
+      // 이미 만들어진 인스턴스가 있으면 그걸 쓴다 (백엔드를 두 번 만드는 경로)
+      return named ? fsMod.getFirestore(app, dbId) : fsMod.getFirestore(app);
+    }
+  })();
   const storage = stMod.getStorage(app);
 
   const {
