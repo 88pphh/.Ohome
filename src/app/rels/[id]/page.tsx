@@ -23,7 +23,7 @@ import { Modal, ConfirmModal, useConfirmDelete } from '@/components/ui/Modal';
 import { ColorField } from '@/components/ui/ColorField';
 import { DragList } from '@/components/ui/DragList';
 import { BlobImg, useBlobUrl } from '@/lib/blobStore';
-import { CroppedBlobImg } from '@/components/ui/CropEditor';
+import { CroppedBlobImg, CropEditor, type CropValue } from '@/components/ui/CropEditor';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { useToast } from '@/components/ui/Toast';
 import { PageTitle } from '@/components/ui/PageText';
@@ -40,6 +40,15 @@ function FullImg({ refId, scale, offX = 0, offY = 0 }: { refId: string; scale: n
       filter: 'drop-shadow(0 8px 18px rgba(0,0,0,.35))',
     }} />
   );
+}
+
+/** 얼굴칸(1:1) 크롭 편집기 — 파일 참조를 주소로 바꿔 CropEditor에 넘긴다 (v2.0) */
+function FaceCropModal({ fileRef, crop, onClose, onApply }: {
+  fileRef: string; crop?: CropValue; onClose: () => void; onApply: (c: CropValue) => void;
+}) {
+  const url = useBlobUrl(fileRef);
+  if (!url) return null;
+  return <CropEditor open src={url} aspect="1:1" initial={crop} onClose={onClose} onApply={onApply} />;
 }
 
 /** 캐릭터 대표 이미지 — 등록돼 있으면 실제 이미지, 없을 때만 기존 플레이스홀더 */
@@ -62,11 +71,12 @@ function rgbTriple(hex: string): string {
   return `${parseInt(f.slice(0, 2), 16)},${parseInt(f.slice(2, 4), 16)},${parseInt(f.slice(4, 6), 16)}`;
 }
 
-function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side, onMoveSide }: {
+function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side, onMoveSide, onFaceCrop }: {
   member: RelMember; char?: Character; isAdmin: boolean; onGo: () => void; onRemove: () => void;
   auUnregistered?: boolean;   // AU 선택 중인데 이 캐릭터의 AU 프로필이 미등록 (v1.9)
   side?: 'l' | 'r';           // 페어에서 지금 어느 자리인지 (좌우 옮기기 메뉴용, v2.0)
   onMoveSide?: () => void;
+  onFaceCrop?: (ref: string) => void;   // 얼굴칸(1:1) 크롭 다시 잡기 (v2.0)
 }) {
   const { familyOf } = useFonts();   // 이름은 캐릭터 프로필에서 지정한 폰트로
   const [lb, setLb] = useState<number | null>(null);
@@ -107,7 +117,9 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side,
           <div className="face" data-tip="클릭하면 원본 보기"
             style={{ position: 'relative', overflow: 'hidden', cursor: 'zoom-in' }}
             onClick={e => { e.stopPropagation(); setLb(0); }}>
-            <CroppedBlobImg fileRef={rep} crop={char.thumbCrop} />
+            {/* 얼굴칸은 1:1 — 캐릭터의 3:4 썸네일 크롭을 그대로 쓰면 어긋나므로
+                자관에서 따로 잡아 둔 값이 있으면 그것을 쓴다 (우클릭 > 썸네일 위치) */}
+            <CroppedBlobImg fileRef={rep} crop={member.faceCrop ?? char.thumbCrop} />
           </div>
         ) : (
           <div className={`face ph ${char.thumbClass}`} />
@@ -150,6 +162,9 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side,
       {ctx && createPortal(
         <div className="ctx-menu on" style={{ left: ctx.x, top: ctx.y }} onClick={e => e.stopPropagation()}>
           <div className="ctx-ttl">{char.name}</div>
+          {onFaceCrop && rep && (
+            <button onClick={() => { setCtx(null); onFaceCrop(rep); }}>썸네일 위치 조정</button>
+          )}
           {onMoveSide && (
             <button onClick={() => { setCtx(null); onMoveSide(); }}>
               {side === 'r' ? '왼쪽으로 옮기기' : '오른쪽으로 옮기기'}
@@ -197,6 +212,8 @@ export default function RelDetailPage() {
   const [ansEdit, setAnsEdit] = useState<{ qNo: number; idx: number; text: string; note: string } | null>(null);
   // 질문에 대한 오너 설명 입력 모달 (v2.0)
   const [qNote, setQNote] = useState<{ no: number; text: string } | null>(null);
+  // 멤버 얼굴칸(1:1) 크롭 편집 (v2.0)
+  const [faceEdit, setFaceEdit] = useState<{ charId: string; ref: string; crop?: CropValue } | null>(null);
   // 답변 우클릭 메뉴 (v2.0) — 수정·부연·삭제
   const [ansCtx, setAnsCtx] = useState<{ x: number; y: number; idx: number } | null>(null);
   useEffect(() => {
@@ -539,6 +556,12 @@ export default function RelDetailPage() {
     updateRel({ pairRight: nowRight ? undefined : cid });
   };
 
+  /** 얼굴칸(1:1) 크롭 다시 잡기 — 캐릭터의 3:4 썸네일과 별개로 이 자관에만 저장 (v2.0) */
+  const saveFaceCrop = (cid: string, c: CropValue) => {
+    updateRel({ members: rel.members.map(m => (m.charId === cid ? { ...m, faceCrop: c } : m)) });
+    setFaceEdit(null);
+  };
+
   return (
     <section className="page page-rel-detail">
       {/* 헤더 이미지 (v1.5) — 풀폭 블러 + 아래로 페이드아웃 (이미지 없으면 데모 그라데이션)
@@ -615,6 +638,7 @@ export default function RelDetailPage() {
             ? <MiniProf member={pairSlots[0]} char={charOf(pairSlots[0].charId)} isAdmin={isAdmin}
                 auUnregistered={auUnregOf(pairSlots[0].charId)}
                 side="l" onMoveSide={() => moveSide(pairSlots[0]!.charId)}
+                onFaceCrop={ref => setFaceEdit({ charId: pairSlots[0]!.charId, ref, crop: pairSlots[0]!.faceCrop })}
                 onGo={() => router.push(charHref(pairSlots[0]!.charId))}
                 onRemove={() => removeMember(pairSlots[0]!.charId)} />
             : <EmptyCard isAdmin={isAdmin} onAdd={() => setMemberOpen(true)} />}
@@ -668,6 +692,7 @@ export default function RelDetailPage() {
             ? <MiniProf member={pairSlots[1]} char={charOf(pairSlots[1].charId)} isAdmin={isAdmin}
                 auUnregistered={auUnregOf(pairSlots[1].charId)}
                 side="r" onMoveSide={() => moveSide(pairSlots[1]!.charId)}
+                onFaceCrop={ref => setFaceEdit({ charId: pairSlots[1]!.charId, ref, crop: pairSlots[1]!.faceCrop })}
                 onGo={() => router.push(charHref(pairSlots[1]!.charId))}
                 onRemove={() => removeMember(pairSlots[1]!.charId)} />
             : <EmptyCard isAdmin={isAdmin} onAdd={() => setMemberOpen(true)} />}
@@ -1202,6 +1227,13 @@ export default function RelDetailPage() {
           );
         })(),
         document.body,
+      )}
+
+      {/* 멤버 얼굴칸(1:1) 크롭 — 캐릭터의 3:4 썸네일과 별개로 이 자관에만 저장 (v2.0) */}
+      {faceEdit && (
+        <FaceCropModal fileRef={faceEdit.ref} crop={faceEdit.crop}
+          onClose={() => setFaceEdit(null)}
+          onApply={c => saveFaceCrop(faceEdit.charId, c)} />
       )}
 
       {/* 삭제 확인 — DOM 마지막에 렌더해 다른 모달(AU 관리 등) 위에 뜨게 */}

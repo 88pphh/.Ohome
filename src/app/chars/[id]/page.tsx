@@ -185,7 +185,10 @@ function CharDetailInner() {
             <div className="profile-center"
               style={{ cursor: arts.length > 1 ? 'pointer' : undefined }}
               onClick={() => { if (arts.length > 1) setArtIdx(i => (i + 1) % arts.length); }}>
-              <BlobImg fileRef={arts[cur] ?? eff.artUrl} ph={ch.thumbClass} label="CHARACTER FULL ART" />
+              {/* 지정한 크롭 위치를 여기서도 쓴다 — 예전에는 가운데 기준으로 잘려서
+                  리스트에서 맞춰 둔 위치와 다른 곳이 보였다 (대표 아트에만 적용) */}
+              <CroppedBlobImg fileRef={arts[cur] ?? eff.artUrl} crop={cur === 0 ? eff.thumbCrop : undefined}
+                ph={ch.thumbClass} label="CHARACTER FULL ART" />
               {arts.length > 1 && (
                 <div style={{ position: 'absolute', left: 0, right: 0, bottom: 12, display: 'flex', justifyContent: 'center', gap: 5, zIndex: 3 }}>
                   {arts.map((_, i) => (
