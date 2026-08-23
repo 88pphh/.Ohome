@@ -158,6 +158,8 @@ export default function RelDetailPage() {
   const [qaText, setQaText] = useState('');
   // 답변 수정·오너 부연 모달 (v1.9) — 훅은 early return 앞에
   const [ansEdit, setAnsEdit] = useState<{ qNo: number; idx: number; text: string; note: string } | null>(null);
+  // 질문에 대한 오너 설명 입력 모달 (v2.0)
+  const [qNote, setQNote] = useState<{ no: number; text: string } | null>(null);
   const [qaChar, setQaChar] = useState<string | null>(null);
   // 다인관 — 입력 캐릭터 드롭다운 (v1.9): body 포털(fixed)로 위에 표시 — qa-today 스크롤 영역에 잘리지 않게
   const [qaPickPos, setQaPickPos] = useState<{ left: number; top: number } | null>(null);
@@ -422,6 +424,16 @@ export default function RelDetailPage() {
 
   /* ---------- 답변 수정·삭제·오너 부연 (v1.9 사용자 요청) ----------
      수정: 작성자 본인(구버전 무기록 답변은 관리자) · 삭제: 본인+관리자 · 부연(note): 관리자만 */
+  /* 질문에 대한 오너 설명 저장 (v2.0) — 비우면 지운다 */
+  const saveQNote = () => {
+    if (!qNote) return;
+    patchAuData({
+      questions: auQuestions.map(q => (q.no === qNote.no ? { ...q, note: qNote.text.trim() || undefined } : q)),
+    });
+    setQNote(null);
+    toast('질문 설명을 저장했습니다');
+  };
+
   const canEditAns = (a: QaAnswer) => (a.authorId ? a.authorId === user?.id : isAdmin);
   const canDelAns = (a: QaAnswer) => isAdmin || (!!a.authorId && a.authorId === user?.id);
   const saveAnsEdit = () => {
@@ -747,8 +759,17 @@ export default function RelDetailPage() {
             <div className="qa-today">
               {curQa ? (
                 <>
-                  <div className="qa-no">TODAY&apos;S QUESTION · Q.{String(curQa.no).padStart(3, '0')}</div>
+                  <div className="qa-no">TODAY&apos;S QUESTION · Q.{String(curQa.no).padStart(3, '0')}
+                    {/* 질문에 대한 오너 설명 — 관리자만 작성 (v2.0 사용자 요청) */}
+                    {isAdmin && (
+                      <small style={{ cursor: 'var(--cur-pointer,pointer)', color: 'var(--accent)', marginLeft: 8, fontWeight: 400, letterSpacing: 0 }}
+                        onClick={() => setQNote({ no: curQa.no, text: curQa.note ?? '' })}>
+                        {curQa.note ? '설명 수정' : '＋ 설명'}
+                      </small>
+                    )}
+                  </div>
                   <div className="qa-q">{curQa.q}</div>
+                  {curQa.note && <div className="qa-note">{curQa.note}</div>}
                   {/* 날짜만, 오른쪽 정렬 (v1.9 사용자 피드백) */}
                   <div className="qa-date" style={{ textAlign: 'right' }}>{curQa.date.replace(/-/g, '.')}</div>
                   {curQa.answers.map((a, i) => {
@@ -1072,6 +1093,23 @@ export default function RelDetailPage() {
                   style={{ minHeight: 46 }} />
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* 질문에 대한 오너 설명 (v2.0) — 답변의 부연과 달리 질문 아래에 그대로 보인다 */}
+      <Modal open={qNote !== null} onClose={() => setQNote(null)} small title="질문 설명"
+        desc="이 질문이 왜 나왔는지, 어떤 맥락인지 — 질문 아래에 그대로 표시됩니다"
+        dirty={!!qNote?.text}
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setQNote(null)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={saveQNote}>SAVE</button>
+        </>}>
+        {qNote && (
+          <div>
+            <label className="k-label" style={{ marginBottom: 5 }}>설명 (비우면 표시하지 않습니다)</label>
+            <KTextarea value={qNote.text} onChange={e => setQNote(s => s && { ...s, text: e.target.value })}
+              style={{ minHeight: 70 }} />
           </div>
         )}
       </Modal>

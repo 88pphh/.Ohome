@@ -1061,6 +1061,11 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .qa-today{display:flex;flex-direction:column;overflow:auto;padding-right:6px;scrollbar-color:#c9ccd2 transparent;scrollbar-width:thin}
 .qa-no{font-size:calc(10px*var(--fs,1));letter-spacing:.3em;color:var(--faint)}
 .qa-q{font-family:'Noto Serif KR',serif;font-size:calc(20px*var(--fs,1));font-weight:700;line-height:1.5;margin:6px 0 4px}
+/* 질문에 대한 오너 설명 — 질문 바로 아래, 답변보다 한 톤 낮게 (v2.0) */
+.qa-note{
+  font-size:calc(12px*var(--fs,1));line-height:1.75;color:var(--sub);
+  border-left:2px solid var(--line-dark);padding:2px 0 2px 10px;margin:0 0 6px;white-space:pre-wrap;
+}
 .qa-date{font-size:calc(10.5px*var(--fs,1));color:var(--faint);margin-bottom:18px}
 .qa-ans{margin-bottom:14px;--cc:93,99,109;max-width:88%}
 .qa-ans .who{font-size:calc(10px*var(--fs,1));letter-spacing:.1em;color:rgb(var(--cc));font-weight:700;margin-bottom:3px}

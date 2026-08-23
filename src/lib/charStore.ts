@@ -117,7 +117,10 @@ export interface QaAnswer {
   note?: string;      // 오너 부연설명 — 말풍선 호버 툴팁 (수정 모달에서 관리자가 작성, v1.9)
   authorId?: string;  // 작성 회원 (v1.9 — 본인 수정, 본인·관리자 삭제 판정)
 }
-export interface QaEntry { no: number; q: string; date: string; answers: QaAnswer[] }
+export interface QaEntry {
+  no: number; q: string; date: string; answers: QaAnswer[];
+  note?: string;   // 질문에 대한 오너 설명 — 질문 아래에 표시 (관리자만 작성, v2.0)
+}
 
 /** CP/NCP 구분 (v1.9) — CP=커플, NCP=커플 아님. 자관 기본값 + AU마다 별개 지정 가능 */
 export type RelCpTag = 'cp' | 'ncp';
