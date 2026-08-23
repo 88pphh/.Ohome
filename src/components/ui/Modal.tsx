@@ -80,14 +80,16 @@ export function ConfirmModal({ open, title, body, buttons, onClose, wide }: {
 /** 삭제 확인 훅 — 즉시 삭제되는 버튼에 경고 모달을 간단히 붙임.
  *  const del = useConfirmDelete();  → 버튼에서 del.ask('제목', () => 실제 삭제, '본문?');  렌더에 {del.element} */
 export function useConfirmDelete() {
-  const [req, setReq] = useState<{ title: string; body?: React.ReactNode; onYes: () => void } | null>(null);
-  const ask = (title: string, onYes: () => void, body?: React.ReactNode) => setReq({ title, onYes, body });
+  const [req, setReq] = useState<{ title: string; body?: React.ReactNode; onYes: () => void; label?: string } | null>(null);
+  // label — 삭제가 아닌 동작(건너뛰기 등)에서 확인 버튼 문구를 바꾸고 싶을 때
+  const ask = (title: string, onYes: () => void, body?: React.ReactNode, label?: string) =>
+    setReq({ title, onYes, body, label });
   const element = (
     <ConfirmModal open={req !== null} title={req?.title ?? ''}
       body={req?.body ?? '삭제하면 복구할 수 없습니다.'}
       onClose={() => setReq(null)}
       buttons={[
-        { label: 'DELETE', kind: 'accent', onClick: () => { req?.onYes(); setReq(null); } },
+        { label: req?.label ?? 'DELETE', kind: 'accent', onClick: () => { req?.onYes(); setReq(null); } },
         { label: 'CANCEL', kind: 'ghost', onClick: () => setReq(null) },
       ]} />
   );

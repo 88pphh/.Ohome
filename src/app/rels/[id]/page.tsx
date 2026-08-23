@@ -375,6 +375,30 @@ export default function RelDetailPage() {
     toast('다음 질문이 출제되었습니다');
   };
 
+  /* 질문 건너뛰기 (v2.0 사용자 요청) — 마음에 안 드는 질문을 아예 버린다.
+     대기 풀로 되돌리지 않으므로 다시 나오지 않는다. 이어서 다음 질문을 출제. */
+  const skipQuestion = () => {
+    const cur = curQa;
+    if (!cur) return;
+    del.ask('이 질문을 건너뛰시겠습니까?', () => {
+      const rest = auQuestions.filter(q => q.no !== cur.no);
+      let questions = rest;
+      let qaPool = auQaPool;
+      if (auQaPool.length > 0) {
+        const i = Math.floor(Math.random() * auQaPool.length);
+        const no = Math.max(0, cur.no, ...rest.map(x => x.no)) + 1;
+        questions = [{ no, q: auQaPool[i], date: new Date().toISOString().slice(0, 10), answers: [] }, ...rest];
+        qaPool = auQaPool.filter((_, j) => j !== i);
+      }
+      patchAuData({ questions, qaPool, qaEnabled: true });
+      setQaNo(questions[0]?.no ?? null);
+      toast(auQaPool.length > 0 ? '건너뛰고 다음 질문을 출제했습니다' : '건너뛰었습니다 — 대기 중인 질문이 없습니다');
+    }, cur.answers.length > 0
+      ? `이미 달린 답변 ${cur.answers.length}개도 함께 사라집니다. 건너뛴 질문은 다시 나오지 않습니다.`
+      : '건너뛴 질문은 다시 나오지 않습니다.',
+    '건너뛰기');
+  };
+
   // 이 캐릭터로 답할 수 있는가 — 관리자 전부, 회원은 권한(play/edit) 부여된 캐릭터만 (v1.9)
   const canAnswerAs = (cid: string) => {
     if (isAdmin) return true;
@@ -644,24 +668,31 @@ export default function RelDetailPage() {
           )}
           {isAdmin && (
             <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+              {/* 이 줄의 버튼은 홈 공통 버튼과 같은 세로 크기(35px)로 — 탭 줄에서만 작아 보이던 것 */}
               {tab === 'tl' && auTimeline.length > 1 && (
                 <button className={`btn ${tlSort ? 'btn-accent' : 'btn-ghost'}`}
-                  style={{ height: 29, padding: '0 12px', fontSize: 11 }}
+                  style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
                   onClick={() => setTlSort(v => !v)}>
                   {tlSort ? '정렬 완료' : '⠿ 정렬'}
                 </button>
               )}
               {tab === 'tl'
-                ? <button className="btn btn-dark" style={{ height: 29, padding: '0 12px', fontSize: 11 }} onClick={() => setTlOpen(true)}>＋ ADD RECORD</button>
+                ? <button className="btn btn-dark" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} onClick={() => setTlOpen(true)}>＋ ADD RECORD</button>
                 : <>
-                  <button className="btn btn-ghost" style={{ height: 29, padding: '0 12px', fontSize: 11 }} onClick={() => setQsetOpen(true)}>＋ 질문 리스트</button>
+                  <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} onClick={() => setQsetOpen(true)}>＋ 질문 리스트</button>
+                  {/* 마음에 안 드는 질문은 아예 버린다 — 대기 풀로 돌아가지 않는다 (v2.0) */}
+                  {curQa && (
+                    <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
+                      data-tip="이 질문을 버리고 다음 질문으로"
+                      onClick={skipQuestion}>질문 건너뛰기</button>
+                  )}
                   {/* 현재 질문 완료 → 대기 풀에서 랜덤 출제 (v1.9) */}
                   {auQaPool.length > 0 && (
-                    <button className="btn btn-ghost" style={{ height: 29, padding: '0 12px', fontSize: 11 }}
+                    <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
                       data-tip={`대기 질문 ${auQaPool.length}개`}
                       onClick={drawNextQuestion}>완료 — 다음 질문</button>
                   )}
-                  <button className="btn btn-dark" style={{ height: 29, padding: '0 12px', fontSize: 11 }} onClick={() => setQOpen(true)}>＋ ADD QUESTION</button>
+                  <button className="btn btn-dark" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} onClick={() => setQOpen(true)}>＋ ADD QUESTION</button>
                 </>}
             </span>
           )}
