@@ -10,6 +10,7 @@ import { KInput, KSelect, KStep, KCheck } from '@/components/ui/Kit';
 import { ColorField } from '@/components/ui/ColorField';
 import { CropEditor, CropValue, CropImg } from '@/components/ui/CropEditor';
 import { DragList } from '@/components/ui/DragList';
+import { Lightbox } from '@/components/ui/Lightbox';
 import { RichEditor } from '@/components/ui/RichEditor';
 import { useConfirmDelete } from '@/components/ui/Modal';
 import { fileDrop } from '@/lib/dnd';
@@ -77,6 +78,7 @@ export function CommForm({ initial, settings, onSave, onCancel }: {
   const [arts, setArts] = useState<ArtItem[]>(() => (initial?.images ?? []).map(r => ({ id: newId(), ref: r })));
   const [thumbCrop, setThumbCrop] = useState<CropValue | undefined>(initial?.thumbCrop);
   const [cropOpen, setCropOpen] = useState(false);
+  const [lb, setLb] = useState<number | null>(null);   // 이미지 썸네일 클릭 → 원본 보기
   const [descHtml, setDescHtml] = useState(initial?.descHtml ?? '');
   const [titleFontId, setTitleFontId] = useState(initial?.titleFontId ?? 'serif');
   const [bodyFontId, setBodyFontId] = useState(initial?.bodyFontId ?? 'default');
@@ -129,7 +131,10 @@ export function CommForm({ initial, settings, onSave, onCancel }: {
             render={(a, i) => (
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', padding: '3px 0' }}>
                 <span className="drag-h">⠿</span>
-                <ArtThumb item={a} crop={i === 0 ? thumbCrop : undefined} ratio={settings.ratio} />
+                <div data-tip="클릭하면 원본 보기" onClick={() => setLb(i)}
+                  style={{ display: 'flex', flexShrink: 0, cursor: 'zoom-in' }}>
+                  <ArtThumb item={a} crop={i === 0 ? thumbCrop : undefined} ratio={settings.ratio} />
+                </div>
                 {i === 0 ? (
                   <>
                     <span className="pill dark">대표 · 썸네일</span>
@@ -333,6 +338,10 @@ export function CommForm({ initial, settings, onSave, onCancel }: {
         <FirstCrop item={arts[0]} aspect={settings.ratio} crop={thumbCrop}
           onClose={() => setCropOpen(false)}
           onApply={c => { setThumbCrop(c); setCropOpen(false); }} />
+      )}
+      {/* 이미지 원본 보기 — 아직 저장 전 파일은 url, 저장된 것은 ref (Lightbox가 둘 다 처리) */}
+      {lb !== null && (
+        <Lightbox srcs={arts.map(a => a.url ?? a.ref ?? '')} index={lb} onClose={() => setLb(null)} />
       )}
       {del.element}
     </div>

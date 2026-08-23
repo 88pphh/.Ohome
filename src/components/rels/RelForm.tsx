@@ -13,6 +13,7 @@ import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
 import { KInput, KSelect, KCheck } from '@/components/ui/Kit';
 import { CropEditor, CropValue, CropImg } from '@/components/ui/CropEditor';
 import { DragList } from '@/components/ui/DragList';
+import { Lightbox } from '@/components/ui/Lightbox';
 import { useConfirmDelete } from '@/components/ui/Modal';
 import { fileDrop } from '@/lib/dnd';
 import { useToast } from '@/components/ui/Toast';
@@ -169,6 +170,7 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
   });
   const [thumbCrop, setThumbCrop] = useState<CropValue | undefined>(initial?.thumbCrop);
   const [cropOpen, setCropOpen] = useState(false);
+  const [lb, setLb] = useState<number | null>(null);   // 아트 썸네일 클릭 → 원본 보기
   const [headerFile, setHeaderFile] = useState<File | null>(null);
   const [headerUrl, setHeaderUrl] = useState('');
   const [headerRemoved, setHeaderRemoved] = useState(false);
@@ -351,7 +353,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
             render={(a, i) => (
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', padding: '3px 0' }}>
                 <span className="drag-h">⠿</span>
-                <div style={{ width: 84, aspectRatio: '4/3', borderRadius: 7, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+                <div data-tip="클릭하면 원본 보기" onClick={() => setLb(i)}
+                  style={{ width: 84, aspectRatio: '4/3', borderRadius: 7, overflow: 'hidden', position: 'relative', flexShrink: 0, cursor: 'zoom-in' }}>
                   <ArtThumb item={a} crop={i === 0 ? thumbCrop : undefined} />
                 </div>
                 {i === 0 ? (
@@ -626,6 +629,10 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
         <FirstArtCrop open={cropOpen} item={arts[0]} crop={thumbCrop}
           onClose={() => setCropOpen(false)}
           onApply={c => { setThumbCrop(c); setCropOpen(false); }} />
+      )}
+      {/* 아트 원본 보기 — 아직 저장 전 파일은 url, 저장된 것은 ref (Lightbox가 둘 다 처리) */}
+      {lb !== null && (
+        <Lightbox srcs={arts.map(a => a.url ?? a.ref ?? '')} index={lb} onClose={() => setLb(null)} />
       )}
       {del.element}
     </div>
