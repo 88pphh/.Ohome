@@ -105,3 +105,22 @@ export async function pushLocalSettings(keys: string[]): Promise<number> {
   }
   return n;
 }
+
+/**
+ * 이 브라우저에만 있고 서버에는 없는 설정 키.
+ *
+ * 설치 화면에서 DB를 먼저 연결한 보통의 경우에는 설정이 바뀔 때마다 서버로 나가므로 항상 빈 배열이다.
+ * 로컬(브라우저 저장)으로 먼저 꾸민 뒤에 서버를 붙인 경우에만 값이 남고, 그때만 「설정 올리기」가 필요하다.
+ * 캐시는 primeSettings가 서버에서 받아 채운 것이라 "서버에 있는가"의 기준이 된다.
+ */
+export function unsyncedSettingKeys(): string[] {
+  if (!isServerMode()) return [];
+  const out: string[] = [];
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith('ohome.') || LOCAL_ONLY.has(k)) continue;
+      if (!cache.has(k)) out.push(k);
+    }
+  } catch { /* 무시 */ }
+  return out;
+}

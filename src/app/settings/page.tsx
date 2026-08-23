@@ -46,7 +46,7 @@ import { useFonts, fontCssUrl, FontDef, FontRole, ROLE_LABEL, FOLLOW_MENU, FOLLO
 import { useToast } from '@/components/ui/Toast';
 import { PageTitle, EditableDesc, getPageText, setPageText } from '@/components/ui/PageText';
 import { putBlob } from '@/lib/blobStore';
-import { getSetting, setSetting, pushLocalSettings } from '@/lib/settingStore';
+import { getSetting, setSetting, pushLocalSettings, unsyncedSettingKeys } from '@/lib/settingStore';
 import { isServerMode, createBackend } from '@/lib/backend';
 import type { BackendConfig, BackendKind } from '@/lib/backend/types';
 import { validateConfig, configFileText, saveLocalConfig, parseFirebaseSnippet } from '@/lib/serverConfig';
@@ -1137,6 +1137,10 @@ function DataPane() {
   const [picked, setPicked] = useState<string[]>([]);  // 선택한 초기화 그룹
   const [pushing, setPushing] = useState(false);       // 설정 서버 업로드 중 (v2.0)
   const serverOn = isServerMode();
+  // 서버에 아직 없는 로컬 설정 — 로컬로 먼저 꾸민 뒤 서버를 붙인 경우에만 생긴다.
+  // 보통의 설치(연결 먼저)에서는 설정이 바뀔 때마다 서버로 나가므로 이 줄 자체가 뜨지 않는다.
+  const [unsynced, setUnsynced] = useState<string[]>([]);
+  useEffect(() => { setUnsynced(unsyncedSettingKeys()); }, []);
 
   // 이 브라우저에 저장돼 있던 사이트 설정을 서버로 올린다 (연결 직후 1회면 충분)
   const doPush = async () => {
@@ -1145,6 +1149,7 @@ function DataPane() {
       const keys = Object.keys(localStorage).filter(k => k.startsWith('ohome.'));
       const n = await pushLocalSettings(keys);
       toast(n > 0 ? `설정 ${n}건을 서버에 올렸습니다 — 방문자에게도 같은 모습으로 보입니다` : '올릴 설정이 없습니다');
+      setUnsynced(unsyncedSettingKeys());
     } catch {
       toast('설정 업로드에 실패했습니다 — 관리자 계정으로 로그인했는지 확인해 주세요');
     }
@@ -1251,10 +1256,10 @@ function DataPane() {
       <h3>데이터 백업</h3>
       <div className="d">글·캐릭터·자관·역극 등 모든 데이터(JSON)와 이미지 전부를 zip 하나로 — 다른 브라우저/PC 이전용</div>
 
-      {/* 서버 연결 직후 1회 — 이 브라우저에 꾸며 둔 설정을 방문자도 보게 올린다 (v2.0) */}
-      {serverOn && (
+      {/* 로컬로 먼저 꾸민 뒤 서버를 붙인 경우에만 — 서버에 없는 설정이 남아 있을 때만 나타난다 (v2.0) */}
+      {serverOn && unsynced.length > 0 && (
         <div className="set-row" style={{ flexWrap: 'wrap' }}>
-          <div className="l"><b>이 브라우저 설정을 서버로 올리기</b><small>테마·메뉴·폰트·로고·메인 위젯 배치 — 올려야 방문자에게도 같은 모습으로 보입니다</small></div>
+          <div className="l"><b>서버에 올리지 않은 설정 {unsynced.length}건</b><small>서버를 붙이기 전에 이 브라우저에서 꾸민 설정입니다 — 올려야 방문자에게도 같은 모습으로 보입니다</small></div>
           <button className="btn btn-ghost" style={{ padding: '9px 18px', opacity: pushing ? 0.5 : 1 }}
             disabled={pushing} onClick={doPush}>{pushing ? '올리는 중…' : '↑ 설정 올리기'}</button>
         </div>

@@ -651,6 +651,18 @@ a{color:inherit;text-decoration:none}
 }
 
 /* 설치 초기 화면 (v2.0) — 서버(Supabase) 연결 · 관리자 계정 · 설정 파일 / 백업 복원 */
+/* 첫 부팅(연결·설정 로딩) 대기 표시 — 400ms 넘게 걸릴 때만 나타난다(ServerBoot).
+   배경은 body가 첫 페인트 전에 칠하므로 여기서는 덧칠하지 않는다 */
+.boot-wait{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none}
+.boot-wait i{
+  width:26px;height:26px;border-radius:50%;
+  border:2px solid var(--line-dark,rgba(255,255,255,.16));
+  border-top-color:var(--accent,#8ea2c6);
+  animation:boot-spin .8s linear infinite;
+}
+@keyframes boot-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.boot-wait i{animation-duration:2.4s}}
+
 /* 설치 화면은 앱 셸(#appMain) 바깥, body 직속이라 스크롤을 여기서 맡는다
    (body가 height:100vh·overflow:hidden — 안 그러면 긴 단계에서 아래가 아예 안 보임).
    가운데 정렬은 place-items 대신 margin:auto — 내용이 길 때 위쪽이 잘려 못 보는 것을 막는다 */
