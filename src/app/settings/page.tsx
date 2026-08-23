@@ -7,7 +7,7 @@ import { useMembers } from '@/lib/members';
 import { useTheme } from '@/lib/ThemeProvider';
 import { ThemeVars } from '@/lib/theme';
 import { ColorField } from '@/components/ui/ColorField';
-import { KStep, KToggle, KInput, KTextarea, KSelect, KCheck, Pager } from '@/components/ui/Kit';
+import { KStep, KToggle, KInput, LiveInput, KTextarea, KSelect, KCheck, Pager } from '@/components/ui/Kit';
 import { DragList } from '@/components/ui/DragList';
 import { useMainStore, WidgetConf, WIDGET_META, MULTI_TYPES, widgetLabel } from '@/lib/mainStore';
 import { useConfirmDelete, ConfirmModal, Modal } from '@/components/ui/Modal';
@@ -108,6 +108,14 @@ function DesignPane() {
   const siteDraft = useSiteDraft();
   const { rolesDirty, saveRoles, discardRoles } = useFonts();
   const dirty = themeDirty || siteDraft.dirty || rolesDirty;
+  // 저장 안 한 채 새로고침·창 닫기를 하면 조용히 사라진다 —
+  // 미리보기가 화면(탭 제목·로고·색)에 바로 적용돼서 저장된 줄 알기 쉬우므로 한 번 물어본다
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
   const toast = useToast();
   const del = useConfirmDelete();
   const [resetOpen, setResetOpen] = useState(false);
@@ -137,7 +145,7 @@ function DesignPane() {
 
       {/* 저장/취소 — 이리저리 실험 후 저장하지 않을 수 있음 (v1.9) */}
       <div className="set-row">
-        <div className="l"><b>저장</b><small>새로고침하면 저장하지 않은 변경은 사라집니다</small></div>
+        <div className="l"><b>저장</b><small>화면에는 바로 보이지만 <b>SAVE를 눌러야 실제로 저장</b>됩니다 — 색·폰트·로고·탭 제목 모두</small></div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {dirty && <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>저장 안 된 변경</span>}
           {/* 컨트롤 세로 크기 통일 — 35px (btn-dark 기본과 동일) */}
@@ -1051,7 +1059,8 @@ function MoodPane() {
 function DocTitleControl() {
   const { site, set } = useSiteDraft();
   return (
-    <KInput value={site.docTitle ?? ''} onChange={e => set({ docTitle: e.target.value })}
+    // 값이 드래프트 저장소를 거쳐 되돌아오므로 한글 조합이 깨지지 않는 인풋을 쓴다
+    <LiveInput value={site.docTitle ?? ''} onValue={v => set({ docTitle: v })}
       placeholder={`${site.title} — 개인홈`}
       style={{ width: 260, height: 35, boxSizing: 'border-box' }} />
   );
@@ -1062,9 +1071,10 @@ function LogoControls() {
   const { site, set } = useSiteDraft();
   return (
     <>
-      <KInput value={site.title} onChange={e => set({ title: e.target.value })}
+      {/* 로고 문구도 드래프트를 거쳐 되돌아오므로 한글 조합에 안전한 인풋으로 */}
+      <LiveInput value={site.title} onValue={v => set({ title: v })}
         style={{ width: 130, height: 35, boxSizing: 'border-box' }} />
-      <KInput value={site.subtitle} onChange={e => set({ subtitle: e.target.value })}
+      <LiveInput value={site.subtitle} onValue={v => set({ subtitle: v })}
         style={{ width: 160, height: 35, boxSizing: 'border-box' }} />
       <div className="mini-seg">
         {(['left', 'center', 'right'] as const).map(a => (

@@ -9,6 +9,36 @@ export function KInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`k-input ${props.className ?? ''}`} />;
 }
 
+/**
+ * 한글 입력이 깨지지 않는 인풋 — 값이 바깥 저장소를 거쳐 되돌아오는 곳에 쓴다.
+ *
+ * 한글은 자모를 모으는 동안(조합 중) 입력창이 임시 상태를 들고 있는데,
+ * 이때 리렌더로 value가 덮이면 조합이 끊겨 「두 번씩 찍히고 글자가 이상해지는」 증상이 난다.
+ * 그래서 조합 중에는 바깥 값을 받지 않고, 조합이 끝난 뒤에만 맞춘다.
+ */
+export function LiveInput({ value, onValue, ...rest }: {
+  value: string; onValue: (v: string) => void;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [local, setLocal] = useState(value);
+  const composing = useRef(false);
+  useEffect(() => { if (!composing.current) setLocal(value); }, [value]);
+  return (
+    <KInput {...rest} value={local}
+      onCompositionStart={() => { composing.current = true; }}
+      onCompositionEnd={e => {
+        composing.current = false;
+        const v = (e.target as HTMLInputElement).value;
+        setLocal(v); onValue(v);
+      }}
+      onChange={e => {
+        const v = e.target.value;
+        setLocal(v);
+        // 조합 중에는 밖으로 내보내지 않는다 — 되돌아온 값이 조합을 깬다
+        if (!composing.current) onValue(v);
+      }} />
+  );
+}
+
 /* ---------- textarea — 리사이즈 핸들 제거 + 내용 따라 자동 높이 ---------- */
 export function KTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const ref = useRef<HTMLTextAreaElement>(null);
