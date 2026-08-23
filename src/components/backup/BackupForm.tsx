@@ -1,11 +1,12 @@
 'use client';
 // 그림백업 작성/수정 공용 폼 (4.11) — 제목/유형/이미지 다중 업로드(원본·최적화·크롭·⠿순서)/설명/설정/접기
 // 수정 모드: 기존 이미지(ref)는 그대로 유지·재정렬·삭제 가능, 새 파일 추가 가능
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList, newId, FoldType } from '@/lib/postStore';
-import { BackupPost, BACKUP_SEED, BACKUP_CATEGORIES } from '@/lib/galleryStore';
+import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
+import { useBoardSettings, DEFAULT_GALLERY_CATS } from '@/lib/boardStore';
 import { Visibility } from '@/lib/charStore';
 import { KInput, KSelect, KRadio, KCheck, KDate } from '@/components/ui/Kit';
 import { RichEditor } from '@/components/ui/RichEditor';
@@ -54,7 +55,15 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
       crop: i === 0 ? initial?.thumbCrop : undefined,
     })));
   const [desc, setDesc] = useState(initial?.desc ?? '');
-  const [category, setCategory] = useState(initial?.category ?? BACKUP_CATEGORIES[0]);
+  // 갤러리 말머리 — 환경설정 > 게시판 관리에서 관리 (v2.0)
+  const { st: boardSet } = useBoardSettings();
+  const galleryCats = boardSet.galleryCats.length ? boardSet.galleryCats : DEFAULT_GALLERY_CATS;
+  const [category, setCategory] = useState(initial?.category ?? '');
+  // 목록이 로드되면 첫 말머리를 기본값으로 (등록 화면)
+  useEffect(() => {
+    if (!category && galleryCats[0]) setCategory(galleryCats[0].label);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [galleryCats.length]);
   const [madeDate, setMadeDate] = useState(initial?.madeDate ?? '');
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? 'public');
   const [foldType, setFoldType] = useState<FoldType | 'none'>(initial?.fold?.type ?? 'none');
@@ -184,8 +193,9 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
             <h4>설정</h4>
             <div className="form-row">
               <label className="k-label" style={{ width: 70 }}>말머리</label>
+              {/* 말머리 목록은 환경설정 > 게시판 관리에서 관리 (v2.0 — 예전에는 코드에 박혀 있었다) */}
               <KSelect minWidth={120} value={category} onChange={setCategory}
-                options={BACKUP_CATEGORIES.map(c => ({ value: c, label: c }))} />
+                options={galleryCats.map(c => ({ value: c.label, label: c.label }))} />
             </div>
             <div className="form-row">
               <label className="k-label" style={{ width: 70 }}>제작일 (선택)</label>

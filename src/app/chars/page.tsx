@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
 import { Character, CHAR_SEED } from '@/lib/charStore';
-import { SearchBar } from '@/components/ui/Kit';
+import { SearchBar, FitText } from '@/components/ui/Kit';
 import { CroppedBlobImg } from '@/components/ui/CropEditor';
 
 import { useToast } from '@/components/ui/Toast';
@@ -53,8 +53,9 @@ export default function CharsPage() {
                   label={priv ? '비공개' : '3:4'} />
               </div>
               <div className="nm">
-                {/* 리스트에서는 기본 폰트로 통일 — 개별 이름 폰트는 상세에서만 (사용자 확정) */}
-                <b>{c.name}</b>
+                {/* 리스트에서는 기본 폰트로 통일 — 개별 이름 폰트는 상세에서만 (사용자 확정).
+                    긴 이름은 두 줄로 갈라지지 않게 한 줄에 맞춰 줄인다 */}
+                <b style={{ minWidth: 0, flex: 1 }}><FitText min={10}>{c.name}</FitText></b>
                 <i style={{ background: c.color }} />
               </div>
             </div>

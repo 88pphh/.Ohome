@@ -25,8 +25,18 @@ export const DEFAULT_GALLERY_BADGES: BoardBadge[] = [
   { id: 'vlist', label: '단일(세로)', bg: '#eef0f2', border: '#d7dae0', fg: '#5d636d' },
 ];
 
-export interface BoardSettings { system: BoardBadge[]; cats: BoardBadge[]; gallery: BoardBadge[] }
-const DEFAULTS: BoardSettings = { system: DEFAULT_BOARD_SYSTEM, cats: DEFAULT_BOARD_CATS, gallery: DEFAULT_GALLERY_BADGES };
+/** 갤러리 말머리 (v2.0) — 예전에는 코드에 박혀 있어 바꿀 수 없었다. 게시판 말머리처럼 자유롭게 관리 */
+export const DEFAULT_GALLERY_CATS: BoardBadge[] = ['합작', '낙서', '커미션', '설정화'].map(c => ({
+  id: `gcat-${c}`, label: c, bg: '#eef0f2', border: '#d7dae0', fg: '#5d636d',
+}));
+
+export interface BoardSettings {
+  system: BoardBadge[]; cats: BoardBadge[]; gallery: BoardBadge[]; galleryCats: BoardBadge[];
+}
+const DEFAULTS: BoardSettings = {
+  system: DEFAULT_BOARD_SYSTEM, cats: DEFAULT_BOARD_CATS,
+  gallery: DEFAULT_GALLERY_BADGES, galleryCats: DEFAULT_GALLERY_CATS,
+};
 const KEY = 'ohome.boardset.v1';
 
 export function useBoardSettings() {
@@ -41,6 +51,7 @@ export function useBoardSettings() {
           system: DEFAULT_BOARD_SYSTEM.map(d => p.system?.find(s => s.id === d.id) ?? d),
           cats: p.cats ?? DEFAULT_BOARD_CATS,
           gallery: DEFAULT_GALLERY_BADGES.map(d => p.gallery?.find(g => g.id === d.id) ?? d),
+          galleryCats: p.galleryCats ?? DEFAULT_GALLERY_CATS,
         });
       }
     } catch { /* 기본값 */ }
@@ -64,7 +75,18 @@ export function useBoardSettings() {
   const setCats = useCallback((cats: BoardBadge[]) => apply(s => ({ ...s, cats })), [apply]);
   const patchGallery = useCallback((id: string, p: Partial<BoardBadge>) =>
     apply(s => ({ ...s, gallery: s.gallery.map(b => (b.id === id ? { ...b, ...p } : b)) })), [apply]);
-  return { st, loaded, patchSystem, patchCat, addCat, removeCat, setCats, patchGallery };
+  // 갤러리 말머리 — 게시판 말머리와 같은 방식으로 추가·수정·삭제·정렬 (v2.0)
+  const patchGalleryCat = useCallback((id: string, p: Partial<BoardBadge>) =>
+    apply(s => ({ ...s, galleryCats: s.galleryCats.map(b => (b.id === id ? { ...b, ...p } : b)) })), [apply]);
+  const addGalleryCat = useCallback(() =>
+    apply(s => ({ ...s, galleryCats: [...s.galleryCats, { id: newId(), label: '새 말머리', bg: '#eef0f2', border: '#d7dae0', fg: '#5d636d' }] })), [apply]);
+  const removeGalleryCat = useCallback((id: string) =>
+    apply(s => ({ ...s, galleryCats: s.galleryCats.filter(b => b.id !== id) })), [apply]);
+  const setGalleryCats = useCallback((galleryCats: BoardBadge[]) => apply(s => ({ ...s, galleryCats })), [apply]);
+  return {
+    st, loaded, patchSystem, patchCat, addCat, removeCat, setCats, patchGallery,
+    patchGalleryCat, addGalleryCat, removeGalleryCat, setGalleryCats,
+  };
 }
 
 /** 게시글의 뱃지 결정 — 공지/비밀 우선, 그 외 말머리 매칭(라벨 기준·미등록 말머리는 중립색) */

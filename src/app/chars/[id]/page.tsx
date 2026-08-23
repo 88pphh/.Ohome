@@ -14,6 +14,7 @@ import { useTheme } from '@/lib/ThemeProvider';
 import { createPortal } from 'react-dom';
 import { BlobImg, useBlobUrl } from '@/lib/blobStore';
 import { CroppedBlobImg, CropEditor, type CropValue } from '@/components/ui/CropEditor';
+import { FitText } from '@/components/ui/Kit';
 
 import { EditableDesc, PageTitle } from '@/components/ui/PageText';
 import { ConfirmModal } from '@/components/ui/Modal';
@@ -43,7 +44,13 @@ function CharDetailInner() {
   const [auKey, setAuKey] = useState<string | null>(() => params.get('au'));
   // 대표 아트 우클릭 → 상세 화면에 보일 위치 조정 (v2.0)
   const [artCtx, setArtCtx] = useState<{ x: number; y: number; ref: string } | null>(null);
-  const [artCropOpen, setArtCropOpen] = useState<string | null>(null);   // 편집 중인 아트 참조
+  // 편집 중인 아트 참조 + 그때 실제 표시 영역의 가로/세로 비 (3:4가 아니라 화면 높이에 따라 달라진다)
+  const [artCropOpen, setArtCropOpen] = useState<{ ref: string; ratio: number } | null>(null);
+  const artBoxRef = useRef<HTMLDivElement>(null);
+  const artBoxRatio = () => {
+    const r = artBoxRef.current?.getBoundingClientRect();
+    return r && r.height > 1 ? r.width / r.height : 3 / 4;
+  };
   useEffect(() => {
     if (!artCtx) return;
     const close = () => setArtCtx(null);
@@ -203,7 +210,7 @@ function CharDetailInner() {
           }
           const cur = Math.min(artIdx, arts.length - 1);
           return (
-            <div className="profile-center"
+            <div className="profile-center" ref={artBoxRef}
               style={{ cursor: arts.length > 1 ? 'pointer' : undefined }}
               onClick={() => { if (arts.length > 1) setArtIdx(i => (i + 1) % arts.length); }}
               /* 대표 아트 우클릭 → 이 화면에 보일 위치 조정 (관리자, v2.0 사용자 확정) */
@@ -214,8 +221,10 @@ function CharDetailInner() {
               }}>
               {/* 지정한 크롭 위치를 여기서도 쓴다 — 예전에는 가운데 기준으로 잘려서
                   리스트에서 맞춰 둔 위치와 다른 곳이 보였다 (대표 아트에만 적용) */}
+              {/* 리스트 썸네일 크롭은 3:4 기준이라 여기(화면 높이에 따라 비율이 달라지는 영역)에는
+                  맞지 않는다 — 여기서 따로 잡은 값이 있을 때만 쓰고, 없으면 가운데 기준 (v2.0) */}
               <CroppedBlobImg fileRef={arts[cur] ?? eff.artUrl}
-                crop={cur === 0 ? (eff.artCrop ?? eff.thumbCrop) : undefined}
+                crop={cur === 0 ? eff.artCrop : undefined}
                 ph={ch.thumbClass} label="CHARACTER FULL ART" />
               {arts.length > 1 && (
                 <div style={{ position: 'absolute', left: 0, right: 0, bottom: 12, display: 'flex', justifyContent: 'center', gap: 5, zIndex: 3 }}>
@@ -233,9 +242,11 @@ function CharDetailInner() {
 
         {/* 우측 정보 패널 — 최상단 캐릭터 이름 크게 (v1.6) · AU면 그 AU의 이름·폰트 */}
         <div className="panel profile-info" ref={infoRef} style={{ fontFamily: familyOf(eff.bodyFontId) }}>
-          <div style={{ fontFamily: familyOf(eff.fontId) ?? 'var(--serif)', fontSize: 38, fontWeight: 600, letterSpacing: '.2em', lineHeight: 1.1 }}>
-            {eff.name}
-          </div>
+          {/* 긴 이름이 두 줄로 갈라지지 않게 한 줄에 맞춰 줄인다 (사용자 요청) */}
+          <FitText min={18} style={{
+            fontFamily: familyOf(eff.fontId) ?? 'var(--serif)', fontSize: 38,
+            fontWeight: 600, letterSpacing: '.2em', lineHeight: 1.1,
+          }}>{eff.name}</FitText>
           <div className="sub" style={{ marginBottom: 14 }}>{eff.sub}</div>
 
           {tab === 'basic' ? (
@@ -281,15 +292,17 @@ function CharDetailInner() {
       {artCtx && createPortal(
         <div className="ctx-menu on" style={{ left: artCtx.x, top: artCtx.y }} onClick={e => e.stopPropagation()}>
           <div className="ctx-ttl">대표 아트</div>
-          <button onClick={() => { setArtCropOpen(artCtx.ref); setArtCtx(null); }}>이미지 위치 조정</button>
+          <button onClick={() => { setArtCropOpen({ ref: artCtx.ref, ratio: artBoxRatio() }); setArtCtx(null); }}>
+            이미지 위치 조정
+          </button>
           {(eff?.artCrop) && (
-            <button onClick={() => { saveArtCrop(undefined); setArtCtx(null); }}>리스트 썸네일과 같게</button>
+            <button onClick={() => { saveArtCrop(undefined); setArtCtx(null); }}>위치 지정 해제</button>
           )}
         </div>,
         document.body,
       )}
       {artCropOpen && (
-        <ArtCropModal fileRef={artCropOpen} crop={eff?.artCrop ?? eff?.thumbCrop}
+        <ArtCropModal fileRef={artCropOpen.ref} ratio={artCropOpen.ratio} crop={eff?.artCrop}
           onClose={() => setArtCropOpen(null)}
           onApply={c => { saveArtCrop(c); setArtCropOpen(null); }} />
       )}
@@ -297,13 +310,17 @@ function CharDetailInner() {
   );
 }
 
-/** 상세 아트 위치 편집기 — 파일 참조를 주소로 바꿔 CropEditor에 넘긴다 (v2.0) */
-function ArtCropModal({ fileRef, crop, onClose, onApply }: {
-  fileRef: string; crop?: CropValue; onClose: () => void; onApply: (c: CropValue) => void;
+/** 상세 아트 위치 편집기 (v2.0) — 실제 표시 영역의 비율 그대로 열어야 보이는 대로 맞출 수 있다.
+ *  이 영역은 화면 높이에 따라 달라지므로 고정 비율(3:4 등)을 쓰면 편집기와 결과가 어긋난다. */
+function ArtCropModal({ fileRef, ratio, crop, onClose, onApply }: {
+  fileRef: string; ratio: number; crop?: CropValue; onClose: () => void; onApply: (c: CropValue) => void;
 }) {
   const url = useBlobUrl(fileRef);
   if (!url) return null;
-  return <CropEditor open src={url} aspect="3:4" initial={crop} onClose={onClose} onApply={onApply} />;
+  return (
+    <CropEditor open src={url} aspect={ratio} aspectLabel="상세 화면과 같은 비율"
+      initial={crop} onClose={onClose} onApply={onApply} />
+  );
 }
 
 export default function CharDetailPage() {

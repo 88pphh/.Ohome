@@ -570,7 +570,10 @@ function WidgetsPane() {
 
 /** 게시판 관리 탭 (5.2) — 게시판 생성·삭제·스킨·권한 + 게시판별 말머리 + 뱃지 색 */
 function BoardPane() {
-  const { st, patchSystem, patchGallery } = useBoardSettings();
+  const {
+    st, patchSystem, patchGallery,
+    patchGalleryCat, addGalleryCat, removeGalleryCat, setGalleryCats,
+  } = useBoardSettings();
   const { boards, setBoards, patchBoard } = useBoards();
   const [catBoard, setCatBoard] = useState(MAIN_BOARD_ID);   // 말머리 편집 대상 게시판
   const del = useConfirmDelete();
@@ -700,6 +703,31 @@ function BoardPane() {
           </div>
         </div>
       ))}
+
+      {/* 갤러리 말머리 (v2.0 사용자 요청) — 예전에는 코드에 박혀 있어 바꿀 수 없었다 */}
+      <h3 style={{ marginTop: 20 }}>갤러리 말머리</h3>
+      <div className="d">그림백업 글쓰기에서 고르는 말머리 — ⠿ 드래그로 순서 · 추가·수정·삭제 자유</div>
+      <DragList items={st.galleryCats} keyOf={c => c.id} onReorder={setGalleryCats}
+        render={c => (
+          <div className="set-row" style={{ width: '100%' }}>
+            <div className="l" style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
+              <span className="drag-h">⠿</span>
+              <span style={boardBadgeStyle(c)}>{c.label || '말머리'}</span>
+            </div>
+            <div className="cp-group" style={{ justifyContent: 'flex-end' }}>
+              <KInput value={c.label} onChange={e => patchGalleryCat(c.id, { label: e.target.value })}
+                style={{ width: 100, textAlign: 'right' }} />
+              {colorCells(c, p => patchGalleryCat(c.id, p))}
+              <span className="fx" data-tip="말머리 삭제"
+                onClick={() => del.ask(`말머리 「${c.label}」를 삭제하시겠습니까?`,
+                  () => removeGalleryCat(c.id),
+                  '이미 이 말머리로 등록된 글은 그대로 남습니다.')}>✕</span>
+            </div>
+          </div>
+        )} />
+      <button className="btn btn-ghost" style={{ marginTop: 8, padding: '7px 14px', fontSize: 11 }}
+        onClick={addGalleryCat}>＋ 말머리 추가</button>
+
       {del.element}
     </div>
   );
