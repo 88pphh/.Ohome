@@ -20,11 +20,16 @@ const fmt = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(
 export default function CalPage() {
   const { user, isAdmin } = useAuth();
   const toast = useToast();
-  const { st, loaded, addEvent, updateEvent, removeEvent, patchCat, addCat, removeCat, setCats, setAllowMember } = useSched();
+  const {
+    st, loaded, addEvent, updateEvent, removeEvent,
+    patchCat, addCat, removeCat, setCats, setAllowMember, reorderOn,
+  } = useSched();
   const { state: mainState, updateWidget } = useMainStore();
   const del = useConfirmDelete();
   const now = new Date();
   const [view, setView] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  // 오른쪽 카드가 보여 줄 날짜 (v2.0) — 처음에는 오늘
+  const [picked, setPicked] = useState(() => fmt(now.getFullYear(), now.getMonth(), now.getDate()));
   const [menuSet] = useMenuSettings();   // 달 표기 방식 (v1.9 — 메뉴 관리의 스케줄러 행)
   const [catMng, setCatMng] = useState(false);
   // 일정 등록/수정 모달
@@ -58,6 +63,8 @@ export default function CalPage() {
   }
 
   const eventsOn = (date: string) => st.events.filter(e => canSee(e) && eventOnDate(e, date));
+  // 오른쪽 카드가 보여 줄 날짜 — 달력 칸을 누르면 바뀐다 (v2.0)
+  const pickedEvents = eventsOn(picked);
 
   const openNew = (date: string) => {
     if (!canWrite) return;
@@ -158,24 +165,59 @@ export default function CalPage() {
               const evs = eventsOn(date);
               return (
                 <div key={i}
-                  className={`cal-cell ${c.dimmed ? 'dim' : ''} ${date === todayStr ? 'today' : ''}`}
-                  onClick={() => openNew(date)}>
+                  className={`cal-cell ${c.dimmed ? 'dim' : ''} ${date === todayStr ? 'today' : ''} ${date === picked ? 'picked' : ''}`}
+                  /* 칸을 누르면 등록창이 아니라 그 날짜를 고른다 — 등록·순서는 오른쪽 카드에서 (v2.0) */
+                  onClick={() => setPicked(date)}>
                   {c.d}
-                  {evs.map(e => (
+                  {/* 칸에는 위에서 3개까지만 — 나머지는 오른쪽 카드에서 본다 */}
+                  {evs.slice(0, 3).map(e => (
                     <div key={e.id} className="ev" style={{ background: `${eventColor(e, st.cats)}22`, color: eventColor(e, st.cats) }}
                       data-tip={`${e.title}${e.memo ? ` — ${e.memo}` : ''}`}
-                      onClick={ev => { ev.stopPropagation(); openEdit(e); }}>
+                      onClick={ev => { ev.stopPropagation(); setPicked(date); openEdit(e); }}>
                       {e.title}
                     </div>
                   ))}
+                  {evs.length > 3 && <div className="ev more">＋{evs.length - 3}</div>}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* 우: D-day / 투두(메인 위젯 데이터 공유) / 카테고리 */}
-        <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+        {/* 우: 고른 날짜의 일정 / D-day / 투두(메인 위젯 데이터 공유) / 카테고리 */}
+        <div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+          {/* 고른 날짜의 일정 (v2.0 사용자 확정) — 여기서 추가·순서 변경, 달력에는 위 3개만 */}
+          <div className="panel widget">
+            <h4>
+              {picked.slice(5).replace('-', '월 ')}일 일정
+              {canWrite && <span className="more" onClick={() => openNew(picked)}>＋ 추가</span>}
+            </h4>
+            {pickedEvents.length > 0 ? (
+              <DragList items={pickedEvents} keyOf={e => e.id} disabled={!canWrite}
+                onReorder={next => reorderOn(next.map(e => e.id))}
+                render={(e, i) => (
+                  <div className="dday-row" style={{ cursor: canWrite ? 'var(--cur-pointer,pointer)' : undefined }}
+                    onClick={() => openEdit(e)}>
+                    {canWrite && <span className="drag-h" style={{ marginRight: 7 }}>⠿</span>}
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <i style={{
+                        display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                        background: eventColor(e, st.cats), marginRight: 7, fontStyle: 'normal',
+                      }} />
+                      {e.title}
+                    </span>
+                    {/* 달력 칸에 보이는 것은 위에서 3개까지 */}
+                    {i === 2 && pickedEvents.length > 3 && (
+                      <b style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--faint)' }}>여기까지 달력 표시</b>
+                    )}
+                  </div>
+                )} />
+            ) : (
+              <p className="hint" style={{ margin: '6px 0 0' }}>
+                이 날짜에 일정이 없습니다{canWrite ? ' — [＋ 추가]로 등록' : ''}
+              </p>
+            )}
+          </div>
           {ddayConf && <DdayWidget conf={ddayConf} />}
           {todoConf && <TodoWidget conf={todoConf} />}
           <div className="panel widget">

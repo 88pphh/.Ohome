@@ -68,8 +68,20 @@ export function useSched() {
   const removeCat = useCallback((id: string) =>
     apply(s => ({ ...s, cats: s.cats.filter(c => c.id !== id) })), [apply]);
   const setCats = useCallback((cats: SchedCategory[]) => apply(s => ({ ...s, cats })), [apply]);
+  /** 특정 날짜 안에서 순서 바꾸기 (v2.0) — 달력 칸에는 위에서 3개만 보이므로 순서가 곧 우선순위다.
+   *  그 날짜에 걸리는 일정들이 차지하던 자리에 새 순서를 그대로 끼워 넣는다. */
+  const reorderOn = useCallback((ids: string[]) => apply(s => {
+    const pos = s.events.map((e, i) => (ids.includes(e.id) ? i : -1)).filter(i => i >= 0);
+    const byId = new Map(s.events.map(e => [e.id, e]));
+    const next = [...s.events];
+    ids.forEach((id, k) => { const e = byId.get(id); if (e && pos[k] !== undefined) next[pos[k]] = e; });
+    return { ...s, events: next };
+  }), [apply]);
   const setAllowMember = useCallback((v: boolean) => apply(s => ({ ...s, allowMember: v })), [apply]);
-  return { st, loaded, addEvent, updateEvent, removeEvent, patchCat, addCat, removeCat, setCats, setAllowMember };
+  return {
+    st, loaded, addEvent, updateEvent, removeEvent,
+    patchCat, addCat, removeCat, setCats, setAllowMember, reorderOn,
+  };
 }
 
 /** 일정 표시 색 — 개별 색 우선, 없으면 카테고리 색 */

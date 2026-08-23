@@ -1119,6 +1119,10 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .cal-cell:hover{border-color:var(--steel-3)}
 .cal-cell.dim{opacity:.35}
 .cal-cell.today{border:1.5px solid var(--ink)}
+/* 지금 고른 날짜 (v2.0) — 오른쪽 카드가 이 날짜의 일정을 보여 준다 */
+.cal-cell.picked{border-color:var(--accent);box-shadow:0 0 0 2px rgba(166,58,69,.16)}
+/* 달력 칸에는 위에서 3개까지 — 나머지 개수만 표시 */
+.cal-cell .ev.more{background:transparent;color:var(--faint);font-weight:700;padding-left:0}
 .cal-cell .ev{margin-top:4px;font-size:calc(11.5px*var(--fs,1));padding:3px 7px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600} /* 일정 글씨 확대 9.5→11.5 (v1.9 사용자 피드백) */
 
 /* ---------- 다이어리 (4.14) — 좌 리스트 + 우 미니 캘린더 ---------- */
