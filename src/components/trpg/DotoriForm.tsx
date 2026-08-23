@@ -27,7 +27,8 @@ export function DotoriForm({ initial, onSave, onCancel }: {
   const [people, setPeople] = useState(initial?.people ?? '');
   const [tags, setTags] = useState((initial?.tags ?? []).join(', '));
   const [link, setLink] = useState(initial?.link ?? '');
-  const [status, setStatus] = useState<DotoriStatus>(initial?.status ?? 'pledge');
+  // 새로 담는 시나리오는 대개 아직 일정이 없다 — 기본값을 「일정 미정」으로 (사용자 확정)
+  const [status, setStatus] = useState<DotoriStatus>(initial?.status ?? 'undecided');
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState('');
   const [removed, setRemoved] = useState(false);

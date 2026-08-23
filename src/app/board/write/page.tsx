@@ -59,7 +59,9 @@ function WriteInner() {
     if (!p) return;
     hydrated.current = true;
     setTitle(p.title); setBody(p.body);
-    setWriteMode(p.mode === 'md' ? 'md' : 'html');
+    // 에디터로 쓴 글은 에디터로 다시 연다 — 예전에는 무조건 HTML 소스가 떠서
+    // 에디터로 쓴 글을 수정하면 갑자기 태그가 보였다 (authored 없는 옛 글은 지금까지대로 HTML)
+    setWriteMode(p.mode === 'md' ? 'md' : (p.authored === 'editor' ? 'editor' : 'html'));
     setCategory(p.category);
     setSecret(p.secret); setNotice(p.notice);
     setFoldType(p.fold?.type ?? 'none'); setFoldLabel(p.fold?.label ?? '');
@@ -85,7 +87,9 @@ function WriteInner() {
       setPosts(posts.map(p => (p.id === editing.id ? {
         ...p,
         title: title.trim(), body,
-        mode: writeMode === 'md' ? 'md' : 'html', category,
+        mode: writeMode === 'md' ? 'md' : 'html',
+        authored: writeMode === 'editor' ? 'editor' : undefined,
+        category,
         secret, notice: isAdmin ? notice : p.notice,
         fold: foldType === 'none' ? null : { type: foldType, label: foldType === 'custom' ? foldLabel : undefined },
         thumbSrc, thumbCrop,
