@@ -11,8 +11,9 @@ import { Character, CHAR_SEED, charGrant, charWithAu, Relation, REL_SEED } from 
 import { sanitizeHtml } from '@/lib/sanitize';
 import { useFonts } from '@/lib/fontStore';
 import { useTheme } from '@/lib/ThemeProvider';
-import { BlobImg } from '@/lib/blobStore';
-import { CroppedBlobImg } from '@/components/ui/CropEditor';
+import { createPortal } from 'react-dom';
+import { BlobImg, useBlobUrl } from '@/lib/blobStore';
+import { CroppedBlobImg, CropEditor, type CropValue } from '@/components/ui/CropEditor';
 
 import { EditableDesc, PageTitle } from '@/components/ui/PageText';
 import { ConfirmModal } from '@/components/ui/Modal';
@@ -40,10 +41,30 @@ function CharDetailInner() {
     : []), [rels, ch]);
   // AU 편집에서 ?au= 로 돌아오면 그 AU가 선택된 채 시작
   const [auKey, setAuKey] = useState<string | null>(() => params.get('au'));
+  // 대표 아트 우클릭 → 상세 화면에 보일 위치 조정 (v2.0)
+  const [artCtx, setArtCtx] = useState<{ x: number; y: number; ref: string } | null>(null);
+  const [artCropOpen, setArtCropOpen] = useState<string | null>(null);   // 편집 중인 아트 참조
+  useEffect(() => {
+    if (!artCtx) return;
+    const close = () => setArtCtx(null);
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setArtCtx(null); };
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('click', close); window.removeEventListener('keydown', key); };
+  }, [artCtx]);
   // AU는 "새로 등록"하는 프로필 (v1.9 사용자 확정) — 등록 전엔 base를 보여주지 않고 등록 안내
   const auRegistered = !auKey || !!ch?.auProfiles?.[auKey];
   // 표시용 캐릭터 — AU에서 지정한 필드만 base를 대체 (이름·키·성별부터 전부 바뀔 수 있음)
   const eff = ch ? charWithAu(ch, auKey) : undefined;
+
+  /** 상세 화면 아트 위치 저장 (v2.0) — AU를 보는 중이면 그 AU에만, 아니면 원본에 */
+  const saveArtCrop = (c: CropValue | undefined) => {
+    setChars(chars.map(x => {
+      if (x.id !== id) return x;
+      if (!auKey) return { ...x, artCrop: c };
+      return { ...x, auProfiles: { ...x.auProfiles, [auKey]: { ...x.auProfiles?.[auKey], artCrop: c } } };
+    }));
+  };
 
   // AU 전환 시 탭 구성·아트가 달라지므로 리셋
   useEffect(() => { setTab('basic'); setArtIdx(0); }, [auKey]);
@@ -184,10 +205,17 @@ function CharDetailInner() {
           return (
             <div className="profile-center"
               style={{ cursor: arts.length > 1 ? 'pointer' : undefined }}
-              onClick={() => { if (arts.length > 1) setArtIdx(i => (i + 1) % arts.length); }}>
+              onClick={() => { if (arts.length > 1) setArtIdx(i => (i + 1) % arts.length); }}
+              /* 대표 아트 우클릭 → 이 화면에 보일 위치 조정 (관리자, v2.0 사용자 확정) */
+              onContextMenu={e => {
+                if (!(isAdmin || charGrant(ch, user?.id) === 'edit') || cur !== 0) return;
+                e.preventDefault();
+                setArtCtx({ x: e.clientX, y: e.clientY, ref: arts[0] });
+              }}>
               {/* 지정한 크롭 위치를 여기서도 쓴다 — 예전에는 가운데 기준으로 잘려서
                   리스트에서 맞춰 둔 위치와 다른 곳이 보였다 (대표 아트에만 적용) */}
-              <CroppedBlobImg fileRef={arts[cur] ?? eff.artUrl} crop={cur === 0 ? eff.thumbCrop : undefined}
+              <CroppedBlobImg fileRef={arts[cur] ?? eff.artUrl}
+                crop={cur === 0 ? (eff.artCrop ?? eff.thumbCrop) : undefined}
                 ph={ch.thumbClass} label="CHARACTER FULL ART" />
               {arts.length > 1 && (
                 <div style={{ position: 'absolute', left: 0, right: 0, bottom: 12, display: 'flex', justifyContent: 'center', gap: 5, zIndex: 3 }}>
@@ -248,8 +276,34 @@ function CharDetailInner() {
         </div>
       </div>
       )}
+
+      {/* 대표 아트 우클릭 메뉴 (v2.0) — 상세 화면에 보일 위치 조정 */}
+      {artCtx && createPortal(
+        <div className="ctx-menu on" style={{ left: artCtx.x, top: artCtx.y }} onClick={e => e.stopPropagation()}>
+          <div className="ctx-ttl">대표 아트</div>
+          <button onClick={() => { setArtCropOpen(artCtx.ref); setArtCtx(null); }}>이미지 위치 조정</button>
+          {(eff?.artCrop) && (
+            <button onClick={() => { saveArtCrop(undefined); setArtCtx(null); }}>리스트 썸네일과 같게</button>
+          )}
+        </div>,
+        document.body,
+      )}
+      {artCropOpen && (
+        <ArtCropModal fileRef={artCropOpen} crop={eff?.artCrop ?? eff?.thumbCrop}
+          onClose={() => setArtCropOpen(null)}
+          onApply={c => { saveArtCrop(c); setArtCropOpen(null); }} />
+      )}
     </section>
   );
+}
+
+/** 상세 아트 위치 편집기 — 파일 참조를 주소로 바꿔 CropEditor에 넘긴다 (v2.0) */
+function ArtCropModal({ fileRef, crop, onClose, onApply }: {
+  fileRef: string; crop?: CropValue; onClose: () => void; onApply: (c: CropValue) => void;
+}) {
+  const url = useBlobUrl(fileRef);
+  if (!url) return null;
+  return <CropEditor open src={url} aspect="3:4" initial={crop} onClose={onClose} onApply={onApply} />;
 }
 
 export default function CharDetailPage() {

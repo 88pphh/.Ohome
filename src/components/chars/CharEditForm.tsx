@@ -156,7 +156,8 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
                 {i === 0 ? (
                   <>
                     <span className="pill dark">대표 · 썸네일</span>
-                    {/* 옆의 「대표 · 썸네일」 뱃지와 세로 크기 통일 (23px) */}
+                    {/* 옆의 「대표 · 썸네일」 뱃지와 세로 크기 통일 (23px).
+                        상세 화면에 보일 위치는 상세에서 우클릭으로 잡는다 (v2.0) */}
                     <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5, lineHeight: '13px' }}
                       onClick={() => setCropOpen(true)}>✂ 썸네일 크롭</button>
                   </>

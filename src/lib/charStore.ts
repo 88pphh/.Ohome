@@ -28,6 +28,9 @@ export interface Character {
   thumbClass: string;    // 데모 플레이스홀더 클래스
   thumbId?: string;      // 리스트 썸네일 (IndexedDB, 3:4 크롭)
   thumbCrop?: import("@/components/ui/CropEditor").CropValue;
+  /** 상세 페이지 중앙 아트의 위치 (v2.0) — 리스트 썸네일과 보이는 크기·비율이 달라
+   *  같은 크롭을 쓰면 원하는 부분이 안 나온다. 따로 잡으면 상세에서는 이 값을 쓴다. */
+  artCrop?: import("@/components/ui/CropEditor").CropValue;
   arts?: string[];       // 아트 목록 (IndexedDB — 첫 장이 대표 풀 아트이자 썸네일 원본)
   artId?: string;        // (구) 단일 풀 아트
   artUrl?: string;       // (구) 풀 아트 URL
@@ -58,6 +61,7 @@ export interface AuCharProfile {
   tabs?: CharTab[];
   thumbId?: string;
   thumbCrop?: import("@/components/ui/CropEditor").CropValue;
+  artCrop?: import("@/components/ui/CropEditor").CropValue;   // 상세 중앙 아트 위치 (v2.0)
   fontId?: string;
   bodyFontId?: string;
 }
