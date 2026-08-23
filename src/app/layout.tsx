@@ -13,6 +13,7 @@ import { CursorLayer } from '@/components/shell/CursorLayer';
 import { ImgProtect } from '@/components/shell/ImgProtect';
 import { SetupGate } from '@/components/shell/SetupGate';
 import { DocTitle } from '@/components/shell/DocTitle';
+import { SettingSync } from '@/components/shell/SettingSync';
 import { PageFrame } from '@/lib/pageRefresh';
 import { ServerBoot } from '@/components/shell/ServerBoot';
 
@@ -64,6 +65,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <ImgProtect />
                   {/* 브라우저 탭 제목 — 디자인 탭에서 지정 (v1.9) */}
                   <DocTitle />
+                  {/* 설정이 서버에 저장되지 않았을 때 알림 (v2.0) — 조용히 실패하면 원인을 알 수 없다 */}
+                  <SettingSync />
                   </SetupGate>
                 </BgmStoreProvider>
               </MainStoreProvider>
