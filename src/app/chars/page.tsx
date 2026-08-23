@@ -55,7 +55,7 @@ export default function CharsPage() {
               <div className="nm">
                 {/* 리스트에서는 기본 폰트로 통일 — 개별 이름 폰트는 상세에서만 (사용자 확정).
                     긴 이름은 두 줄로 갈라지지 않게 한 줄에 맞춰 줄인다 */}
-                <b style={{ minWidth: 0, flex: 1 }}><FitText min={10}>{c.name}</FitText></b>
+                <b style={{ minWidth: 0, flex: 1 }}><FitText>{c.name}</FitText></b>
                 <i style={{ background: c.color }} />
               </div>
             </div>

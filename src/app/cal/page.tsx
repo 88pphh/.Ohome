@@ -185,7 +185,7 @@ export default function CalPage() {
         </div>
 
         {/* 우: 고른 날짜의 일정 / D-day / 투두(메인 위젯 데이터 공유) / 카테고리 */}
-        <div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+        <div className="cal-side" style={{ display: 'grid', alignContent: 'start' }}>
           {/* 고른 날짜의 일정 (v2.0 사용자 확정) — 여기서 추가·순서 변경, 달력에는 위 3개만 */}
           <div className="panel widget">
             <h4>
@@ -195,21 +195,20 @@ export default function CalPage() {
             {pickedEvents.length > 0 ? (
               <DragList items={pickedEvents} keyOf={e => e.id} disabled={!canWrite}
                 onReorder={next => reorderOn(next.map(e => e.id))}
-                render={(e, i) => (
-                  <div className="dday-row" style={{ cursor: canWrite ? 'var(--cur-pointer,pointer)' : undefined }}
-                    onClick={() => openEdit(e)}>
-                    {canWrite && <span className="drag-h" style={{ marginRight: 7 }}>⠿</span>}
-                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      <i style={{
-                        display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                        background: eventColor(e, st.cats), marginRight: 7, fontStyle: 'normal',
-                      }} />
-                      {e.title}
-                    </span>
-                    {/* 달력 칸에 보이는 것은 위에서 3개까지 */}
-                    {i === 2 && pickedEvents.length > 3 && (
-                      <b style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--faint)' }}>여기까지 달력 표시</b>
-                    )}
+                render={e => (
+                  /* 제목은 왼쪽, 카테고리 색은 맨 오른쪽.
+                     클릭은 제목에만 건다 — 손잡이를 끌다 놓았을 때 수정창이 열리던 것 방지 (v2.0) */
+                  <div className="dday-row" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                    {canWrite && <span className="drag-h">⠿</span>}
+                    <span style={{
+                      flex: 1, minWidth: 0, textAlign: 'left',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      cursor: canWrite ? 'var(--cur-pointer,pointer)' : undefined,
+                    }} onClick={() => openEdit(e)}>{e.title}</span>
+                    <i style={{
+                      width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+                      background: eventColor(e, st.cats), fontStyle: 'normal',
+                    }} />
                   </div>
                 )} />
             ) : (

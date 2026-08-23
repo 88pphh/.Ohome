@@ -16,6 +16,8 @@ import { CropEditor, CroppedBlobImg, CropValue, CropImg } from '@/components/ui/
 import { useToast } from '@/components/ui/Toast';
 
 import { useSiteSettings } from '@/lib/siteStore';
+import { useMainStore } from '@/lib/mainStore';
+import { useCardSort, mergeOrder } from '@/lib/cardSort';
 
 export default function TrpgPage() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function TrpgPage() {
   const [site] = useSiteSettings(); // 티켓 하단 문구 = 로고 서브타이틀 (5.2 연동)
   const [logs, setLogs] = useLocalList<TrpgLog>('ohome.trpg.v1', TRPG_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
+  const { editOn } = useMainStore();          // 편집모드 — 상단바 토글 (다른 목록과 공통)
   const [filter, setFilter] = useState<string>('all');
   const [skin, setSkin] = useState<'ticket' | 'basic'>('ticket');
   const [q, setQ] = useState('');
@@ -72,8 +75,12 @@ export default function TrpgPage() {
     // 비밀번호가 있는 로그는 리스트에 노출 (상세에서 비밀번호 입력으로 열람 — 4.3 접근권한)
     .filter(l => isAdmin || l.visibility === 'public' || (l.visibility === 'member' && user) || !!l.password)
     .filter(l => filter === 'all' || (filter === 'none' ? !l.relId : l.relId === filter))
-    .filter(l => !q || l.title.includes(q) || l.writer.includes(q) || l.withText.includes(q))
-    .sort((a, b) => b.no - a.no);
+    .filter(l => !q || l.title.includes(q) || l.writer.includes(q) || l.withText.includes(q));
+  // 정렬 기준은 저장된 순서 — 편집모드에서 드래그로 바꾼 순서가 그대로 목록에 반영된다 (v2.0).
+  // 새 로그는 앞에 넣으므로 기본은 지금까지처럼 최신순이고, № 번호는 표시용으로만 남는다.
+
+  // 편집모드 카드 드래그 정렬 (v2.0 — 캐릭터 목록과 같은 방식)
+  const sort = useCardSort(visible, next => setLogs(mergeOrder(logs, next)), editOn && isAdmin);
 
   const decodeText = decodeLogText; // 공용 유틸 (galleryStore)
 
@@ -123,8 +130,10 @@ export default function TrpgPage() {
       ? { background: l.thumbColor.c2 ? `linear-gradient(135deg, ${l.thumbColor.c1} 0%, ${l.thumbColor.c2} 100%)` : l.thumbColor.c1 }
       : undefined;
 
-  const Ticket = ({ l }: { l: TrpgLog }) => (
-    <div className="ticket" onClick={() => router.push(`/trpg/${l.id}`)}>
+  // sp: 편집모드 드래그 정렬 props (다른 목록과 같은 방식, v2.0)
+  const Ticket = ({ l, sp }: { l: TrpgLog; sp?: React.HTMLAttributes<HTMLDivElement> }) => (
+    <div className="ticket" {...sp}
+      onClick={() => { if (!editOn) router.push(`/trpg/${l.id}`); }}>
       <div className="stub-line" />
       <div className={`wide ${!l.thumbId && !l.thumbColor ? `ph ${l.ph}` : ''}`} style={thumbStyle(l)}>
         {l.thumbId && <CroppedBlobImg fileRef={l.thumbId} crop={l.thumbCrop} />}
@@ -160,12 +169,13 @@ export default function TrpgPage() {
       <div className="trpg-layout">
         <div>
           {skin === 'ticket' && !isMobile
-            ? visible.map(l => <Ticket key={l.id} l={l} />)
+            ? visible.map((l, i) => <Ticket key={l.id} l={l} sp={sort(i)} />)
             : (
               // 기본형 — 한 줄에 두 개, 번호 없이 제목만 (v2.0 사용자 확정)
               <div className="panel flush trpg-basic">
-                {visible.map(l => (
-                  <div key={l.id} className="list-item" onClick={() => router.push(`/trpg/${l.id}`)}>
+                {visible.map((l, i) => (
+                  <div key={l.id} className="list-item" {...sort(i)}
+                    onClick={() => { if (!editOn) router.push(`/trpg/${l.id}`); }}>
                     <div className={`th ${!l.thumbId && !l.thumbColor ? `ph ${l.ph}` : ''}`} style={{ ...thumbStyle(l), position: 'relative' }}>
                       {l.thumbId && <CroppedBlobImg fileRef={l.thumbId} crop={l.thumbCrop} />}
                     </div>

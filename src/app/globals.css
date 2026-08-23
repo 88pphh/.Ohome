@@ -1120,6 +1120,12 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .cal-cell{aspect-ratio:1/1.02;border-radius:9px;padding:7px 8px;font-size:calc(11px*var(--fs,1));color:var(--sub);background:#fff;border:1px solid var(--line);transition:.13s;cursor:var(--cur-pointer,pointer);overflow:hidden}
 .cal-cell:hover{border-color:var(--steel-3)}
 .cal-cell.dim{opacity:.35}
+/* 스케줄러 우측 열 — 짧은 목록 카드가 세로로 여럿 쌓이는 곳이라
+   메인 위젯 기본값보다 촘촘하게 (v2.0 사용자 피드백: 세로 간격이 너무 넓다) */
+.cal-side{gap:8px}
+.cal-side .panel.widget{padding:13px 14px}
+.cal-side .panel.widget h4{margin-bottom:7px}
+.cal-side .dday-row{padding:4px 0}
 .cal-cell.today{border:1.5px solid var(--ink)}
 /* 지금 고른 날짜 (v2.0) — 오른쪽 카드가 이 날짜의 일정을 보여 준다 */
 .cal-cell.picked{border-color:var(--accent);box-shadow:0 0 0 2px rgba(166,58,69,.16)}

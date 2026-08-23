@@ -43,8 +43,13 @@ export function LiveInput({ value, onValue, ...rest }: {
  * 한 줄에 들어가도록 글씨를 줄이는 상자 (v2.0) — 긴 이름이 두 줄로 갈라지는 것을 막는다.
  * 말줄임(…)과 달리 이름 전체를 보여 준다. min까지 줄여도 안 들어가면 거기서 멈춘다.
  */
-export function FitText({ children, min = 10, className, style }: {
-  children: React.ReactNode; min?: number; className?: string; style?: React.CSSProperties;
+export function FitText({ children, min, minRatio = 0.78, className, style }: {
+  children: React.ReactNode;
+  /** 절대 하한(px). 없으면 기준 크기의 minRatio까지만 줄인다 */
+  min?: number;
+  /** 기준 크기 대비 하한 비율 — 너무 작아져서 오히려 안 예뻐지는 것을 막는다 (기본 78%) */
+  minRatio?: number;
+  className?: string; style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -53,8 +58,9 @@ export function FitText({ children, min = 10, className, style }: {
     const fit = () => {
       el.style.fontSize = '';                       // 기준 크기에서 다시 계산
       const base = parseFloat(getComputedStyle(el).fontSize) || 14;
+      const floor = min ?? base * minRatio;
       let size = base;
-      while (size > min && el.scrollWidth > el.clientWidth + 1) {
+      while (size > floor && el.scrollWidth > el.clientWidth + 1) {
         size -= 0.5;
         el.style.fontSize = `${size}px`;
       }
