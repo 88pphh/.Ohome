@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList, newId } from '@/lib/postStore';
-import { TrpgLog, TRPG_SEED, decodeLogText, logNo } from '@/lib/galleryStore';
+import { TrpgLog, TRPG_SEED, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
 import { Relation, REL_SEED } from '@/lib/charStore';
 import { SearchBar, KInput, KTextarea, KRadio, KSelect, KDate } from '@/components/ui/Kit';
 import { Modal } from '@/components/ui/Modal';
@@ -97,8 +97,8 @@ export default function TrpgPage() {
       writer: nWriter.trim(), withText: nWith.trim(),
       relId: nRel === 'none' ? undefined : nRel,
       date: nDate || undefined, ph: 'cool',
-      // 본문은 IndexedDB에 저장 (localStorage 용량 보호 — 대형 크리스탈리아 로그 대응)
-      body: '', bodyId: bodyText ? await putBlob(new Blob([bodyText], { type: 'text/plain' })) : undefined,
+      // 본문 저장 위치는 saveLogBody가 정한다 (서버면 문서에 직접 · 로컬이거나 아주 크면 파일로)
+      ...(await saveLogBody(bodyText)),
       visibility: 'public',
       // 업로드 원본 파일은 그대로 보관 (4.3 — 백업 목적, IndexedDB → R2 이전 예정)
       originalFileId: nFile ? await putBlob(nFile) : undefined,

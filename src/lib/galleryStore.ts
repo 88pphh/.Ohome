@@ -88,6 +88,23 @@ export async function decodeLogText(f: File): Promise<string> {
   return utf8;
 }
 
+/**
+ * 로그 본문 저장 위치 결정.
+ *
+ * 서버 모드에서 본문을 Storage에 파일로 올리면, 다시 읽을 때 fetch가 필요해
+ * **버킷 CORS 설정을 해야만** 본문이 보인다(설정 전에는 빈 본문처럼 보인다).
+ * 본문은 텍스트라 문서에 그대로 담는 편이 안전하다 — 다만 Firestore 문서 상한이 1MB라
+ * 아주 큰 로그만 파일로 보관한다(그 경우에는 CORS 설정이 필요하다).
+ */
+export async function saveLogBody(text: string): Promise<{ body: string; bodyId?: string }> {
+  if (!text) return { body: '' };
+  const { isServerMode } = await import('./backend');
+  const { putBlob } = await import('./blobStore');
+  const bytes = new TextEncoder().encode(text).length;
+  if (isServerMode() && bytes < 700_000) return { body: text };
+  return { body: '', bodyId: await putBlob(new Blob([text], { type: 'text/plain' })) };
+}
+
 /* ---------- TRPG 도토리 (4.15) — 시나리오 위시리스트 ---------- */
 export type DotoriStatus = 'pledge' | 'undecided' | 'confirmed' | 'done';
 export const DOTORI_STATUS_LABEL: Record<DotoriStatus, string> = {

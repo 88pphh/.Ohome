@@ -5,10 +5,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
-import { TrpgLog, TRPG_SEED, isHtmlBody, decodeLogText, logNo } from '@/lib/galleryStore';
+import { TrpgLog, TRPG_SEED, isHtmlBody, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
 import { Relation, REL_SEED, Character, CHAR_SEED, charGrant } from '@/lib/charStore';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
-import { getBlob, putBlob } from '@/lib/blobStore';
+import { getBlob, putBlob, useBlobUrl } from '@/lib/blobStore';
 import { PageTitle } from '@/components/ui/PageText';
 import { KInput, KSelect, KDate, KTextarea } from '@/components/ui/Kit';
 import { ColorField } from '@/components/ui/ColorField';
@@ -78,6 +78,7 @@ export default function TrpgDetailPage() {
   const [eThumb, setEThumb] = useState<File | null>(null);
   const [eThumbUrl, setEThumbUrl] = useState('');
   const [eThumbCrop, setEThumbCrop] = useState<CropValue | undefined>(undefined);
+  const curThumbUrl = useBlobUrl(l?.thumbId);   // 「현재 유지」로 위치만 조정할 때의 원본
   const [eCropOpen, setECropOpen] = useState(false);
   const [eColorMode, setEColorMode] = useState<'grad' | 'solid'>('grad');
   const [eC1, setEC1] = useState('#4c5a6e');
@@ -90,16 +91,19 @@ export default function TrpgDetailPage() {
     if (bodyMode === 'file' && eFile) {
       const text = await decodeLogText(eFile);
       bodyPatch = {
-        body: '', bodyId: await putBlob(new Blob([text], { type: 'text/plain' })),
+        ...(await saveLogBody(text)),
         originalFileId: await putBlob(eFile), originalName: eFile.name,
       };
     } else if (bodyMode === 'text' && eText.trim()) {
-      bodyPatch = { body: '', bodyId: await putBlob(new Blob([eText], { type: 'text/plain' })) };
+      bodyPatch = await saveLogBody(eText);
     }
     // 썸네일 교체 준비
     let thumbPatch: Partial<TrpgLog> = {};
     if (thumbMode === 'image' && eThumb) {
       thumbPatch = { thumbId: await putBlob(eThumb), thumbCrop: eThumbCrop, thumbColor: undefined };
+    } else if (thumbMode === 'keep' && l?.thumbId) {
+      // 이미지는 그대로 두고 위치·확대만 바꾼 경우 (사용자 요청)
+      thumbPatch = { thumbCrop: eThumbCrop };
     } else if (thumbMode === 'color') {
       thumbPatch = { thumbId: undefined, thumbCrop: undefined, thumbColor: { c1: eC1, c2: eColorMode === 'grad' ? eC2 : undefined } };
     }
@@ -221,7 +225,8 @@ r();})();
             });
             // 본문·썸네일 교체 상태 초기화 (기본: 현재 것 유지)
             setBodyMode('keep'); setEFile(null); setEText(bodyText ?? '');
-            setThumbMode('keep'); setEThumb(null); setEThumbUrl(''); setEThumbCrop(undefined);
+            // 「현재 유지」에서도 위치·확대를 조정할 수 있게 지금 크롭값에서 시작한다
+            setThumbMode('keep'); setEThumb(null); setEThumbUrl(''); setEThumbCrop(l.thumbCrop);
             setEColorMode(l.thumbColor ? (l.thumbColor.c2 ? 'grad' : 'solid') : 'grad');
             if (l.thumbColor) { setEC1(l.thumbColor.c1); if (l.thumbColor.c2) setEC2(l.thumbColor.c2); }
             setEOpen(true);
@@ -252,21 +257,28 @@ r();})();
         {/* 설명문 없이 원본 파일 다운로드 링크만 (4.3 백업) */}
         <p className="hint" style={{ marginTop: 10 }}>
           {l.originalFileId && (
-            <>
-              <span style={{ color: 'var(--accent)', cursor: 'var(--cur-pointer,pointer)', fontWeight: 600 }}
-                onClick={async () => {
-                  // 보관된 원본 파일 다운로드 (4.3 — 백업 목적)
-                  const b = await getBlob(l.originalFileId!);
-                  if (!b) return;
-                  const u = URL.createObjectURL(b);
-                  const a = document.createElement('a');
-                  a.href = u; a.download = l.originalName ?? 'log.txt';
-                  a.click();
-                  URL.revokeObjectURL(u);
-                }}>
-                ⤓ 원본 파일 ({l.originalName})
-              </span>
-            </>
+            /^https?:/.test(l.originalFileId)
+              // 서버에 올라간 파일은 링크로 연다 — fetch로 받으면 버킷 CORS 설정이 필요해진다
+              ? (
+                <a href={l.originalFileId} target="_blank" rel="noreferrer" download={l.originalName}
+                  style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
+                  ⤓ 원본 파일 ({l.originalName})
+                </a>
+              ) : (
+                <span style={{ color: 'var(--accent)', cursor: 'var(--cur-pointer,pointer)', fontWeight: 600 }}
+                  onClick={async () => {
+                    // 이 브라우저에 보관된 원본 파일 (4.3 — 백업 목적)
+                    const b = await getBlob(l.originalFileId!);
+                    if (!b) return;
+                    const u = URL.createObjectURL(b);
+                    const a = document.createElement('a');
+                    a.href = u; a.download = l.originalName ?? 'log.txt';
+                    a.click();
+                    URL.revokeObjectURL(u);
+                  }}>
+                  ⤓ 원본 파일 ({l.originalName})
+                </span>
+              )
           )}
         </p>
       </div>
@@ -334,6 +346,19 @@ r();})();
               )}
             </div>
           )}
+          {/* 현재 유지 — 이미지는 그대로 두고 위치·확대만 조정 (사용자 요청) */}
+          {thumbMode === 'keep' && l.thumbId && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{
+                width: 128, aspectRatio: '16/9', borderRadius: 8, overflow: 'hidden',
+                border: '1.5px solid var(--line)', flexShrink: 0, position: 'relative',
+              }}>
+                {curThumbUrl && <CropImg src={curThumbUrl} crop={eThumbCrop} />}
+              </div>
+              <button className="btn btn-ghost" style={{ padding: '5px 11px', fontSize: 11 }}
+                disabled={!curThumbUrl} onClick={() => setECropOpen(true)}>✂ 위치·확대 조정</button>
+            </div>
+          )}
           {thumbMode === 'color' && (
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{
@@ -383,8 +408,9 @@ r();})();
       </Modal>
 
       {/* 썸네일 크롭 편집기 (6.1 — 16:9 티켓 규격) */}
-      {eThumbUrl && (
-        <CropEditor open={eCropOpen} src={eThumbUrl} aspect="16:9" initial={eThumbCrop}
+      {/* 새로 고른 이미지가 있으면 그것을, 「현재 유지」면 지금 썸네일을 대상으로 */}
+      {(eThumbUrl || (thumbMode === 'keep' && curThumbUrl)) && (
+        <CropEditor open={eCropOpen} src={eThumbUrl || curThumbUrl!} aspect="16:9" initial={eThumbCrop}
           onClose={() => setECropOpen(false)}
           onApply={c => { setEThumbCrop(c); setECropOpen(false); }} />
       )}
