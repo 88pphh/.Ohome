@@ -65,6 +65,7 @@ export interface TrpgLog {
   serifTitle?: boolean;      // 타이틀 폰트 개별 지정 예시 (폰트 라이브러리는 후속)
   body: string;              // 로그 본문 (소형/시드용 — 대형 로그는 bodyId 사용)
   bodyId?: string;           // IndexedDB 본문 파일 id (대용량 로그 — localStorage 용량 보호)
+  bodyHtml?: boolean;        // 본문 표시 방식 지정 (v2.0) — 없으면 내용으로 자동 판별
   originalFileId?: string;   // 업로드 원본 파일 보관 (4.3 — 백업 목적)
   originalName?: string;
   visibility: Visibility;
@@ -74,8 +75,13 @@ export interface TrpgLog {
 /** № 자리 표시 — 직접 입력한 텍스트가 있으면 그대로, 없으면 자동 № 0XX */
 export const logNo = (l: TrpgLog) => l.noText || `№ ${String(l.no).padStart(3, '0')}`;
 
-/** 본문이 HTML 문서인지 자동 판별 (4.3 — 확장자와 무관하게 내용 기준) */
+/** 본문이 HTML 문서인지 자동 판별 (4.3 — 확장자와 무관하게 내용 기준).
+ *  직접 쓴 글에 태그처럼 보이는 문자가 섞이면 오판할 수 있으므로, 로그에 `bodyHtml`이
+ *  지정돼 있으면 그 값이 우선한다(수정 화면의 「본문 표시」에서 지정). */
 export const isHtmlBody = (s: string) => /<\s*(html|body|div|p|span|table|br|style|font)[^>]*>/i.test(s);
+
+/** 이 로그를 HTML로 그릴지 — 지정값이 있으면 그대로, 없으면 내용으로 판별 */
+export const showAsHtml = (l: { bodyHtml?: boolean }, body: string) => l.bodyHtml ?? isHtmlBody(body);
 
 /** 로그 파일 인코딩 자동 판별 — UTF-8 우선, 깨짐 문자가 많으면 EUC-KR 재시도 (구형 로그 툴 대응) */
 export async function decodeLogText(f: File): Promise<string> {

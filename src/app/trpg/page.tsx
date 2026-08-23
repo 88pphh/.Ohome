@@ -162,14 +162,15 @@ export default function TrpgPage() {
           {skin === 'ticket' && !isMobile
             ? visible.map(l => <Ticket key={l.id} l={l} />)
             : (
-              <div className="panel flush">
+              // 기본형 — 한 줄에 두 개, 번호 없이 제목만 (v2.0 사용자 확정)
+              <div className="panel flush trpg-basic">
                 {visible.map(l => (
                   <div key={l.id} className="list-item" onClick={() => router.push(`/trpg/${l.id}`)}>
                     <div className={`th ${!l.thumbId && !l.thumbColor ? `ph ${l.ph}` : ''}`} style={{ ...thumbStyle(l), position: 'relative' }}>
                       {l.thumbId && <CroppedBlobImg fileRef={l.thumbId} crop={l.thumbCrop} />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <b>{logNo(l)} {l.title}</b>
+                      <b>{l.title}</b>
                       <small>{[l.writer, l.withText].filter(Boolean).join(' · ')}{l.date ? ` · ${l.date.replace(/-/g, '.')}` : ''}</small>
                     </div>
                   </div>

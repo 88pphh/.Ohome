@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
-import { TrpgLog, TRPG_SEED, isHtmlBody, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
+import { TrpgLog, TRPG_SEED, showAsHtml, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
 import { Relation, REL_SEED, Character, CHAR_SEED, charGrant } from '@/lib/charStore';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { getBlob, putBlob, useBlobUrl } from '@/lib/blobStore';
@@ -16,8 +16,9 @@ import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
 import { useToast } from '@/components/ui/Toast';
 
 /** 로그 렌더 프레임 — 대형 문서도 안정적으로 로드되도록 srcdoc 대신 Blob URL 사용 */
-function LogFrame({ frameRef, html, title }: {
+function LogFrame({ frameRef, html, title, onFrameLoad }: {
   frameRef: React.RefObject<HTMLIFrameElement | null>; html: string; title: string;
+  onFrameLoad: () => void;
 }) {
   const url = useMemo(() => URL.createObjectURL(new Blob([html], { type: 'text/html' })), [html]);
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
@@ -28,6 +29,7 @@ function LogFrame({ frameRef, html, title }: {
       sandbox="allow-scripts"
       src={url}
       title={title}
+      onLoad={onFrameLoad}
     />
   );
 }
@@ -43,6 +45,7 @@ export default function TrpgDetailPage() {
   const [delAsk, setDelAsk] = useState(false);
   const [bodyText, setBodyText] = useState<string | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const gotHeightRef = useRef(false);   // 안쪽에서 높이 보고가 왔는지 (안 오면 기본 높이로 되돌린다)
 
   const l = logs.find(x => x.id === id);
 
@@ -69,6 +72,8 @@ export default function TrpgDetailPage() {
   });
   // 본문 교체
   const [bodyMode, setBodyMode] = useState<'keep' | 'file' | 'text'>('keep');
+  // 본문 표시 방식 (v2.0) — 자동 판별이 직접 쓴 글을 HTML로 오판하는 경우가 있어 직접 고를 수 있게
+  const [bodyDisp, setBodyDisp] = useState<'auto' | 'text' | 'html'>('auto');
   const [eFile, setEFile] = useState<File | null>(null);
   const [eText, setEText] = useState('');
   const eFileRef = useRef<HTMLInputElement>(null);
@@ -115,6 +120,7 @@ export default function TrpgDetailPage() {
       relId: e.relId === 'none' ? undefined : e.relId,
       date: e.date || undefined,
       visibility: e.visibility, password: e.password.trim() || undefined,
+      bodyHtml: bodyDisp === 'auto' ? undefined : bodyDisp === 'html',
       ...bodyPatch, ...thumbPatch,
     } : x));
     if (bodyMode !== 'keep') setBodyText(null); // 본문 다시 로드
@@ -143,6 +149,7 @@ export default function TrpgDetailPage() {
         // 더하면 "설정 → 커진 값 보고 → 재설정" 무한 성장 루프가 됨 — 보고값 그대로,
         // 그리고 현재 높이와 사실상 같으면(±2px) 재설정하지 않음
         const next = Math.min(200000, Math.max(200, Math.round(h)));
+        gotHeightRef.current = true;
         const cur = frameRef.current.getBoundingClientRect().height;
         if (Math.abs(next - cur) > 2) frameRef.current.style.height = `${next}px`;
       }
@@ -150,6 +157,18 @@ export default function TrpgDetailPage() {
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, []);
+
+  /** 문서가 뜨는 순간 일단 낮게 줄인다 — 안쪽 높이 계산이 뷰포트(현재 iframe 높이)에 끌려
+   *  커지는 것을 막기 위해서다. 곧 오는 보고값으로 내용 높이에 맞춘다.
+   *  보고가 오지 않는 문서(스크립트가 없거나 막힌 경우)는 기본 높이로 되돌려 내부 스크롤로 읽게 한다. */
+  const onFrameLoad = () => {
+    if (!frameRef.current) return;
+    gotHeightRef.current = false;
+    frameRef.current.style.height = '240px';
+    setTimeout(() => {
+      if (!gotHeightRef.current && frameRef.current) frameRef.current.style.height = '';
+    }, 1800);
+  };
 
   if (!loaded) return <section className="page" />;
   if (!l) {
@@ -194,7 +213,8 @@ export default function TrpgDetailPage() {
 
   const rel = rels.find(r => r.id === l.relId);
   const body = bodyText ?? '';
-  const html = isHtmlBody(body);
+  // 지정값이 있으면 그대로 — 직접 쓴 글이 태그처럼 보이는 문자 때문에 HTML로 오판되던 것 방지
+  const html = showAsHtml(l, body);
   // iframe 기본 body 마진 제거(흰 테두리 방지) + 높이 리포터 주입
   // 크리스탈리아/크릿 계열 로그는 본문을 JS로 그리므로 스크립트 실행이 필요 —
   // 널 오리진 샌드박스(allow-scripts만)라 사이트 쿠키·DOM 접근은 불가 (6.3의 격리 목적 유지)
@@ -209,10 +229,10 @@ try{Object.defineProperty(window,'localStorage',{value:__m});Object.defineProper
 // 내용이 짧아도 줄어들지 못한다(짧은 로그 아래에 빈 공간이 남던 원인) → body 기준으로 잰다.
 (function(){var p=0;function r(){try{
 var b=document.body,d=document.documentElement;if(!b)return;
-// documentElement.scrollHeight는 뷰포트(=iframe 현재 높이)보다 작아지지 않아, 한 번 커지면
-// 내용이 짧아도 못 줄어든다(짧은 로그 아래에 빈 공간이 남던 원인). 내용 기준 값을 먼저 보고,
-// 아직 레이아웃 전이라 0이면 예전 방식으로 되돌려 최소한 동작은 하게 한다.
-var h=Math.max(b.scrollHeight||0,b.offsetHeight||0,d.offsetHeight||0)||d.scrollHeight||0;
+// html(documentElement)은 내용이 짧아도 뷰포트(=iframe 현재 높이)만큼 늘어나므로 기준으로 쓰지 않는다.
+// scrollHeight든 offsetHeight든 마찬가지라, 늘어나지 않는 body만 본다.
+// (레이아웃 전이라 0이면 그때만 예전 방식으로 되돌린다 — 최소한 동작은 하게)
+var h=Math.max(b.scrollHeight||0,b.offsetHeight||0,Math.ceil(b.getBoundingClientRect().height)||0)||d.scrollHeight||0;
 if(h&&h!==p){p=h;parent.postMessage({__logH:h},'*');}}catch(e3){}}
 document.addEventListener('DOMContentLoaded',r);addEventListener('load',r);addEventListener('resize',r);
 try{new MutationObserver(r).observe(document.documentElement,{childList:true,subtree:true,attributes:true});}catch(e4){}
@@ -238,6 +258,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
             });
             // 본문·썸네일 교체 상태 초기화 (기본: 현재 것 유지)
             setBodyMode('keep'); setEFile(null); setEText(bodyText ?? '');
+            setBodyDisp(l.bodyHtml === undefined ? 'auto' : l.bodyHtml ? 'html' : 'text');
             // 「현재 유지」에서도 위치·확대를 조정할 수 있게 지금 크롭값에서 시작한다
             setThumbMode('keep'); setEThumb(null); setEThumbUrl(''); setEThumbCrop(l.thumbCrop);
             setEColorMode(l.thumbColor ? (l.thumbColor.c2 ? 'grad' : 'solid') : 'grad');
@@ -261,7 +282,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
         )}
         {html ? (
           /* 원본 스타일·스크립트 유지 — 널 오리진 샌드박스라 사이트 데이터에는 접근 불가 (6.3 격리) */
-          <LogFrame frameRef={frameRef} html={srcDoc} title={l.title} />
+          <LogFrame frameRef={frameRef} html={srcDoc} title={l.title} onFrameLoad={onFrameLoad} />
         ) : (
           body
             ? <div className="log-plain">{body}</div>
@@ -397,6 +418,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
           <label className="k-label" style={{ margin: '4px 0 0' }}>본문</label>
           <div className="mini-seg" style={{ justifySelf: 'start' }}>
             <button className={bodyMode === 'keep' ? 'on' : ''} onClick={() => setBodyMode('keep')}>현재 유지</button>
+            {/* 아래 표시 방식 세그는 본문 교체와 별개 — 저장하면 항상 반영된다 */}
             <button className={bodyMode === 'text' ? 'on' : ''} onClick={() => { setBodyMode('text'); if (!eText) setEText(bodyText ?? ''); }}>직접 수정</button>
             <button className={bodyMode === 'file' ? 'on' : ''} onClick={() => setBodyMode('file')}>파일 업로드</button>
           </div>
@@ -417,6 +439,17 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
             <KTextarea style={{ minHeight: 160, fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
               placeholder="HTML 코드 통째 붙여넣기 또는 텍스트 직접 작성" value={eText} onChange={ev => setEText(ev.target.value)} />
           )}
+
+          {/* 본문 표시 방식 (v2.0) — 자동 판별이 직접 쓴 글을 HTML로 오판하는 경우가 있어 직접 고를 수 있게 */}
+          <label className="k-label" style={{ margin: '4px 0 0' }}>본문 표시</label>
+          <div className="mini-seg" style={{ justifySelf: 'start' }}>
+            <button className={bodyDisp === 'auto' ? 'on' : ''} onClick={() => setBodyDisp('auto')}>자동</button>
+            <button className={bodyDisp === 'text' ? 'on' : ''} onClick={() => setBodyDisp('text')}>글자 그대로</button>
+            <button className={bodyDisp === 'html' ? 'on' : ''} onClick={() => setBodyDisp('html')}>HTML로</button>
+          </div>
+          <p className="hint" style={{ margin: 0 }}>
+            자동은 내용을 보고 판단합니다 — 직접 쓴 글에 &lt;태그&gt;처럼 보이는 문자가 있으면 HTML로 잘못 볼 수 있으니, 그럴 때 「글자 그대로」를 고르세요.
+          </p>
         </div>
       </Modal>
 
