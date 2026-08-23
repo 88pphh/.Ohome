@@ -1,0 +1,107 @@
+﻿'use client';
+// 설치 화면에서 복사해 쓰는 Firebase 보안 규칙 — 원본: firebase/firestore.rules · firebase/storage.rules
+// (원본을 고치면 이 파일도 함께 갱신)
+
+export const FIRESTORE_RULES = `rules_version = '2';
+
+// ============================================================
+// O.HOME Firestore 보안 규칙
+// Firebase 콘솔 → Firestore Database → 규칙 에 붙여넣고 [게시].
+//
+// 문서 구조
+//   meta/owner            { uid, admins[] }   ← 첫 로그인 계정이 1회만 자기를 등록
+//   profiles/{uid}        { nickname, avatarUrl, avatarColor }
+//   settings/{key}        { value }           ← 테마·메뉴·폰트·메인 위젯 등
+//   <콘텐츠>/{id}          { data, authorId, visibility, sort }
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownerData() {
+      return get(/databases/$(database)/documents/meta/owner).data;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/meta/owner)
+        && (ownerData().uid == request.auth.uid
+            || (ownerData().keys().hasAny(['admins']) && request.auth.uid in ownerData().admins));
+    }
+
+    // 콘텐츠 컬렉션 목록 — 여기 없는 이름은 아무 권한도 없다
+    function isContent(name) {
+      return name in [
+        'posts', 'guestbook', 'characters', 'relations', 'gallery', 'roadview',
+        'trpg_logs', 'trpg_chars', 'dotori', 'playlog', 'rp_rooms', 'threads',
+        'diary', 'memos', 'commissions', 'applicants', 'moods'
+      ];
+    }
+
+    // ── 소유자(관리자) 지정 — 아직 없을 때 딱 한 번 ──────────────
+    match /meta/owner {
+      allow read: if true;
+      allow create: if signedIn() && !exists(/databases/$(database)/documents/meta/owner);
+      allow update, delete: if isAdmin();
+    }
+
+    // ── 회원 프로필 ─────────────────────────────────────────────
+    match /profiles/{uid} {
+      allow read: if true;
+      allow create, update: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ── 사이트 설정 (읽기 공개 · 쓰기 관리자) ────────────────────
+    match /settings/{key} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── 콘텐츠 ─────────────────────────────────────────────────
+    match /{coll}/{docId} {
+      // 읽기: 전체공개 / 멤버공개(로그인) / 내가 쓴 것 / 관리자
+      allow read: if isContent(coll) && (
+        resource.data.visibility == 'public'
+        || (resource.data.visibility == 'member' && signedIn())
+        || (signedIn() && resource.data.authorId == request.auth.uid)
+        || isAdmin()
+      );
+
+      // 쓰기: 로그인 회원 — 방명록만 비로그인 방문자도 남길 수 있음(닉네임+비밀번호 방식)
+      allow create: if isContent(coll) && (signedIn() || coll == 'guestbook');
+
+      // 수정·삭제: 작성자 본인 또는 관리자
+      allow update, delete: if isContent(coll)
+        && signedIn()
+        && (resource.data.authorId == request.auth.uid || isAdmin());
+    }
+  }
+}
+`;
+
+export const STORAGE_RULES = `rules_version = '2';
+
+// ============================================================
+// O.HOME Storage 보안 규칙 (이미지·파일)
+// Firebase 콘솔 → Storage → 규칙 에 붙여넣고 [게시].
+//   · 읽기는 공개 (방문자가 그림을 봐야 하므로)
+//   · 올리기·지우기는 로그인 회원만
+//   · 한 번에 20MB 초과 업로드 차단
+// ============================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /ohome/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.size < 20 * 1024 * 1024;
+      allow delete: if request.auth != null;
+    }
+  }
+}
+`;

@@ -1,0 +1,116 @@
+'use client';
+// 백엔드 어댑터 (v2.0) — Supabase / Firebase 두 버전을 같은 인터페이스로 쓴다.
+//
+// 화면 코드는 이 파일의 타입만 알고, 어떤 서비스에 붙었는지는 모른다.
+// 새 백엔드를 추가하려면 이 인터페이스만 구현하면 된다.
+
+export type BackendKind = 'supabase' | 'firebase';
+
+/** 설치 화면에서 입력받는 연결 정보 — 모두 공개돼도 되는 값이다(보안은 서버 규칙이 담당) */
+export type BackendConfig =
+  | { kind: 'supabase'; url: string; anonKey: string }
+  | {
+      kind: 'firebase';
+      apiKey: string; authDomain: string; projectId: string;
+      storageBucket: string; appId: string; messagingSenderId?: string;
+    };
+
+/** 로그인 사용자 */
+export interface BackendUser {
+  id: string;
+  nickname: string;
+  role: 'admin' | 'member';
+  email?: string;
+  avatarUrl?: string;
+  avatarColor?: string;
+}
+
+/** 연결·규칙 점검 결과 (설치 화면의 [연결 확인]) */
+export interface BackendCheck {
+  ok: boolean;
+  reachable: boolean;   // 프로젝트에 닿음
+  schema: boolean;      // 테이블/규칙 준비됨
+  hasAdmin: boolean;    // 관리자 계정 있음
+  message: string;
+}
+
+export interface ListItem { id: string; [k: string]: unknown }
+
+export interface Backend {
+  kind: BackendKind;
+
+  /* ---- 연결 점검 ---- */
+  check(): Promise<BackendCheck>;
+
+  /* ---- 인증 ---- */
+  currentUser(): Promise<BackendUser | null>;
+  onAuthChange(cb: (u: BackendUser | null) => void): () => void;
+  signIn(id: string, password: string): Promise<{ ok: boolean; error?: string }>;
+  signUp(id: string, password: string, nickname: string): Promise<{ ok: boolean; error?: string }>;
+  signOut(): Promise<void>;
+  resetPassword(email: string): Promise<{ ok: boolean; error?: string }>;
+  updateProfile(patch: { nickname?: string; avatarUrl?: string | null; avatarColor?: string | null }): Promise<{ ok: boolean; error?: string }>;
+  /** 첫 계정을 이 홈의 관리자로 등록 (관리자가 아직 없을 때만) */
+  claimOwner(): Promise<{ ok: boolean; error?: string }>;
+  /** 가입 회원 목록 — 역극 참여자 선택·회원 관리 화면용 */
+  listMembers(): Promise<{ id: string; nickname: string; role: 'admin' | 'member'; email?: string }[]>;
+
+  /* ---- 목록(콘텐츠) ---- */
+  fetchList<T extends ListItem>(coll: string): Promise<T[]>;
+  syncList<T extends ListItem>(coll: string, prev: T[], next: T[], uid: string | null): Promise<void>;
+  subscribe(coll: string, onChange: () => void): () => void;
+
+  /* ---- 설정(key/value) ---- */
+  fetchSetting<T>(key: string): Promise<T | null>;
+  saveSetting(key: string, value: unknown): Promise<void>;
+  fetchAllSettings(): Promise<Record<string, unknown>>;
+
+  /* ---- 이미지·파일 ---- */
+  uploadFile(blob: Blob, ext: string): Promise<string>;   // → 공개 URL
+}
+
+/** 콘텐츠 컬렉션 이름 (localStorage 키 → 컬렉션/테이블) — 두 백엔드가 같은 이름을 쓴다 */
+export const COLLECTION_OF: Record<string, string> = {
+  'ohome.board.v1': 'posts',
+  'ohome.guest.v1': 'guestbook',
+  'ohome.chars.v1': 'characters',
+  'ohome.rels.v1': 'relations',
+  'ohome.backup.v1': 'gallery',
+  'ohome.road.v1': 'roadview',
+  'ohome.trpg.v1': 'trpg_logs',
+  'ohome.tchars.v1': 'trpg_chars',
+  'ohome.dotori.v1': 'dotori',
+  'ohome.playlog.v1': 'playlog',
+  'ohome.rp.v1': 'rp_rooms',
+  'ohome.threads.v1': 'threads',
+  'ohome.diary.v1': 'diary',
+  'ohome.memo.v1': 'memos',
+  'ohome.comm.v1': 'commissions',
+  'ohome.commapply.v1': 'applicants',
+  'ohome.moods.v1': 'moods',
+};
+
+export const CONTENT_COLLECTIONS = Object.values(COLLECTION_OF);
+
+/** 항목 배열 비교 — 두 백엔드가 공유하는 diff (바뀐 것만 저장) */
+export function diffList<T extends ListItem>(prev: T[], next: T[]) {
+  const prevMap = new Map(prev.map((it, i) => [it.id, { it, i }]));
+  const nextIds = new Set(next.map(it => it.id));
+  const inserts: { item: T; sort: number }[] = [];
+  const updates: { item: T; sort: number }[] = [];
+  next.forEach((it, i) => {
+    const before = prevMap.get(it.id);
+    if (!before) inserts.push({ item: it, sort: i });
+    else if (before.i !== i || JSON.stringify(before.it) !== JSON.stringify(it)) updates.push({ item: it, sort: i });
+  });
+  const deletes = prev.filter(it => !nextIds.has(it.id)).map(it => it.id);
+  return { inserts, updates, deletes };
+}
+
+/** 항목에서 권한 판단에 쓰는 값 뽑기 */
+export function metaOf(item: ListItem, uid: string | null) {
+  const rawAuthor = typeof item.authorId === 'string' ? item.authorId : '';
+  const authorId = rawAuthor || uid || null;
+  const visibility = typeof item.visibility === 'string' ? item.visibility : 'public';
+  return { authorId, visibility };
+}

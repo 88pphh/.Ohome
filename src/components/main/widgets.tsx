@@ -1,0 +1,498 @@
+'use client';
+// 메인 위젯 렌더러 (4.0) — DIARY/LATEST/UPCOMING 등은 해당 기능(2·3차) 전까지 데모 데이터
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { WidgetConf, useMainStore, WIDGET_META } from '@/lib/mainStore';
+import { useAuth } from '@/lib/auth';
+import { useMenuSettings, buildMenu } from '@/lib/menuStore';
+import { useBoards } from '@/lib/boardStore';
+import { Modal } from '@/components/ui/Modal';
+import { KTextarea, KSelect, KStep, KCheck } from '@/components/ui/Kit';
+import { ColorField } from '@/components/ui/ColorField';
+import { useFonts } from '@/lib/fontStore';
+import { BannerEditor, BannerSlide, DEMO_SLIDES, DdayEditor, DecoEditor, TodoEditor, TodoSetItem } from '@/components/main/widgetEditors';
+import { CroppedBlobImg, CropValue } from '@/components/ui/CropEditor';
+import { useLocalList } from '@/lib/postStore';
+import { RoadItem, ROAD_SEED, BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
+import { DiaryPost, DIARY_SEED, Mood, MOOD_SEED, moodTint } from '@/lib/diaryStore';
+import { useSched, eventColor } from '@/lib/schedStore';
+import { StickyMemo, MEMO_SEED, MEMO_SIZE_W, useMemoSettings } from '@/lib/memoStore';
+import { BlobImg, useBlobUrl } from '@/lib/blobStore';
+import { normalizeInternalLink } from '@/lib/link';
+
+/* 편집모드 우클릭 「설정」 → 해당 위젯의 설정 모달 열기 (v1.9 사용자 확정 — 이벤트로 연결) */
+function useEditEvent(id: string, onOpen: () => void) {
+  useEffect(() => {
+    const h = (e: Event) => { if ((e as CustomEvent).detail?.id === id) onOpen(); };
+    window.addEventListener('ohome-widget-edit', h);
+    return () => window.removeEventListener('ohome-widget-edit', h);
+  }, [id, onOpen]);
+}
+
+/* ---------- 슬라이드 배너 (고정 요소, 4.0) — 이미지·링크·간격·순서 관리 ---------- */
+
+export function BannerWidget({ conf }: { conf: WidgetConf }) {
+  const { isAdmin } = useAuth();
+  const { editOn, updateWidget } = useMainStore();
+  const router = useRouter();
+  const [cur, setCur] = useState(0);
+  const [mngOpen, setMngOpen] = useState(false);
+  useEditEvent(conf.id, () => setMngOpen(true));   // 편집모드 우클릭 → 설정 (v1.9)
+  const slides = ((conf.settings.slides as BannerSlide[]) ?? []).length > 0
+    ? (conf.settings.slides as BannerSlide[]) : DEMO_SLIDES;
+  const interval = (conf.settings.interval as number) ?? 4;
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const t = setInterval(() => setCur(c => (c + 1) % slides.length), Math.max(2, interval) * 1000);
+    return () => clearInterval(t);
+  }, [slides.length, interval]);
+
+  const s = slides[Math.min(cur, slides.length - 1)];
+  const go = () => {
+    if (editOn || !s.link) return;
+    // 기존 저장분에 풀주소가 있어도 같은 사이트면 내부 이동으로 (v1.9)
+    const l = normalizeInternalLink(s.link);
+    if (/^https?:\/\//.test(l)) window.open(l, '_blank');
+    else router.push(l);
+  };
+
+  return (
+    <div className="banner" style={{ cursor: s.link && !editOn ? 'pointer' : undefined }} onClick={go}>
+      {slides.map((sl, i) => (
+        <div key={sl.id} className={`slide ${i === Math.min(cur, slides.length - 1) ? 'on' : ''}`}>
+          {sl.imgId
+            /* 업로드 이미지 — 원본 보존 + 위치 크롭만 적용 (배너 크기가 바뀌어도 비율 좌표로 재현) */
+            ? <CroppedBlobImg fileRef={sl.imgId} crop={sl.crop} ph="" />
+            : sl.img
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={sl.img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <div className={`ph ${sl.cls ?? ''}`} style={{ position: 'absolute', inset: 0 }}><span>SLIDE BANNER {String(i + 1).padStart(2, '0')}</span></div>}
+        </div>
+      ))}
+      <div className="cap"><b>{s.cap}</b><span>{s.sub}</span></div>
+      <div className="dots" onClick={e => e.stopPropagation()}>
+        {slides.map((sl, i) => (
+          <i key={sl.id} className={i === Math.min(cur, slides.length - 1) ? 'on' : ''} onClick={() => setCur(i)} />
+        ))}
+      </div>
+      {/* 배너 관리 (관리자) — 배너에 마우스를 올렸을 때만 표시 */}
+      {isAdmin && !editOn && (
+        <button className="hv-actions"
+          style={{
+            position: 'absolute', top: 10, right: 10, zIndex: 4, fontSize: 10.5, letterSpacing: '.06em',
+            padding: '5px 11px', borderRadius: 999, background: 'rgba(15,17,20,.55)', color: '#dfe2e7',
+          }}
+          onClick={e => { e.stopPropagation(); setMngOpen(true); }}>MANAGE</button>
+      )}
+      <div onClick={e => e.stopPropagation()}>
+        <Modal open={mngOpen} onClose={() => setMngOpen(false)} title="슬라이드 배너 관리"
+          desc="이미지 업로드 · 캡션 · 링크(내부 경로 또는 외부 URL) · ⠿ 드래그로 순서 · 원본은 잘리지 않음">
+          {mngOpen && <BannerEditor conf={conf} onSaved={() => setMngOpen(false)} onClose={() => setMngOpen(false)} />}
+        </Modal>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 메뉴리스트 (모바일 전용, 8장) ---------- */
+export function MenuListWidget() {
+  const router = useRouter();
+  const [open, setOpen] = useState<string | null>(null);
+  const [menuSet, , menuLoaded] = useMenuSettings(); // 메뉴 관리 (5.2) 반영
+  const { boards, loaded: boardsLoaded } = useBoards(); // 다중 게시판 (5.2)
+  const { user: wUser, isAdmin: wIsAdmin } = useAuth(); // 공개범위 필터 (v1.9)
+  return (
+    <div className="panel menu-list wgt-menu">
+      {(menuLoaded && boardsLoaded ? buildMenu(menuSet, boards, { loggedIn: !!wUser, isAdmin: wIsAdmin }) : []).map(m =>
+        m.children ? (
+          <div key={m.label} className={`mgrp ${open === m.label ? 'open' : ''}`}>
+            <a onClick={() => setOpen(o => (o === m.label ? null : m.label))}>{m.label}</a>
+            <div className="msub">
+              {m.children.map(c => <a key={c.href} onClick={() => router.push(c.href)}>{c.label}</a>)}
+            </div>
+          </div>
+        ) : (
+          <a key={m.label} onClick={() => router.push(m.href!)}>{m.label}</a>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ---------- MEMO — 관리자 클릭 시 큰 편집 모달 (4.12 v1.8) ---------- */
+export function MemoWidget({ conf }: { conf: WidgetConf }) {
+  const { isAdmin } = useAuth();
+  const { editOn, updateWidget } = useMainStore();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const text = (conf.settings.text as string) ?? '';
+  useEditEvent(conf.id, () => { setDraft(text); setOpen(true); });   // 편집모드 우클릭 → 설정 (v1.9)
+  return (
+    <div className="panel widget" style={{ cursor: isAdmin ? 'pointer' : undefined }}
+      onClick={e => { if ((e.target as HTMLElement).closest('.modal-ov')) return; if (isAdmin && !editOn) { setDraft(text); setOpen(true); } }}>
+      <h4>MEMO {isAdmin && <span className="more">관리 ›</span>}</h4>
+      <p style={{ fontSize: 12, lineHeight: 1.7, color: '#3a3f47', whiteSpace: 'pre-line' }}>{text || '메모가 비어 있습니다'}</p>
+
+      <Modal open={open} onClose={() => setOpen(false)} title="메모 관리" desc="메인 메모 위젯 내용 — 관리자 전용"
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setOpen(false)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={() => {
+            updateWidget(conf.id, { settings: { ...conf.settings, text: draft } }, { persist: true }); setOpen(false);
+          }}>SAVE</button>
+        </>}>
+        <KTextarea value={draft} onChange={e => setDraft(e.target.value)} />
+      </Modal>
+    </div>
+  );
+}
+
+/* ---------- DIARY (최근 일기 — 실데이터, 4.14) ---------- */
+export function DiaryWidget() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [posts] = useLocalList<DiaryPost>('ohome.diary.v1', DIARY_SEED);
+  const [moods] = useLocalList<Mood>('ohome.moods.v1', MOOD_SEED);
+  // 비공개 일기는 위젯에 절대 노출되지 않음 — 관리자여도 (4.14)
+  const latest = posts
+    .filter(p => p.visibility === 'public' || (p.visibility === 'member' && !!user))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
+  return (
+    <div className="panel widget" style={{ margin: 0 }}>
+      <h4>DIARY <span className="more" onClick={() => router.push('/diary')}>더보기 ›</span></h4>
+      {latest.map(p => {
+        const m = moods.find(x => x.id === p.moodId);
+        return (
+          <div key={p.id} className="diary-mini" onClick={() => router.push(`/diary#${p.id}`)}>
+            <div className="mood" style={{ background: moodTint(m?.color ?? '#888'), color: m?.color }}>{m?.icon ?? '·'}</div>
+            <div className="t"><span className="tt">{p.title}</span> <small>{p.date.slice(5).replace('-', '.')}{m ? ` · ${m.name}` : ''}</small></div>
+          </div>
+        );
+      })}
+      {latest.length === 0 && <p className="hint">공개된 일기가 없습니다</p>}
+    </div>
+  );
+}
+
+/* ---------- LATEST (최신 그림 — 로드비 + 갤러리 통합 최신 3장, v1.9 사용자 피드백) ---------- */
+export function LatestWidget() {
+  const router = useRouter();
+  const [roads] = useLocalList<RoadItem>('ohome.road.v1', ROAD_SEED);
+  const [backups] = useLocalList<BackupPost>('ohome.backup.v1', BACKUP_SEED);
+  const latest = [
+    ...roads.map(it => ({
+      id: `r-${it.id}`, date: it.date, ref: it.imgId ?? it.imgUrl, ph: it.ph,
+      href: '/roadview', tip: `로드비 · No.${String(it.no ?? 0).padStart(3, '0')}`,
+    })),
+    // 갤러리 — 전체공개 + 접기 없는 게시물의 대표(첫) 이미지
+    ...backups.filter(p => p.visibility === 'public' && !p.fold).map(p => ({
+      id: `b-${p.id}`, date: p.date, ref: p.images[0], ph: p.phList[0] ?? 'cool',
+      href: `/backup/${p.id}`, tip: `갤러리 · ${p.title}`,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+  const phFallback = ['cool', 'warm', 'red'];
+  return (
+    <div className="panel widget" style={{ margin: 0 }}>
+      <h4>LATEST <span className="more" onClick={() => router.push('/backup')}>더보기 ›</span></h4>
+      <div className="latest-grid">
+        {[0, 1, 2].map(i => {
+          const it = latest[i];
+          return (
+            <div key={it?.id ?? i} style={{ aspectRatio: '1', borderRadius: 9, overflow: 'hidden', position: 'relative', cursor: it ? 'pointer' : undefined }}
+              onClick={() => { if (it) router.push(it.href); }} data-tip={it?.tip}>
+              <BlobImg fileRef={it?.ref} ph={it?.ph || phFallback[i]} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- D-DAY (4.12 — 스케줄러 연동은 3차) ---------- */
+interface DdayItem { title: string; date: string; plusOne?: boolean }
+function ddayLabel(date: string, plusOne?: boolean): { label: string; passed: boolean; near: boolean } {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(date + 'T00:00:00');
+  const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+  // +1 Day: 시작일을 1일로 세는 기념일 카운트 (커플 기념일 등) — 당일 = D+1
+  if (plusOne && diff <= 0) return { label: `D+${-diff + 1}`, passed: true, near: false };
+  if (diff === 0) return { label: 'D-DAY', passed: false, near: true };
+  return diff > 0
+    ? { label: `D-${diff}`, passed: false, near: diff <= 7 }
+    : { label: `D+${-diff}`, passed: true, near: false };
+}
+
+export function DdayWidget({ conf }: { conf: WidgetConf }) {
+  const { isAdmin } = useAuth();
+  const { editOn } = useMainStore();
+  const [open, setOpen] = useState(false);
+  const items = (conf.settings.items as DdayItem[]) ?? [];
+  useEditEvent(conf.id, () => setOpen(true));   // 편집모드 우클릭 → 설정 (v1.9)
+  return (
+    <div className="panel widget" style={{ cursor: isAdmin ? 'pointer' : undefined }}
+      onClick={e => { if ((e.target as HTMLElement).closest('.modal-ov')) return; if (isAdmin && !editOn) setOpen(true); }}>
+      <h4>D-DAY {isAdmin && <span className="more">관리 ›</span>}</h4>
+      {items.map(it => {
+        const d = ddayLabel(it.date, it.plusOne);
+        return (
+          <div className="dday-row" key={it.title}>
+            <span>{it.title}</span>
+            <b className={d.near ? 'd-red' : ''}>{d.label}</b>
+          </div>
+        );
+      })}
+      {items.length === 0 && <p className="hint">등록된 D-day가 없습니다</p>}
+
+      <Modal open={open} onClose={() => setOpen(false)} title="D-day 관리"
+        desc="추가 · 수정 · 삭제 · ⠿ 드래그로 순서 조정 — 환경설정 「위젯」에서도 관리 가능"
+        actions={<button className="btn btn-dark" onClick={() => setOpen(false)}>CLOSE</button>}>
+        {open && <DdayEditor conf={conf} />}
+      </Modal>
+    </div>
+  );
+}
+
+/* ---------- TO-DO — 관리자 클릭 시 관리 모달 (4.12 확정) ---------- */
+export function TodoWidget({ conf }: { conf: WidgetConf }) {
+  const { isAdmin } = useAuth();
+  const { editOn, updateWidget } = useMainStore();
+  const [open, setOpen] = useState(false);
+  const items = (conf.settings.items as TodoSetItem[]) ?? [];
+  useEditEvent(conf.id, () => setOpen(true));   // 편집모드 우클릭 → 설정 (v1.9)
+
+  const setItems = (next: TodoSetItem[]) => {
+    updateWidget(conf.id, { settings: { ...conf.settings, items: next } }, { persist: true });
+  };
+
+  return (
+    <div className="panel widget" style={{ cursor: isAdmin ? 'pointer' : undefined }}
+      onClick={e => {
+        if (!isAdmin || editOn) return;
+        if ((e.target as HTMLElement).closest('.k-check') || (e.target as HTMLElement).closest('.modal-ov')) return;
+        setOpen(true);
+      }}>
+      <h4>TO-DO {isAdmin && <span className="more">관리 ›</span>}</h4>
+      {items.map((it, i) => (
+        <label className={`todo-row k-check ${it.done ? 'done' : ''}`} key={`${it.text}-${i}`}
+          style={!isAdmin ? { pointerEvents: 'none' } : undefined}>
+          <input type="checkbox" checked={it.done}
+            onChange={ev => setItems(items.map((x, j) => (j === i ? { ...x, done: ev.target.checked } : x)))} />
+          <span className="box" /><span>{it.text}</span>
+        </label>
+      ))}
+      {items.length === 0 && <p className="hint">할 일이 없습니다</p>}
+
+      <Modal open={open} onClose={() => setOpen(false)} title="투두 관리"
+        desc="추가 · 체크 · 삭제 · ⠿ 드래그로 순서 조정 — 환경설정 「위젯」에서도 관리 가능">
+        {open && <TodoEditor conf={conf} />}
+        <div className="modal-actions">
+          <button className="btn btn-dark" onClick={() => setOpen(false)}>CLOSE</button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ---------- UPCOMING (다가오는 일정 — 스케줄러 실데이터, 4.12) ---------- */
+export function UpcomingWidget() {
+  const router = useRouter();
+  const { user, isAdmin } = useAuth();
+  const { st } = useSched();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  // 오늘 포함 이후 일정 — 매년 반복은 올해 날짜로 환산해 가장 가까운 3개
+  const upcoming = st.events
+    .filter(e => isAdmin || e.visibility === 'public' || (e.visibility === 'member' && !!user))
+    .map(e => {
+      let d = e.start;
+      if (e.repeat === 'yearly') {
+        const thisYear = `${today.getFullYear()}-${e.start.slice(5)}`;
+        d = thisYear >= todayStr ? thisYear : `${today.getFullYear() + 1}-${e.start.slice(5)}`;
+      }
+      return { e, d };
+    })
+    .filter(x => x.d >= todayStr)
+    .sort((a, b) => a.d.localeCompare(b.d))
+    .slice(0, 3);
+  return (
+    <div className="panel widget" style={{ cursor: 'var(--cur-pointer,pointer)' }} onClick={() => router.push('/cal')}>
+      <h4>UPCOMING <span className="more">더보기 ›</span></h4>
+      {upcoming.map(({ e, d }) => (
+        <div key={e.id} className="dday-row">
+          <span>{d.slice(5).replace('-', '.')} · {e.title}</span>
+          <b style={{ fontSize: 11, color: eventColor(e, st.cats) }}>●</b>
+        </div>
+      ))}
+      {upcoming.length === 0 && <p className="hint">다가오는 일정이 없습니다</p>}
+    </div>
+  );
+}
+
+/* ---------- 자유 텍스트 (v1.9 개편 — 사용자 확정) ----------
+   패널 없이 문구만 — 폰트·크기·색·정렬을 지정해 장식처럼 아무 곳에나 배치(위젯 드래그·크기 공통).
+   편집은 편집모드에서만 — 우클릭 「설정」 (v1.9 사용자 확정: 평상시 클릭 편집 제거). */
+export function FreeTextWidget({ conf }: { conf: WidgetConf }) {
+  const { isAdmin } = useAuth();
+  const { updateWidget } = useMainStore();
+  const { fonts, familyOf } = useFonts();
+  const [open, setOpen] = useState(false);
+  const s = conf.settings as { text?: string; fontId?: string; size?: number; color?: string; align?: 'left' | 'center' | 'right'; bold?: boolean };
+  const [draft, setDraft] = useState(s);
+  useEditEvent(conf.id, () => { setDraft({ ...s }); setOpen(true); });
+  return (
+    <div>
+      <p style={{
+        fontFamily: familyOf(s.fontId) ?? 'var(--sans)',
+        fontSize: s.size ?? 15, color: s.color ?? 'var(--page-desc)',
+        textAlign: s.align ?? 'left', fontWeight: s.bold ? 700 : 400,
+        lineHeight: 1.7, whiteSpace: 'pre-line', margin: 0, wordBreak: 'keep-all',
+      }}>
+        {s.text || (isAdmin ? '자유 텍스트 — 편집모드에서 우클릭 → 설정' : '')}
+      </p>
+      <Modal open={open} onClose={() => setOpen(false)} title="자유 텍스트"
+        desc="패널 없이 문구만 표시 — 폰트·크기·색·정렬 지정, 배치는 편집모드에서 드래그"
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setOpen(false)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={() => {
+            updateWidget(conf.id, { settings: { ...conf.settings, ...draft } }, { persist: true }); setOpen(false);
+          }}>SAVE</button>
+        </>}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <KTextarea value={draft.text ?? ''} onChange={e => setDraft(d => ({ ...d, text: e.target.value }))} />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <KSelect minWidth={170} value={draft.fontId ?? 'default'}
+              onChange={v => setDraft(d => ({ ...d, fontId: v }))}
+              options={fonts.map(f => ({ value: f.id, label: <span style={{ fontFamily: familyOf(f.id) }}>{f.name}</span> }))} />
+            <span className="cp-lb">크기</span>
+            <KStep value={draft.size ?? 15} min={10} max={64} step={1} suffix="px"
+              onChange={v => setDraft(d => ({ ...d, size: v }))} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className="cp-lb">글씨색</span>
+            <ColorField value={draft.color ?? '#5d636d'} onChange={hex => setDraft(d => ({ ...d, color: hex }))} />
+            <div className="mini-seg">
+              {(['left', 'center', 'right'] as const).map(a => (
+                <button key={a} className={(draft.align ?? 'left') === a ? 'on' : ''}
+                  onClick={() => setDraft(d => ({ ...d, align: a }))}>
+                  {a === 'left' ? '왼쪽' : a === 'center' ? '가운데' : '오른쪽'}
+                </button>
+              ))}
+            </div>
+            <KCheck label="굵게" checked={!!draft.bold} onChange={v => setDraft(d => ({ ...d, bold: v }))} />
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ---------- 장식 이미지 — 패널 없이 이미지만 (장식용) ---------- */
+/** 비율 유지(안 잘림) 렌더 — cover(크롭)와 선택제 (v1.9 사용자 요청)
+ *  둥근 모서리는 위젯 박스가 아니라 **이미지 크기**에 맞춰 적용 (v1.9 사용자 피드백 — 여백까지 둥글면 티가 안 남) */
+function ContainImg({ fileRef, rounded }: { fileRef: string; rounded: boolean }) {
+  const url = useBlobUrl(fileRef);
+  if (!url) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" draggable={false}
+        style={{
+          maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', display: 'block',
+          borderRadius: rounded ? 'var(--radius)' : 0,
+        }} />
+    </div>
+  );
+}
+
+export function DecoWidget({ conf }: { conf: WidgetConf }) {
+  const { isAdmin } = useAuth();
+  const { editOn } = useMainStore();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const imgId = conf.settings.imgId as string | undefined;
+  const crop = conf.settings.crop as CropValue | undefined;
+  const rounded = (conf.settings.rounded as boolean) ?? true;
+  const link = (conf.settings.link as string) ?? '';
+  const fit = (conf.settings.fit as 'cover' | 'contain') ?? 'cover';   // 꽉 채움(잘림) / 비율 유지 (v1.9)
+  useEditEvent(conf.id, () => setOpen(true));   // 편집은 편집모드 우클릭 「설정」 전용 (v1.9 사용자 확정)
+  // 링크 이동 (v1.9 — 이미지+링크를 위젯 테두리 없이)
+  const onBody = () => {
+    if (editOn) return;
+    if (imgId && link) {
+      const l = normalizeInternalLink(link);
+      if (/^https?:\/\//.test(l)) window.open(l, '_blank');
+      else router.push(l);
+    }
+  };
+  return (
+    <div className="deco-wgt"
+      style={{
+        position: 'relative', width: '100%', height: '100%', minHeight: 80, overflow: 'hidden',
+        aspectRatio: conf.h == null ? '1/1' : undefined, // 크기 동결 전 기본 정사각
+        borderRadius: rounded ? 'var(--radius)' : 0,
+        cursor: !editOn && imgId && link ? 'var(--cur-pointer,pointer)' : undefined,
+      }}
+      onClick={onBody}>
+      {imgId
+        ? (fit === 'contain'
+          ? <ContainImg fileRef={imgId} rounded={rounded} />
+          : <CroppedBlobImg fileRef={imgId} crop={crop} ph="" />)
+        : (
+          <div className="ph" style={{ position: 'absolute', inset: 0 }}>
+            <span style={{ fontSize: 10 }}>{isAdmin ? 'DECO — 편집모드에서 우클릭 → 설정' : 'DECO'}</span>
+          </div>
+        )}
+      <div onClick={e => e.stopPropagation()}>
+        <Modal open={open} onClose={() => setOpen(false)} small title="장식 이미지"
+          desc="업로드 · 위치 크롭(현재 위젯 비율) · 둥근 모서리 — 원본은 잘리지 않음">
+          {open && <DecoEditor conf={conf} onClose={() => setOpen(false)} />}
+        </Modal>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 스티커 메모 미니보드 (4.6) — 읽기 전용 축소 보드, 클릭 시 /memo ---------- */
+export function MemoBoardWidget() {
+  const router = useRouter();
+  const [memos] = useLocalList<StickyMemo>('ohome.memo.v1', MEMO_SEED);
+  const [settings] = useMemoSettings();
+  return (
+    <div className="panel widget" style={{ display: 'flex', flexDirection: 'column' }}>
+      <h4>STICKY</h4>
+      <div className="memo-mini" onClick={() => router.push('/memo')}>
+        {memos.map(m => (
+          <div key={m.id} className="postit"
+            style={{
+              left: `${m.x}%`, top: `${m.y}%`, zIndex: m.z,
+              transform: `rotate(${m.rot}deg)`, background: m.color,
+              width: Math.round(MEMO_SIZE_W[m.size] * 0.53),
+            }}>
+            {settings.showAuthor && <b>{m.author}</b>}
+            {m.text}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 타입 → 렌더러 ---------- */
+export function renderWidget(conf: WidgetConf) {
+  switch (conf.type) {
+    case 'banner': return <BannerWidget conf={conf} />;
+    case 'menu': return <MenuListWidget />;
+    case 'memo': return <MemoWidget conf={conf} />;
+    case 'diary': return <DiaryWidget />;
+    case 'latest': return <LatestWidget />;
+    case 'dday': return <DdayWidget conf={conf} />;
+    case 'todo': return <TodoWidget conf={conf} />;
+    case 'upcoming': return <UpcomingWidget />;
+    case 'freetext': return <FreeTextWidget conf={conf} />;
+    case 'deco': return <DecoWidget conf={conf} />;
+    case 'memoboard': return <MemoBoardWidget />;
+    default: return <div className="panel widget"><h4>{WIDGET_META[conf.type]?.title ?? conf.type}</h4></div>;
+  }
+}

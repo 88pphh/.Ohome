@@ -1,0 +1,400 @@
+'use client';
+// TRPG 로그 상세 (4.3) — HTML이면 원본 스타일 그대로 격리 렌더(iframe 샌드박스, 스크립트 실행 안 됨),
+// 일반 텍스트면 로그용 기본 서식으로 표시
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { useLocalList } from '@/lib/postStore';
+import { TrpgLog, TRPG_SEED, isHtmlBody, decodeLogText, logNo } from '@/lib/galleryStore';
+import { Relation, REL_SEED, Character, CHAR_SEED, charGrant } from '@/lib/charStore';
+import { Modal, ConfirmModal } from '@/components/ui/Modal';
+import { getBlob, putBlob } from '@/lib/blobStore';
+import { PageTitle } from '@/components/ui/PageText';
+import { KInput, KSelect, KDate, KTextarea } from '@/components/ui/Kit';
+import { ColorField } from '@/components/ui/ColorField';
+import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
+import { useToast } from '@/components/ui/Toast';
+
+/** 로그 렌더 프레임 — 대형 문서도 안정적으로 로드되도록 srcdoc 대신 Blob URL 사용 */
+function LogFrame({ frameRef, html, title }: {
+  frameRef: React.RefObject<HTMLIFrameElement | null>; html: string; title: string;
+}) {
+  const url = useMemo(() => URL.createObjectURL(new Blob([html], { type: 'text/html' })), [html]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  return (
+    <iframe
+      ref={frameRef}
+      className="log-frame"
+      sandbox="allow-scripts"
+      src={url}
+      title={title}
+    />
+  );
+}
+
+export default function TrpgDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { user, isAdmin } = useAuth();
+  const toast = useToast();
+  const [logs, setLogs, loaded] = useLocalList<TrpgLog>('ohome.trpg.v1', TRPG_SEED);
+  const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
+  const [allChars] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
+  const [delAsk, setDelAsk] = useState(false);
+  const [bodyText, setBodyText] = useState<string | null>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  const l = logs.find(x => x.id === id);
+
+  // 비밀번호 열람 (4.3) — 세션 동안 유지
+  const [unlocked, setUnlocked] = useState(false);
+  const [pwTry, setPwTry] = useState('');
+  useEffect(() => {
+    try { if (sessionStorage.getItem(`trpg-unlock:${id}`) === '1') setUnlocked(true); } catch { /* 무시 */ }
+  }, [id]);
+  const tryUnlock = () => {
+    if (l?.password && pwTry === l.password) {
+      setUnlocked(true);
+      try { sessionStorage.setItem(`trpg-unlock:${id}`, '1'); } catch { /* 무시 */ }
+    } else {
+      toast('비밀번호가 올바르지 않습니다');
+    }
+  };
+
+  // 로그 정보 수정 — 메타 + 본문 교체(파일/직접 입력) + 썸네일 교체(이미지 크롭/단색·그라데이션)
+  const [eOpen, setEOpen] = useState(false);
+  const [e, setE] = useState({
+    noText: '', title: '', catchphrase: '', writer: '', withText: '',
+    relId: 'none', date: '', visibility: 'public' as TrpgLog['visibility'], password: '',
+  });
+  // 본문 교체
+  const [bodyMode, setBodyMode] = useState<'keep' | 'file' | 'text'>('keep');
+  const [eFile, setEFile] = useState<File | null>(null);
+  const [eText, setEText] = useState('');
+  const eFileRef = useRef<HTMLInputElement>(null);
+  const eThumbRef = useRef<HTMLInputElement>(null);
+  // 썸네일 교체
+  const [thumbMode, setThumbMode] = useState<'keep' | 'image' | 'color'>('keep');
+  const [eThumb, setEThumb] = useState<File | null>(null);
+  const [eThumbUrl, setEThumbUrl] = useState('');
+  const [eThumbCrop, setEThumbCrop] = useState<CropValue | undefined>(undefined);
+  const [eCropOpen, setECropOpen] = useState(false);
+  const [eColorMode, setEColorMode] = useState<'grad' | 'solid'>('grad');
+  const [eC1, setEC1] = useState('#4c5a6e');
+  const [eC2, setEC2] = useState('#242b36');
+
+  const saveEdit = async () => {
+    if (!e.title.trim()) { toast('시나리오 타이틀을 입력해 주세요'); return; }
+    // 본문 교체 준비
+    let bodyPatch: Partial<TrpgLog> = {};
+    if (bodyMode === 'file' && eFile) {
+      const text = await decodeLogText(eFile);
+      bodyPatch = {
+        body: '', bodyId: await putBlob(new Blob([text], { type: 'text/plain' })),
+        originalFileId: await putBlob(eFile), originalName: eFile.name,
+      };
+    } else if (bodyMode === 'text' && eText.trim()) {
+      bodyPatch = { body: '', bodyId: await putBlob(new Blob([eText], { type: 'text/plain' })) };
+    }
+    // 썸네일 교체 준비
+    let thumbPatch: Partial<TrpgLog> = {};
+    if (thumbMode === 'image' && eThumb) {
+      thumbPatch = { thumbId: await putBlob(eThumb), thumbCrop: eThumbCrop, thumbColor: undefined };
+    } else if (thumbMode === 'color') {
+      thumbPatch = { thumbId: undefined, thumbCrop: undefined, thumbColor: { c1: eC1, c2: eColorMode === 'grad' ? eC2 : undefined } };
+    }
+    setLogs(logs.map(x => x.id === id ? {
+      ...x,
+      noText: e.noText.trim() || undefined,
+      title: e.title.trim(), catchphrase: e.catchphrase.trim() || undefined,
+      writer: e.writer.trim(), withText: e.withText.trim(),
+      relId: e.relId === 'none' ? undefined : e.relId,
+      date: e.date || undefined,
+      visibility: e.visibility, password: e.password.trim() || undefined,
+      ...bodyPatch, ...thumbPatch,
+    } : x));
+    if (bodyMode !== 'keep') setBodyText(null); // 본문 다시 로드
+    setEOpen(false);
+    setBodyMode('keep'); setEFile(null); setEText('');
+    setThumbMode('keep'); setEThumb(null); setEThumbUrl(''); setEThumbCrop(undefined);
+    toast('저장되었습니다');
+  };
+
+  // 본문 로드 — 인라인(시드) 또는 IndexedDB(bodyId, 대용량 로그)
+  useEffect(() => {
+    if (!l) return;
+    if (l.body) { setBodyText(l.body); return; }
+    if (l.bodyId) {
+      getBlob(l.bodyId).then(async b => setBodyText(b ? await b.text() : ''));
+    } else setBodyText('');
+  }, [l]);
+
+  // 샌드박스 안 높이 리포터 수신 → iframe 높이 자동 맞춤 (널 오리진이라 직접 측정 불가)
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.source !== frameRef.current?.contentWindow) return;
+      const h = (e.data as { __logH?: unknown })?.__logH;
+      if (typeof h === 'number' && isFinite(h) && frameRef.current) {
+        // scrollHeight는 최소한 뷰포트(=현재 iframe 높이)만큼 보고되므로 여기에 여백을
+        // 더하면 "설정 → 커진 값 보고 → 재설정" 무한 성장 루프가 됨 — 보고값 그대로,
+        // 그리고 현재 높이와 사실상 같으면(±2px) 재설정하지 않음
+        const next = Math.min(200000, Math.max(200, Math.round(h)));
+        const cur = frameRef.current.getBoundingClientRect().height;
+        if (Math.abs(next - cur) > 2) frameRef.current.style.height = `${next}px`;
+      }
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  if (!loaded) return <section className="page" />;
+  if (!l) {
+    return (
+      <section className="page">
+        <div className="page-head"><PageTitle>TRPG LOG</PageTitle><p>로그를 찾을 수 없습니다</p></div>
+      </section>
+    );
+  }
+
+  // 접근권한 (4.3) — 관리자 / 공개범위 충족 / 비밀번호 입력자 /
+  // 연동 자관의 상대방(멤버 캐릭터에 권한이 부여된 회원)은 무조건 열람 (3차 회원-캐릭터 연결, v1.9)
+  const logRel = rels.find(r => r.id === l?.relId);
+  const isRelPartner = !!user && !!logRel && logRel.members.some(m => {
+    const ch = allChars.find(c => c.id === m.charId);
+    return ch ? !!charGrant(ch, user.id) : false;
+  });
+  const baseAllowed = isAdmin || isRelPartner
+    || l.visibility === 'public' || (l.visibility === 'member' && !!user);
+  if (!baseAllowed && !unlocked) {
+    if (!l.password) {
+      return (
+        <section className="page">
+          <div className="page-head"><PageTitle>TRPG LOG</PageTitle><p>열람 권한이 없습니다</p></div>
+        </section>
+      );
+    }
+    // 비밀번호 게이트 — 맞으면 이 세션 동안 열람 유지
+    return (
+      <section className="page">
+        <div className="page-head"><PageTitle>TRPG LOG</PageTitle><p>비밀번호를 입력하면 열람할 수 있습니다</p></div>
+        <div className="panel" style={{ maxWidth: 420, margin: '0 auto', padding: 26, display: 'grid', gap: 10 }}>
+          <KInput type="password" placeholder="비밀번호" value={pwTry} onChange={e => setPwTry(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') tryUnlock(); }} />
+          <button className="btn btn-dark" style={{ justifyContent: 'center', padding: 9 }} onClick={tryUnlock}>확인</button>
+        </div>
+      </section>
+    );
+  }
+
+  const rel = rels.find(r => r.id === l.relId);
+  const body = bodyText ?? '';
+  const html = isHtmlBody(body);
+  // iframe 기본 body 마진 제거(흰 테두리 방지) + 높이 리포터 주입
+  // 크리스탈리아/크릿 계열 로그는 본문을 JS로 그리므로 스크립트 실행이 필요 —
+  // 널 오리진 샌드박스(allow-scripts만)라 사이트 쿠키·DOM 접근은 불가 (6.3의 격리 목적 유지)
+  // 심(shim)+높이 리포터를 문서 맨 앞에 배치 — 로그 문서가 파싱 도중 어떤 상태가 되어도
+  // 인터벌 리포터는 계속 동작 (뒤에 붙이면 일부 대형 로그에서 실행되지 않는 사례 있음)
+  const srcDoc = `<script>
+// 널 오리진에서 localStorage 접근이 예외를 던져 로그 스크립트가 죽는 것 방지 (무동작 심)
+try{void window.localStorage}catch(e){var __m={getItem:function(){return null},setItem:function(){},removeItem:function(){},clear:function(){},key:function(){return null},length:0};
+try{Object.defineProperty(window,'localStorage',{value:__m});Object.defineProperty(window,'sessionStorage',{value:__m});}catch(e2){}}
+// 높이 리포터 — 타이머 대신 MutationObserver+load 이벤트 (백그라운드 탭 스로틀링 회피)
+(function(){var p=0;function r(){try{var h=document.documentElement.scrollHeight;if(h&&h!==p){p=h;parent.postMessage({__logH:h},'*');}}catch(e3){}}
+document.addEventListener('DOMContentLoaded',r);addEventListener('load',r);addEventListener('resize',r);
+try{new MutationObserver(r).observe(document.documentElement,{childList:true,subtree:true,attributes:true});}catch(e4){}
+setInterval(r,800); // 창이 보이면 즉시 반영 (숨김 상태에선 레이아웃이 0이라 스킵됨)
+r();})();
+</scr${''}ipt><style>html,body{margin:0!important;padding:0!important}</style>${body}`;
+
+  return (
+    <section className="page">
+      <div className="page-head">
+        <PageTitle>TRPG LOG</PageTitle>
+        <p>{logNo(l)}{[l.writer, l.withText].filter(Boolean).map(x => ` · ${x}`).join('')}{l.date ? ` · ${l.date.replace(/-/g, '.')}` : ''}</p>
+        <div className="head-actions">
+          {rel && <button className="btn btn-dark" onClick={() => router.push(`/rels/${rel.id}`)}>{rel.name} ›</button>}
+          {isAdmin && <button className="btn btn-dark" onClick={() => {
+            setE({
+              noText: l.noText ?? '', title: l.title, catchphrase: l.catchphrase ?? '', writer: l.writer,
+              withText: l.withText, relId: l.relId ?? 'none', date: l.date ?? '',
+              visibility: l.visibility, password: l.password ?? '',
+            });
+            // 본문·썸네일 교체 상태 초기화 (기본: 현재 것 유지)
+            setBodyMode('keep'); setEFile(null); setEText(bodyText ?? '');
+            setThumbMode('keep'); setEThumb(null); setEThumbUrl(''); setEThumbCrop(undefined);
+            setEColorMode(l.thumbColor ? (l.thumbColor.c2 ? 'grad' : 'solid') : 'grad');
+            if (l.thumbColor) { setEC1(l.thumbColor.c1); if (l.thumbColor.c2) setEC2(l.thumbColor.c2); }
+            setEOpen(true);
+          }}>EDIT</button>}
+          {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
+        </div>
+      </div>
+
+      {/* 본문만 폭 제한 — 헤더는 풀폭 위치 유지 */}
+      <div className="panel" style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
+        <h2 style={{
+          fontFamily: l.serifTitle ? 'var(--serif)' : "'Noto Serif KR',serif",
+          fontSize: 24, fontWeight: 700,
+          marginBottom: l.catchphrase ? 2 : 18, // 캐치프레이즈가 없으면 본문과 붙지 않게 여백
+          letterSpacing: l.serifTitle ? '.12em' : '.04em',
+        }}>{l.title}</h2>
+        {l.catchphrase && (
+          <p style={{ fontSize: 11.5, color: 'var(--faint)', letterSpacing: '.14em', marginBottom: 16 }}>{l.catchphrase}</p>
+        )}
+        {html ? (
+          /* 원본 스타일·스크립트 유지 — 널 오리진 샌드박스라 사이트 데이터에는 접근 불가 (6.3 격리) */
+          <LogFrame frameRef={frameRef} html={srcDoc} title={l.title} />
+        ) : (
+          body
+            ? <div className="log-plain">{body}</div>
+            : <p className="hint">본문이 비어 있습니다 — 이전 버전에서 등록된 항목이면 삭제 후 다시 등록해 주세요</p>
+        )}
+        {/* 설명문 없이 원본 파일 다운로드 링크만 (4.3 백업) */}
+        <p className="hint" style={{ marginTop: 10 }}>
+          {l.originalFileId && (
+            <>
+              <span style={{ color: 'var(--accent)', cursor: 'var(--cur-pointer,pointer)', fontWeight: 600 }}
+                onClick={async () => {
+                  // 보관된 원본 파일 다운로드 (4.3 — 백업 목적)
+                  const b = await getBlob(l.originalFileId!);
+                  if (!b) return;
+                  const u = URL.createObjectURL(b);
+                  const a = document.createElement('a');
+                  a.href = u; a.download = l.originalName ?? 'log.txt';
+                  a.click();
+                  URL.revokeObjectURL(u);
+                }}>
+                ⤓ 원본 파일 ({l.originalName})
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* 로그 정보 수정 모달 — 메타 + 본문 교체(파일/직접 수정) + 썸네일 교체(이미지/색) */}
+      <Modal open={eOpen} onClose={() => setEOpen(false)} title="로그 정보 수정"
+        dirty
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setEOpen(false)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={saveEdit}>SAVE</button>
+        </>}>
+        <div style={{ display: 'grid', gap: 9 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <KInput placeholder="시나리오 타이틀 (필수)" value={e.title} onChange={ev => setE(s => ({ ...s, title: ev.target.value }))} />
+            {/* № 자리 표시 텍스트 전체를 직접 입력 — 비우면 자동 № 0XX */}
+            <KInput placeholder="№ 표기 (선택 — 비우면 자동)" value={e.noText} onChange={ev => setE(s => ({ ...s, noText: ev.target.value }))}
+              style={{ maxWidth: 200 }} />
+          </div>
+          <KInput placeholder="캐치프레이즈 (선택)" value={e.catchphrase} onChange={ev => setE(s => ({ ...s, catchphrase: ev.target.value }))} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <KInput placeholder="라이터 (선택)" value={e.writer} onChange={ev => setE(s => ({ ...s, writer: ev.target.value }))} />
+            <KInput placeholder="같이 간 사람 (선택)" value={e.withText} onChange={ev => setE(s => ({ ...s, withText: ev.target.value }))} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <KSelect minWidth={140} value={e.relId} onChange={v => setE(s => ({ ...s, relId: v }))}
+              options={[{ value: 'none', label: '자관 연동 없음' }, ...rels.map(r => ({ value: r.id, label: r.name }))]} />
+            <KDate value={e.date} onChange={v => setE(s => ({ ...s, date: v }))} style={{ flex: 1 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <KSelect minWidth={140} value={e.visibility} onChange={v => setE(s => ({ ...s, visibility: v as TrpgLog['visibility'] }))}
+              options={[
+                { value: 'public', label: '전체공개' },
+                { value: 'member', label: '멤버공개' },
+                { value: 'private', label: '나만보기' },
+              ]} />
+            <KInput placeholder="열람 비밀번호 (선택)" value={e.password} onChange={ev => setE(s => ({ ...s, password: ev.target.value }))} style={{ flex: 1 }} />
+          </div>
+
+          {/* 썸네일 교체 — 기본은 현재 썸네일 유지 */}
+          <label className="k-label" style={{ margin: '4px 0 0' }}>썸네일</label>
+          <div className="mini-seg" style={{ justifySelf: 'start' }}>
+            <button className={thumbMode === 'keep' ? 'on' : ''} onClick={() => setThumbMode('keep')}>현재 유지</button>
+            <button className={thumbMode === 'image' ? 'on' : ''} onClick={() => { setThumbMode('image'); if (!eThumb) eThumbRef.current?.click(); }}>이미지 교체</button>
+            <button className={thumbMode === 'color' ? 'on' : ''} onClick={() => setThumbMode('color')}>색으로 교체</button>
+          </div>
+          <input ref={eThumbRef} type="file" accept="image/*" style={{ display: 'none' }}
+            onChange={ev => {
+              const f = ev.target.files?.[0];
+              if (f) { setEThumb(f); setEThumbUrl(URL.createObjectURL(f)); setEThumbCrop(undefined); setECropOpen(true); }
+              ev.target.value = '';
+            }} />
+          {thumbMode === 'image' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  width: 128, aspectRatio: '16/9', borderRadius: 8, overflow: 'hidden', cursor: 'var(--cur-pointer,pointer)',
+                  border: '1.5px dashed var(--line)', flexShrink: 0, position: 'relative',
+                }}
+                onClick={() => eThumbRef.current?.click()}>
+                {eThumbUrl && <CropImg src={eThumbUrl} crop={eThumbCrop} />}
+              </div>
+              {eThumb && (
+                <button className="btn btn-ghost" style={{ padding: '5px 11px', fontSize: 11 }}
+                  onClick={() => setECropOpen(true)}>✂ 위치·확대 조정</button>
+              )}
+            </div>
+          )}
+          {thumbMode === 'color' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{
+                width: 128, aspectRatio: '16/9', borderRadius: 8, flexShrink: 0,
+                border: '1.5px solid var(--line)',
+                background: eColorMode === 'grad' ? `linear-gradient(135deg, ${eC1} 0%, ${eC2} 100%)` : eC1,
+              }} />
+              <div className="mini-seg">
+                <button className={eColorMode === 'grad' ? 'on' : ''} onClick={() => setEColorMode('grad')}>그라데이션</button>
+                <button className={eColorMode === 'solid' ? 'on' : ''} onClick={() => setEColorMode('solid')}>단색</button>
+              </div>
+              <ColorField value={eC1} onChange={setEC1} />
+              {eColorMode === 'grad' && (
+                <>
+                  <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
+                  <ColorField value={eC2} onChange={setEC2} />
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 본문 교체 — 기본은 현재 본문 유지 */}
+          <label className="k-label" style={{ margin: '4px 0 0' }}>본문</label>
+          <div className="mini-seg" style={{ justifySelf: 'start' }}>
+            <button className={bodyMode === 'keep' ? 'on' : ''} onClick={() => setBodyMode('keep')}>현재 유지</button>
+            <button className={bodyMode === 'text' ? 'on' : ''} onClick={() => { setBodyMode('text'); if (!eText) setEText(bodyText ?? ''); }}>직접 수정</button>
+            <button className={bodyMode === 'file' ? 'on' : ''} onClick={() => setBodyMode('file')}>파일 업로드</button>
+          </div>
+          {bodyMode === 'file' && (
+            <>
+              <input ref={eFileRef} type="file" accept=".txt,.html,.htm,text/*" style={{ display: 'none' }}
+                onChange={ev => { const f = ev.target.files?.[0]; if (f) setEFile(f); ev.target.value = ''; }} />
+              <div className="upzone" style={{ marginBottom: 0 }} onClick={() => eFileRef.current?.click()}
+                onDragOver={ev => ev.preventDefault()}
+                onDrop={ev => { ev.preventDefault(); const f = ev.dataTransfer.files?.[0]; if (f) setEFile(f); }}>
+                {eFile
+                  ? <b>{eFile.name} — 저장 시 이 파일로 본문이 교체됩니다</b>
+                  : <b>.txt / .html 파일을 끌어다 놓거나 클릭</b>}
+              </div>
+            </>
+          )}
+          {bodyMode === 'text' && (
+            <KTextarea style={{ minHeight: 160, fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
+              placeholder="HTML 코드 통째 붙여넣기 또는 텍스트 직접 작성" value={eText} onChange={ev => setEText(ev.target.value)} />
+          )}
+        </div>
+      </Modal>
+
+      {/* 썸네일 크롭 편집기 (6.1 — 16:9 티켓 규격) */}
+      {eThumbUrl && (
+        <CropEditor open={eCropOpen} src={eThumbUrl} aspect="16:9" initial={eThumbCrop}
+          onClose={() => setECropOpen(false)}
+          onApply={c => { setEThumbCrop(c); setECropOpen(false); }} />
+      )}
+
+      <ConfirmModal open={delAsk} title="로그를 삭제하시겠습니까?" body="삭제한 로그는 복구할 수 없습니다."
+        onClose={() => setDelAsk(false)}
+        buttons={[
+          { label: 'DELETE', kind: 'accent', onClick: () => { setLogs(logs.filter(x => x.id !== l.id)); router.push('/trpg'); } },
+          { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
+        ]} />
+    </section>
+  );
+}

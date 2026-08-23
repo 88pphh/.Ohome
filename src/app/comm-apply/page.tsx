@@ -1,0 +1,153 @@
+'use client';
+// 신청자 리스트 (4.18 v1.9) — 마감일 크게 + 상태 뱃지(고정폭) + 신청자/신청일 + 커미션 종류 +
+// 잠금 픽토그램(커스텀 툴팁) · 우측 필터 사이드(상태별+커미션별 동시 적용) ·
+// 드래그 정렬은 편집모드에서만 · 공개범위는 환경설정 > 커미션 탭
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { useMainStore } from '@/lib/mainStore';
+import { useLocalList } from '@/lib/postStore';
+import {
+  Applicant, APPLY_SEED, CommItem, COMM_SEED, useCommSettings, badgeStyle, maskName,
+  applyVis, APPLY_VIS_LABEL,
+} from '@/lib/commStore';
+import { SearchBar, Tip } from '@/components/ui/Kit';
+import { DragList } from '@/components/ui/DragList';
+import { EditableDesc, PageTitle } from '@/components/ui/PageText';
+
+/** 잠금 픽토그램 (선 아이콘) */
+function LockIcon({ open }: { open?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, stroke: 'currentColor', fill: 'none', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      {open
+        ? <path d="M8 11V7a4 4 0 0 1 7.6-1.7" />
+        : <path d="M8 11V7a4 4 0 0 1 8 0v4" />}
+    </svg>
+  );
+}
+
+export default function CommApplyPage() {
+  const router = useRouter();
+  const { user, isAdmin } = useAuth();
+  const { editOn } = useMainStore();
+  const [apps, setApps, loaded] = useLocalList<Applicant>('ohome.commapply.v1', APPLY_SEED);
+  const [comms] = useLocalList<CommItem>('ohome.comm.v1', COMM_SEED);
+  const [settings, , setLoaded] = useCommSettings();
+  const [q, setQ] = useState('');
+  const [fStatus, setFStatus] = useState<string>('all');
+  const [fComm, setFComm] = useState<string>('all');
+
+  if (!loaded || !setLoaded) return <section className="page" />;
+
+  // 리스트 공개범위 (환경설정 > 커미션 — 4.18)
+  if ((settings.applyVisibility === 'private' && !isAdmin)
+    || (settings.applyVisibility === 'member' && !user)) {
+    return (
+      <section className="page">
+        <div className="page-head"><PageTitle>APPLICANTS</PageTitle><p>
+          {settings.applyVisibility === 'private' ? '비공개 리스트입니다' : '멤버공개 — 로그인 후 열람할 수 있습니다'}
+        </p></div>
+      </section>
+    );
+  }
+
+  // 비권한자에게는 마스킹된 표기 (공개 글자 수만큼만 — 4.18 v1.9)
+  const dispName = (a: Applicant) => (isAdmin ? a.name : maskName(a.name, a.nameOpen ?? 1));
+
+  const query = q.trim().toLowerCase();
+  const shown = apps
+    .filter(a => fStatus === 'all' || a.badgeId === fStatus)
+    .filter(a => fComm === 'all' || a.commId === fComm)
+    // 검색도 보이는 표기 기준 — 마스킹된 글자로 이름이 새지 않게
+    .filter(a => !query || dispName(a).toLowerCase().includes(query));
+
+  const commName = (id?: string) => comms.find(x => x.id === id)?.name ?? '';
+  const cntS = (sid: string) => apps.filter(a => sid === 'all' || a.badgeId === sid).length;
+  const cntC = (cid: string) => apps.filter(a => cid === 'all' || a.commId === cid).length;
+
+  const row = (a: Applicant) => {
+    const badge = settings.applyBadges.find(b => b.id === a.badgeId);
+    const vis = applyVis(a);
+    // 본인 열람 — 지정 회원(selfId)만, 미지정 구버전 데이터는 로그인 회원 허용
+    const canSee = isAdmin || vis === 'public'
+      || (vis === 'self' && !!user && (a.selfId ? user.id === a.selfId : true));
+    return (
+      <div className="ap-row" key={a.id}
+        style={{ width: '100%', cursor: 'var(--cur-pointer,pointer)' }}
+        onClick={() => { if (!editOn) router.push(`/comm-apply/${a.id}`); }}>
+        {/* 드래그 핸들 — 편집모드에서만 표시 */}
+        {editOn && <span className="drag-h">⠿</span>}
+        <div className="dl">
+          <small>DEADLINE</small>
+          <b>{a.deadline ? a.deadline.replace(/-/g, '.') : '—'}</b>
+        </div>
+        <span className="bwrap">
+          {badge && <span style={badgeStyle(badge, settings.badgeShape)}>{badge.label}</span>}
+        </span>
+        <div className="who">
+          <b>{dispName(a)}</b>
+          {(a.appliedDate || a.source) && (
+            <small>{[a.appliedDate && `신청 ${a.appliedDate.replace(/-/g, '.')}`, a.source].filter(Boolean).join(' · ')}</small>
+          )}
+        </div>
+        <span className="kind">{commName(a.commId)}</span>
+        <span className="lock" onClick={e => e.stopPropagation()}>
+          {/* 공개범위 안내만 — 내용은 툴팁에 노출하지 않음 (비공개 의미 유지, 사용자 확정) */}
+          <Tip dd tip={APPLY_VIS_LABEL[vis]}>
+            <span style={{ color: canSee ? 'var(--accent)' : 'var(--faint)' }}><LockIcon open={canSee} /></span>
+          </Tip>
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <section className="page">
+      <div className="page-head">
+        <PageTitle>APPLICANTS</PageTitle>
+        <EditableDesc k="commapply-desc" def="신청 순번 공개 리스트 — 내용은 비공개" />
+        <div className="head-actions">
+          <SearchBar placeholder="신청자 검색" onSearch={setQ} />
+          {isAdmin && <button className="btn btn-dark" onClick={() => router.push('/comm-apply/new')}>＋ ADD APPLICANT</button>}
+        </div>
+      </div>
+
+      <div className="ap-layout">
+        {/* overflow visible — 잠금 아이콘 커스텀 툴팁이 카드 밖으로 나올 수 있게 */}
+        <div className="panel" style={{ padding: '8px 18px', overflow: 'visible' }}>
+          {editOn && isAdmin ? (
+            <DragList items={shown} keyOf={a => a.id}
+              onReorder={list => {
+                // 필터 없는 상태 기준으로만 저장 (부분 필터 중엔 그 순서를 앞으로)
+                const rest = apps.filter(a => !list.some(x => x.id === a.id));
+                setApps([...list, ...rest]);
+              }}
+              render={row} />
+          ) : (
+            shown.map(a => row(a))
+          )}
+          {shown.length === 0 && <p className="hint" style={{ padding: 14 }}>표시할 신청이 없습니다</p>}
+        </div>
+
+        {/* 우측 필터 사이드 — 상태별 + 커미션 종류별 동시 적용 (4.18) */}
+        <div className="panel tagside" style={{ padding: 16 }}>
+          <h4>진행 상태</h4>
+          <div className={`tag ${fStatus === 'all' ? 'on' : ''}`} onClick={() => setFStatus('all')}>전체 <small>{cntS('all')}</small></div>
+          {settings.applyBadges.map(b => (
+            <div key={b.id} className={`tag ${fStatus === b.id ? 'on' : ''}`} onClick={() => setFStatus(b.id)}>
+              {b.label} <small>{cntS(b.id)}</small>
+            </div>
+          ))}
+          <h4 style={{ marginTop: 18 }}>커미션 종류</h4>
+          <div className={`tag ${fComm === 'all' ? 'on' : ''}`} onClick={() => setFComm('all')}>전체 <small>{cntC('all')}</small></div>
+          {comms.map(cm => (
+            <div key={cm.id} className={`tag ${fComm === cm.id ? 'on' : ''}`} onClick={() => setFComm(cm.id)}>
+              {cm.name} <small>{cntC(cm.id)}</small>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

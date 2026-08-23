@@ -1,0 +1,322 @@
+'use client';
+// TRPG 로그 백업 (4.3) — 티켓형/기본형 스킨 · 우측 자관 뱃지 필터 · ＋ ADD LOG
+// 본문 입력 3방식: 파일 업로드(.txt/.html 내용 자동 판별) / HTML 붙여넣기 / 직접 작성
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { useLocalList, newId } from '@/lib/postStore';
+import { TrpgLog, TRPG_SEED, decodeLogText, logNo } from '@/lib/galleryStore';
+import { Relation, REL_SEED } from '@/lib/charStore';
+import { SearchBar, KInput, KTextarea, KRadio, KSelect, KDate } from '@/components/ui/Kit';
+import { Modal } from '@/components/ui/Modal';
+import { EditableDesc, PageTitle } from '@/components/ui/PageText';
+import { putBlob } from '@/lib/blobStore';
+import { ColorField } from '@/components/ui/ColorField';
+import { CropEditor, CroppedBlobImg, CropValue, CropImg } from '@/components/ui/CropEditor';
+import { useToast } from '@/components/ui/Toast';
+
+import { useSiteSettings } from '@/lib/siteStore';
+
+export default function TrpgPage() {
+  const router = useRouter();
+  const { user, isAdmin } = useAuth();
+  const toast = useToast();
+  const [site] = useSiteSettings(); // 티켓 하단 문구 = 로고 서브타이틀 (5.2 연동)
+  const [logs, setLogs] = useLocalList<TrpgLog>('ohome.trpg.v1', TRPG_SEED);
+  const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
+  const [filter, setFilter] = useState<string>('all');
+  const [skin, setSkin] = useState<'ticket' | 'basic'>('ticket');
+  const [q, setQ] = useState('');
+  // 모바일은 티켓 스킨 대신 항상 기본형 리스트 — 좁은 폭에서 티켓이 뭉개지지 않게 (v1.9 사용자 확정)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width:620px)');
+    const f = () => setIsMobile(mq.matches);
+    f();
+    mq.addEventListener('change', f);
+    return () => mq.removeEventListener('change', f);
+  }, []);
+  // ADD LOG 모달
+  const [addOpen, setAddOpen] = useState(false);
+  const [nNo, setNNo] = useState('');          // № 자리 표시 텍스트 — 비우면 자동 № 0XX
+  const [nVis, setNVis] = useState<'public' | 'member' | 'private'>('public'); // 접근권한
+  const [nPw, setNPw] = useState('');          // 열람 비밀번호 (선택)
+  const [nTitle, setNTitle] = useState('');
+  const [nCatch, setNCatch] = useState('');
+  const [nWriter, setNWriter] = useState('');
+  const [nWith, setNWith] = useState('');
+  const [nRel, setNRel] = useState('none');
+  const [nDate, setNDate] = useState('');
+  const [nMode, setNMode] = useState<'file' | 'paste'>('paste');
+  const [nBody, setNBody] = useState('');
+  const [nFileName, setNFileName] = useState('');
+  const [nFile, setNFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  // 썸네일 (선택) — 이미지 또는 단색/그라데이션 (v1.9 사용자 요청)
+  const [nThumb, setNThumb] = useState<File | null>(null);
+  const [nThumbUrl, setNThumbUrl] = useState('');
+  const [nColorMode, setNColorMode] = useState<'grad' | 'solid'>('grad');
+  const [nThumbCrop, setNThumbCrop] = useState<CropValue | undefined>(undefined);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [nC1, setNC1] = useState('#4c5a6e');
+  const [nC2, setNC2] = useState('#242b36');
+  const thumbRef = useRef<HTMLInputElement>(null);
+
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    logs.forEach(l => { const k = l.relId ?? 'none'; m[k] = (m[k] ?? 0) + 1; });
+    return m;
+  }, [logs]);
+
+  const visible = logs
+    // 비밀번호가 있는 로그는 리스트에 노출 (상세에서 비밀번호 입력으로 열람 — 4.3 접근권한)
+    .filter(l => isAdmin || l.visibility === 'public' || (l.visibility === 'member' && user) || !!l.password)
+    .filter(l => filter === 'all' || (filter === 'none' ? !l.relId : l.relId === filter))
+    .filter(l => !q || l.title.includes(q) || l.writer.includes(q) || l.withText.includes(q))
+    .sort((a, b) => b.no - a.no);
+
+  const decodeText = decodeLogText; // 공용 유틸 (galleryStore)
+
+  const readFile = (f: File | undefined) => {
+    if (!f) return;
+    setNFileName(f.name);
+    setNFile(f); // 원본 파일 보관용 (4.3)
+    // 미리보기 글자 수 표시용 — 등록 시에는 파일에서 직접 다시 읽으므로 레이스 없음
+    decodeText(f).then(setNBody);
+  };
+
+  const add = async () => {
+    if (!nTitle.trim()) { toast('시나리오 타이틀을 입력해 주세요'); return; }
+    // 파일이 있으면 등록 시점에 직접 읽음 — 읽기 완료 전에 ADD를 눌러도 본문이 비지 않음
+    const bodyText = nFile ? await decodeText(nFile) : nBody;
+    const log: TrpgLog = {
+      id: newId(),
+      no: Math.max(0, ...logs.map(l => l.no)) + 1, // 내부 순번 (정렬용)
+      noText: nNo.trim() || undefined,             // № 자리 표시 텍스트 — 비우면 자동 № 0XX
+      title: nTitle.trim(), catchphrase: nCatch.trim() || undefined,
+      writer: nWriter.trim(), withText: nWith.trim(),
+      relId: nRel === 'none' ? undefined : nRel,
+      date: nDate || undefined, ph: 'cool',
+      // 본문은 IndexedDB에 저장 (localStorage 용량 보호 — 대형 크리스탈리아 로그 대응)
+      body: '', bodyId: bodyText ? await putBlob(new Blob([bodyText], { type: 'text/plain' })) : undefined,
+      visibility: 'public',
+      // 업로드 원본 파일은 그대로 보관 (4.3 — 백업 목적, IndexedDB → R2 이전 예정)
+      originalFileId: nFile ? await putBlob(nFile) : undefined,
+      originalName: nFile?.name,
+      // 썸네일: 이미지(선택) 또는 단색/그라데이션
+      thumbId: nThumb ? await putBlob(nThumb) : undefined,
+      thumbCrop: nThumb ? nThumbCrop : undefined,
+      thumbColor: nThumb ? undefined : { c1: nC1, c2: nColorMode === 'grad' ? nC2 : undefined },
+    };
+    log.visibility = nVis;
+    log.password = nPw.trim() || undefined;
+    setLogs([log, ...logs]);
+    setAddOpen(false);
+    setNNo(''); setNVis('public'); setNPw(''); setNTitle(''); setNCatch(''); setNWriter(''); setNWith(''); setNBody(''); setNFileName(''); setNDate(''); setNFile(null);
+    setNThumb(null); setNThumbUrl(''); setNThumbCrop(undefined);
+    toast(nFile ? '로그가 등록되었습니다 — 원본 파일도 보관됩니다' : '로그가 등록되었습니다');
+  };
+
+  // 티켓 썸네일 — 업로드 이미지 > 지정 색(단색/그라데이션) > 데모 ph
+  const thumbStyle = (l: TrpgLog): React.CSSProperties | undefined =>
+    l.thumbColor
+      ? { background: l.thumbColor.c2 ? `linear-gradient(135deg, ${l.thumbColor.c1} 0%, ${l.thumbColor.c2} 100%)` : l.thumbColor.c1 }
+      : undefined;
+
+  const Ticket = ({ l }: { l: TrpgLog }) => (
+    <div className="ticket" onClick={() => router.push(`/trpg/${l.id}`)}>
+      <div className="stub-line" />
+      <div className={`wide ${!l.thumbId && !l.thumbColor ? `ph ${l.ph}` : ''}`} style={thumbStyle(l)}>
+        {l.thumbId && <CroppedBlobImg fileRef={l.thumbId} crop={l.thumbCrop} />}
+        <span className="no">{l.noText ? `ADMIT ONE · ${l.noText}` : `ADMIT ONE · LOG ${String(l.no).padStart(3, '0')}`}</span>
+        {!l.thumbId && !l.thumbColor && <span>WIDE THUMBNAIL</span>}
+      </div>
+      <div className="stub">
+        <div className="sc-title" style={l.serifTitle ? { fontFamily: 'var(--serif)', letterSpacing: '.12em' } : undefined}>
+          {l.title}
+        </div>
+        {l.catchphrase && <div className="sc-catch">{l.catchphrase}</div>}
+        {!isAdmin && l.password && !(l.visibility === 'public' || (l.visibility === 'member' && user)) && (
+          <div className="row"><b>열람</b> 비밀번호 필요</div>
+        )}
+        {l.writer && <div className="row"><b>라이터</b> {l.writer}</div>}
+        {l.withText && <div className="row"><b>동행</b> {l.withText}</div>}
+        {l.date && <div className="row"><b>날짜</b> {l.date.replace(/-/g, '.')}</div>}
+        <div className="adm"><span>{site.subtitle}</span><span>{logNo(l)}</span></div>
+      </div>
+    </div>
+  );
+
+  return (
+    <section className="page">
+      <div className="page-head">
+        <PageTitle>TRPG LOG</PageTitle>
+        <EditableDesc k="trpg-desc" def="티켓형 스킨 · 시나리오 타이틀 폰트 개별 설정 · 우측 자관 뱃지로 필터" />
+        <div className="head-actions">
+          <SearchBar onSearch={setQ} />
+          {isAdmin && <button className="btn btn-dark" style={{ whiteSpace: 'nowrap' }} onClick={() => setAddOpen(true)}>＋ ADD LOG</button>}
+        </div>
+      </div>
+      <div className="trpg-layout">
+        <div>
+          {skin === 'ticket' && !isMobile
+            ? visible.map(l => <Ticket key={l.id} l={l} />)
+            : (
+              <div className="panel flush">
+                {visible.map(l => (
+                  <div key={l.id} className="list-item" onClick={() => router.push(`/trpg/${l.id}`)}>
+                    <div className={`th ${!l.thumbId && !l.thumbColor ? `ph ${l.ph}` : ''}`} style={{ ...thumbStyle(l), position: 'relative' }}>
+                      {l.thumbId && <CroppedBlobImg fileRef={l.thumbId} crop={l.thumbCrop} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <b>{logNo(l)} {l.title}</b>
+                      <small>{[l.writer, l.withText].filter(Boolean).join(' · ')}{l.date ? ` · ${l.date.replace(/-/g, '.')}` : ''}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          {visible.length === 0 && (
+            <div className="panel" style={{ textAlign: 'center', padding: 44, fontSize: 13, color: 'var(--faint)' }}>
+              로그가 없습니다
+            </div>
+          )}
+        </div>
+        {/* 자관 연동 필터 (v1.2) */}
+        <div className="panel tagside">
+          <h4>자관 필터</h4>
+          <div className={`tag ${filter === 'all' ? 'on' : ''}`} onClick={() => setFilter('all')}>
+            전체 <small>{logs.length}</small>
+          </div>
+          {rels.filter(r => counts[r.id]).map(r => (
+            <div key={r.id} className={`tag ${filter === r.id ? 'on' : ''}`} onClick={() => setFilter(r.id)}>
+              {r.name} <small>{counts[r.id]}</small>
+            </div>
+          ))}
+          {counts['none'] > 0 && (
+            <div className={`tag ${filter === 'none' ? 'on' : ''}`} onClick={() => setFilter('none')}>
+              단발 <small>{counts['none']}</small>
+            </div>
+          )}
+          {/* 모바일은 항상 기본형 — 스킨 선택 숨김 (v1.9) */}
+          {!isMobile && (
+            <>
+              <h4 style={{ marginTop: 18 }}>보기</h4>
+              <KRadio name="tsk" value="ticket" current={skin} onChange={v => setSkin(v as 'ticket')} label="티켓형" />
+              <div style={{ height: 7 }} />
+              <KRadio name="tsk" value="basic" current={skin} onChange={v => setSkin(v as 'basic')} label="기본형" />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ＋ ADD LOG (4.3 — 본문 입력 3방식) */}
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="로그 등록"
+        desc="본문: 파일 업로드(.txt/.html — 내용 자동 판별) 또는 붙여넣기/직접 작성"
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setAddOpen(false)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={add}>ADD</button>
+        </>}>
+        <div style={{ display: 'grid', gap: 9 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <KInput placeholder="시나리오 타이틀 (필수)" value={nTitle} onChange={e => setNTitle(e.target.value)} />
+            {/* № 자리 표시 텍스트 전체를 직접 입력 — 비우면 자동 № 0XX */}
+            <KInput placeholder="№ 표기 (선택 — 비우면 자동)" value={nNo} onChange={e => setNNo(e.target.value)}
+              style={{ maxWidth: 200 }} />
+          </div>
+          <KInput placeholder="캐치프레이즈 (선택)" value={nCatch} onChange={e => setNCatch(e.target.value)} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <KInput placeholder="라이터 (선택)" value={nWriter} onChange={e => setNWriter(e.target.value)} />
+            <KInput placeholder="같이 간 사람 (선택)" value={nWith} onChange={e => setNWith(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <KSelect minWidth={140} value={nRel} onChange={setNRel}
+              options={[{ value: 'none', label: '자관 연동 없음' }, ...rels.map(r => ({ value: r.id, label: r.name }))]} />
+            <KDate value={nDate} onChange={setNDate} style={{ flex: 1 }} />
+          </div>
+          {/* 접근권한 + 열람 비밀번호 (선택) — 권한이 없어도 비밀번호를 아는 사람은 열람 가능.
+              연동 자관의 상대방(회원-캐릭터 연결)은 항상 열람 가능 — 연결 기능은 3차 */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <KSelect minWidth={140} value={nVis} onChange={v => setNVis(v as 'public')}
+              options={[
+                { value: 'public', label: '전체공개' },
+                { value: 'member', label: '멤버공개' },
+                { value: 'private', label: '나만보기' },
+              ]} />
+            <KInput placeholder="열람 비밀번호 (선택)" value={nPw} onChange={e => setNPw(e.target.value)} style={{ flex: 1 }} />
+          </div>
+
+          {/* 썸네일 (선택) — 이미지 업로드 또는 단색/그라데이션 */}
+          <label className="k-label" style={{ margin: '4px 0 0' }}>썸네일 (선택)</label>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                width: 128, aspectRatio: '16/9', borderRadius: 8, overflow: 'hidden', cursor: 'var(--cur-pointer,pointer)',
+                border: '1.5px dashed var(--line)', flexShrink: 0, position: 'relative',
+                background: nThumbUrl ? undefined
+                  : nColorMode === 'grad' ? `linear-gradient(135deg, ${nC1} 0%, ${nC2} 100%)` : nC1,
+              }}
+              onClick={() => thumbRef.current?.click()}>
+              {nThumbUrl && <CropImg src={nThumbUrl} crop={nThumbCrop} />}
+            </div>
+            <input ref={thumbRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) { setNThumb(f); setNThumbUrl(URL.createObjectURL(f)); setNThumbCrop(undefined); setCropOpen(true); }
+                e.target.value = '';
+              }} />
+            {nThumb ? (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-ghost" style={{ padding: '5px 11px', fontSize: 11 }}
+                  onClick={() => setCropOpen(true)}>✂ 위치·확대 조정</button>
+                <button className="btn btn-ghost" style={{ padding: '5px 11px', fontSize: 11 }}
+                  onClick={() => { setNThumb(null); setNThumbUrl(''); setNThumbCrop(undefined); }}>이미지 제거 → 색으로</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="mini-seg">
+                  <button className={nColorMode === 'grad' ? 'on' : ''} onClick={() => setNColorMode('grad')}>그라데이션</button>
+                  <button className={nColorMode === 'solid' ? 'on' : ''} onClick={() => setNColorMode('solid')}>단색</button>
+                </div>
+                <ColorField value={nC1} onChange={setNC1} />
+                {nColorMode === 'grad' && (
+                  <>
+                    <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
+                    <ColorField value={nC2} onChange={setNC2} />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="mini-seg" style={{ justifySelf: 'start' }}>
+            <button className={nMode === 'paste' ? 'on' : ''} onClick={() => setNMode('paste')}>붙여넣기/직접 작성</button>
+            <button className={nMode === 'file' ? 'on' : ''} onClick={() => setNMode('file')}>파일 업로드</button>
+          </div>
+          {nMode === 'file' ? (
+            <>
+              <input ref={fileRef} type="file" accept=".txt,.html,.htm,text/*" style={{ display: 'none' }}
+                onChange={e => { readFile(e.target.files?.[0]); e.target.value = ''; }} />
+              <div className="upzone" style={{ marginBottom: 0 }} onClick={() => fileRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); readFile(e.dataTransfer.files?.[0]); }}>
+                {nFileName
+                  ? <b>{nFileName} — 읽기 완료 ({nBody.length.toLocaleString()}자)</b>
+                  : <><b style={{ display: 'block', marginBottom: 3 }}>.txt / .html 파일을 끌어다 놓거나 클릭</b>크리스탈리아 등 로그 툴 내보내기 파일 그대로 — 내용 자동 판별</>}
+              </div>
+            </>
+          ) : (
+            <KTextarea style={{ minHeight: 120, fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
+              placeholder="HTML 코드 통째 붙여넣기 또는 텍스트 직접 작성" value={nBody} onChange={e => setNBody(e.target.value)} />
+          )}
+        </div>
+      </Modal>
+
+      {/* 썸네일 크롭 편집기 (6.1 — 16:9 티켓 규격) */}
+      {nThumbUrl && (
+        <CropEditor open={cropOpen} src={nThumbUrl} aspect="16:9" initial={nThumbCrop}
+          onClose={() => setCropOpen(false)}
+          onApply={c => { setNThumbCrop(c); setCropOpen(false); }} />
+      )}
+    </section>
+  );
+}
