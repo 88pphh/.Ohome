@@ -16,11 +16,23 @@ import { DocTitle } from '@/components/shell/DocTitle';
 import { SettingSync } from '@/components/shell/SettingSync';
 import { PageFrame } from '@/lib/pageRefresh';
 import { ServerBoot } from '@/components/shell/ServerBoot';
+import { siteMeta } from '@/lib/siteMeta';
 
-export const metadata: Metadata = {
-  title: 'O.HOME — 개인홈',
-  description: '자캐놀이용 개인 아카이브',
-};
+/**
+ * 링크를 미리 읽어 가는 쪽(카톡·디스코드·검색)은 서버가 돌려준 HTML만 본다.
+ * 탭 제목은 화면이 뜬 뒤에 바꾸므로 그쪽에는 늘 기본값이 나갔다 —
+ * 여기서 같은 설정을 한 번 읽어 제목을 맞춘다 (읽기 실패하면 기본값).
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { title, subtitle } = await siteMeta();
+  const description = subtitle?.trim() || '자캐놀이용 개인 아카이브';
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: 'website' },
+    twitter: { card: 'summary', title, description },
+  };
+}
 
 // 서버 함수 리전은 코드로 못 정한다 — preferredRegion은 이 Next 버전에서 deprecated이고,
 // vercel.json의 regions는 새 프로젝트에서도 적용되지 않는 것을 실측으로 확인했다.
