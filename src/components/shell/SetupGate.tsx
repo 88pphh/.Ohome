@@ -222,7 +222,21 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
                   <b>Supabase 프로젝트 만들기</b>
                   <small>
                     <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">supabase.com</a>에서
-                    새 프로젝트를 만들고 <b>Project Settings → API</b>로 갑니다.
+                    <b> [New project]</b>를 누릅니다. 아래 두 가지만 신경 쓰면 됩니다.
+                  </small>
+                  <ul className="setup-picks">
+                    <li>
+                      <b>Region</b> — <b>Northeast Asia (Seoul)</b>
+                      <em className="warn">나중에 바꿀 수 없습니다.</em>
+                      <em>무료 요금제에서도 자유롭게 고를 수 있으니 가까운 서울이 가장 빠릅니다.</em>
+                    </li>
+                    <li>
+                      <b>Database Password</b> — 만든 뒤 <b>어딘가에 저장해 두세요</b>
+                      <em>다시 볼 수 없습니다. 홈을 쓰는 데는 필요 없지만, 나중에 데이터베이스에 직접 접속할 일이 생기면 이 값이 필요합니다.</em>
+                    </li>
+                  </ul>
+                  <small style={{ marginTop: 8 }}>
+                    만들어지는 데 1~2분 걸립니다. 끝나면 <b>Project Settings → API</b>로 갑니다.
                   </small>
                 </li>
                 <li>
@@ -253,9 +267,34 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
                   <b>Firebase 프로젝트 만들기</b>
                   <small>
                     <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer">Firebase 콘솔</a>에서
-                    프로젝트를 만들고 ① <b>Authentication → 이메일/비밀번호</b> 켜기 ② <b>Firestore Database</b> 만들기
-                    ③ <b>Storage</b> 만들기(요금제 전환이 필요할 수 있습니다) ④ 웹 앱(&lt;/&gt;) 추가.
+                    프로젝트를 만든 뒤 아래 네 가지를 순서대로 합니다.
+                    <b> 위치는 나중에 바꿀 수 없으니</b> 적어 둔 값으로 골라 주세요.
                   </small>
+                  <ul className="setup-picks">
+                    <li>
+                      <b>1. Authentication</b> → 시작하기 → <b>이메일/비밀번호</b> 사용 설정
+                      <em>이걸 켜지 않으면 아래에서 관리자 계정을 만들 수 없습니다.</em>
+                    </li>
+                    <li>
+                      <b>2. Firestore Database</b> → 데이터베이스 만들기 <span className="warn">(글·설정이 저장되는 곳)</span>
+                      <em>· 에디션 <b>Standard</b> — Enterprise는 대규모 서비스용이라 고를 이유가 없습니다</em>
+                      <em>· 위치 <b>asia-northeast3 (서울)</b> — 어느 지역이든 무료 한도가 같으니 가까운 곳이 유리합니다</em>
+                      <em>· 보안 규칙 <b>프로덕션 모드에서 시작</b> — 테스트 모드는 30일간 누구나 읽고 쓸 수 있습니다</em>
+                      <em>· 데이터베이스 ID는 <b>(default)</b> 그대로 — 바꾸면 홈이 못 찾습니다</em>
+                    </li>
+                    <li>
+                      <b>3. Storage</b> → 시작하기 <span className="warn">(이미지가 저장되는 곳)</span>
+                      <em>· 무료 5GB를 유지하려면 <b>us-west1 (오레곤)</b> — 미국 리전에만 무료 한도가 적용됩니다</em>
+                      <em>· 속도를 원하면 <b>asia-northeast3 (서울)</b> — 월 1,000원 안팎이 듭니다</em>
+                      <em>· 미국을 골라도 글·목록은 서울에서 오므로 페이지는 바로 뜨고 사진만 조금 늦게 채워집니다</em>
+                      <em>· 종량제(Blaze) 전환을 요구할 수 있습니다 — 무료 한도 안에서는 청구되지 않습니다</em>
+                    </li>
+                    <li>
+                      <b>4. 웹 앱 등록</b> → ⚙️ <b>프로젝트 설정 → 일반 → 맨 아래 「내 앱」 → 앱 추가 → 웹</b>
+                      <em className="warn">왼쪽 메뉴의 「App Hosting(앱 호스팅)」이 아닙니다.</em>
+                      <em>그건 홈을 Firebase에서 직접 굴리는 기능인데, 이 홈은 이미 Vercel에 올라가 있어 쓰지 않습니다.</em>
+                    </li>
+                  </ul>
                 </li>
                 <li>
                   <b>설정값 붙여넣기</b>
@@ -387,6 +426,23 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
                   </div>
                   <pre className="setup-sql" style={{ maxHeight: 150 }}>{envText()}</pre>
                 </div>
+              </li>
+            )}
+
+            {doneStep && (
+              <li>
+                <b>서버 위치를 서울로 (한국에서 쓴다면)</b>
+                <small>
+                  Vercel은 서버를 <b>미국 동부</b>에 두는 것이 기본값이라, 그냥 두면 페이지를 열 때마다
+                  태평양을 왕복합니다. <b>자동으로는 바뀌지 않으니</b> 직접 한 번 눌러 주세요 — 30초면 됩니다.
+                </small>
+                <ul className="setup-picks">
+                  <li>
+                    <b>Settings → Functions → Function Region → Seoul (icn1) → 저장</b>
+                    <em className="warn">저장만 하면 안 바뀝니다 — Deployments → 맨 위 배포의 ⋯ → Redeploy까지 해야 적용됩니다.</em>
+                    <em>확인: 홈에서 F12 → Network → 맨 위 요청 → Response Headers의 x-vercel-id가 icn1로 시작하면 성공입니다.</em>
+                  </li>
+                </ul>
               </li>
             )}
           </ol>

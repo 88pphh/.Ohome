@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   description: '자캐놀이용 개인 아카이브',
 };
 
-// 서버 함수 리전(서울)은 vercel.json에 둔다.
-// 라우트 세그먼트 설정 preferredRegion은 이 Next 버전에서 deprecated라 쓰지 않는다.
-// 그래도 안 바뀌면 Vercel 프로젝트 Settings > Functions > Function Region에서 직접 지정 — 설치 안내에 적어 두었다.
+// 서버 함수 리전은 코드로 못 정한다 — preferredRegion은 이 Next 버전에서 deprecated이고,
+// vercel.json의 regions는 새 프로젝트에서도 적용되지 않는 것을 실측으로 확인했다.
+// Vercel 프로젝트 Settings > Functions > Function Region에서 직접 지정 후 재배포해야 한다(설치 안내 2-B ④).
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
