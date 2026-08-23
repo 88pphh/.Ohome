@@ -76,21 +76,45 @@
 
 **① 저장소를 내 계정으로 가져오기**
 
-받은 저장소 주소로 들어가 오른쪽 위 **[Fork]** → **[Create fork]** 를 누릅니다.
-내 계정에 똑같은 저장소가 생깁니다. (GitHub 계정이 없으면 먼저 가입 — 무료입니다.)
+**GitHub 계정이 없다면 먼저 만듭니다** — [github.com/signup](https://github.com/signup), 무료이고 1분이면 됩니다.
+코드를 보관하는 곳이라 홈을 운영하는 내내 쓰게 되고, 다음 단계의 Vercel 가입에도 이 계정을 씁니다.
 
-**② Vercel에 올리기**
+계정이 준비되면 받은 저장소 주소로 들어가 오른쪽 위 **[Fork]** → **[Create fork]** 를 누릅니다.
+내 계정에 똑같은 저장소가 생깁니다.
 
-1. [vercel.com/new](https://vercel.com/new) 접속 → **[Continue with GitHub]** 로 로그인
-2. 목록에서 방금 포크한 저장소를 찾아 **[Import]**
-   - 안 보이면 **[Adjust GitHub App Permissions]** 로 접근을 허용합니다
-3. **[Deploy]** 누르기 — 1~3분 기다립니다
+**② Vercel 계정 만들기**
+
+Vercel은 홈을 인터넷에 띄워 주는 곳입니다. 따로 가입할 필요 없이 **방금 만든 GitHub 계정으로 시작**합니다.
+
+1. [vercel.com/signup](https://vercel.com/signup) 접속
+2. **[Continue with GitHub]** 클릭 — 이게 가입이자 로그인입니다
+3. GitHub 로그인 화면이 뜨면 로그인하고, **[Authorize Vercel]** 로 허용합니다
+   - Vercel이 내 저장소를 읽어 배포하기 위해 필요한 권한입니다
+4. 요금제를 물으면 **Hobby(개인용, 무료)** 를 고릅니다
+
+**③ GitHub 저장소를 Vercel에 연결하기**
+
+로그인하면 **Import Git Repository** 화면이 나옵니다. **처음 쓰는 분들이 가장 많이 막히는 지점**이라 자세히 적습니다.
+
+- 저장소 목록이 **비어 있거나**, 목록 대신 **[Continue with GitHub]** 버튼만 보인다면 아직 GitHub이 연결되지 않은 것입니다 → **그 버튼을 누릅니다**
+- **[Install]** 화면에서 Vercel이 접근할 저장소를 고릅니다
+  - **All repositories** — 전부 허용 (신경 쓸 게 없어 간단합니다)
+  - **Only select repositories** — 포크한 저장소 하나만 골라도 됩니다
+- 설치를 마치면 목록에 저장소가 나타납니다
+
+> 이미 연결했는데 저장소가 안 보이면 **[Adjust GitHub App Permissions]** 에서 접근 범위에 그 저장소를 추가하세요.
+
+**④ 배포하기**
+
+1. 목록에서 포크한 저장소를 찾아 **[Import]** 클릭
+2. 설정 화면이 나와도 **아무것도 바꾸지 말고** **[Deploy]** 클릭
+3. 1~3분 기다립니다
 4. 완료되면 **`https://내프로젝트.vercel.app`** 주소가 나옵니다. 눌러서 들어가면 **설치 화면**이 뜹니다 (3장으로)
 
 이 과정에서 **환경변수는 건드리지 않습니다.** 데이터베이스 연결은 다음 장의 설치 화면에서 합니다.
 내 도메인은 나중에 Vercel 프로젝트의 **Settings → Domains**에서 연결하면 됩니다.
 
-**③ 나중에 새 버전 받기**
+**⑤ 나중에 새 버전 받기**
 
 내 저장소 페이지 위쪽의 **[Sync fork]** → **[Update branch]** 를 누르면 끝입니다.
 Vercel이 1~2분 안에 새로 배포하고, **글·이미지·테마·회원은 내 데이터베이스에 있으므로 그대로**입니다.
