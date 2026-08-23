@@ -30,12 +30,22 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
   });
 
   const auth = authMod.getAuth(app);
-  const db = fsMod.getFirestore(app);
+  // 콘솔에서 데이터베이스를 (default)가 아닌 이름으로 만든 경우를 위해 ID를 받는다
+  const dbId = (cfg.databaseId ?? '').trim();
+  const db = dbId && dbId !== '(default)' ? fsMod.getFirestore(app, dbId) : fsMod.getFirestore(app);
   const storage = stMod.getStorage(app);
 
   const {
-    collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy, onSnapshot, writeBatch, limit,
+    collection, doc, getDoc, getDocs, getDocsFromServer, setDoc, deleteDoc, query, orderBy, onSnapshot, writeBatch, limit,
   } = fsMod;
+
+  // Firestore SDK는 서버에 못 닿으면 무한 재시도한다 — 쓰기가 영영 안 끝나는 것을 막는다
+  const TIMEOUT = Symbol('timeout');
+  const withLimit = <X,>(p: Promise<X>, ms = 12000) =>
+    Promise.race([p, new Promise<typeof TIMEOUT>(r => setTimeout(() => r(TIMEOUT), ms))]);
+  const NO_REACH = dbId
+    ? `Firestore에 저장하지 못했습니다 — 데이터베이스 ID "${dbId}"가 맞는지 확인해 주세요.`
+    : 'Firestore에 저장하지 못했습니다 — 데이터베이스가 만들어졌는지, 이름이 (default)인지 확인해 주세요.';
 
   /** 관리자 여부 — meta/owner 문서의 uid 또는 admins 목록 */
   const ownerInfo = async (): Promise<{ uid?: string; admins?: string[] } | null> => {
@@ -86,20 +96,27 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
     async check(): Promise<BackendCheck> {
       const fail = (p: Partial<BackendCheck>): BackendCheck =>
         ({ ok: false, reachable: false, schema: false, hasAdmin: false, message: '', ...p });
-      // Firestore SDK는 못 닿는 프로젝트에 계속 재시도하므로 시간 제한을 둔다 (v2.0)
-      const timeout = Symbol('timeout');
-      const withLimit = <X,>(p: Promise<X>, ms = 12000) =>
-        Promise.race([p, new Promise<typeof timeout>(r => setTimeout(() => r(timeout), ms))]);
-      // Firestore는 테이블을 미리 만들지 않는다 — 대신 "읽기가 되는지(규칙 적용 여부)"를 본다
+      // Firestore는 테이블을 미리 만들지 않는다 — 대신 "읽기가 되는지(규칙 적용 여부)"를 본다.
+      // 반드시 getDocsFromServer — 일반 getDocs는 서버에 못 닿아도 로컬 캐시로 성공해서,
+      // 데이터베이스가 없는데도 확인을 통과시켜 버린다(그 뒤 쓰기에서 멈춘다).
       try {
-        const r = await withLimit(getDocs(query(collection(db, 'settings'), limit(1))));
-        if (r === timeout) {
+        const r = await withLimit(getDocsFromServer(query(collection(db, 'settings'), limit(1))));
+        if (r === TIMEOUT) {
           return fail({ message: '응답이 없습니다 — projectId가 맞는지, Firestore 데이터베이스를 만들었는지 확인해 주세요.' });
         }
       } catch (e) {
         const code = (e as { code?: string })?.code ?? '';
+        const msg = (e as { message?: string })?.message ?? '';
         if (code.includes('permission-denied')) {
           return fail({ reachable: true, message: '보안 규칙이 아직 적용되지 않았습니다 — 아래 규칙을 Firebase 콘솔의 Firestore → 규칙에 붙여넣고 게시해 주세요.' });
+        }
+        // 데이터베이스 자체가 없을 때 — 가장 흔한 첫 설치 실수
+        if (code.includes('not-found') || /Database .* not found|NOT_FOUND/i.test(msg)) {
+          return fail({
+            message: dbId
+              ? `"${dbId}" 데이터베이스를 찾을 수 없습니다 — Firebase 콘솔의 Firestore Database에서 그 이름이 맞는지 확인해 주세요.`
+              : 'Firestore 데이터베이스가 없습니다 — Firebase 콘솔 → Firestore Database에서 [데이터베이스 만들기]를 먼저 해 주세요. 이미 만들었다면 데이터베이스 ID가 (default)인지 확인해 주세요.',
+          });
         }
         if (code.includes('unavailable') || code.includes('failed-precondition')) {
           return fail({ message: 'Firestore가 아직 준비되지 않았습니다 — Firebase 콘솔에서 Firestore 데이터베이스를 먼저 만들어 주세요.' });
@@ -138,7 +155,10 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       try {
         const cred = await authMod.createUserWithEmailAndPassword(auth, id, password);
         await authMod.updateProfile(cred.user, { displayName: nickname });
-        await setDoc(doc(db, 'profiles', cred.user.uid), { nickname, createdAt: Date.now() }, { merge: true });
+        const r = await withLimit(
+          setDoc(doc(db, 'profiles', cred.user.uid), { nickname, createdAt: Date.now() }, { merge: true }));
+        // 계정(Auth)은 이미 만들어졌으므로 그 사실을 알려 준다 — 다시 시도하면 "이미 사용 중"이 뜬다
+        if (r === TIMEOUT) return { ok: false, error: `${NO_REACH} (로그인 계정은 이미 만들어졌습니다)` };
         return { ok: true };
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },
@@ -173,7 +193,8 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       try {
         const own = await ownerInfo();
         if (own?.uid) return { ok: true };   // 이미 소유자 있음
-        await setDoc(doc(db, 'meta', 'owner'), { uid: u.uid, admins: [u.uid], at: Date.now() });
+        const r = await withLimit(setDoc(doc(db, 'meta', 'owner'), { uid: u.uid, admins: [u.uid], at: Date.now() }));
+        if (r === TIMEOUT) return { ok: false, error: NO_REACH };
         return { ok: true };
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },

@@ -13,6 +13,8 @@ export type BackendConfig =
       kind: 'firebase';
       apiKey: string; authDomain: string; projectId: string;
       storageBucket: string; appId: string; messagingSenderId?: string;
+      /** Firestore 데이터베이스 ID — 비우면 (default). 콘솔에서 다른 이름으로 만들었을 때만 필요 */
+      databaseId?: string;
     };
 
 /** 로그인 사용자 */

@@ -28,6 +28,8 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
   // Firebase 입력 — 콘솔에서 복사한 설정 뭉치를 붙여넣으면 자동으로 뜯어낸다
   const [fbPaste, setFbPaste] = useState('');
   const [fb, setFb] = useState({ apiKey: '', authDomain: '', projectId: '', storageBucket: '', appId: '', messagingSenderId: '' });
+  // 콘솔에서 데이터베이스를 (default) 아닌 이름으로 만든 경우에만 입력 (보통 비워 둔다)
+  const [fbDbId, setFbDbId] = useState('');
 
   const [checking, setChecking] = useState(false);
   const [check, setCheck] = useState<BackendCheck | null>(null);
@@ -71,6 +73,7 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
         storageBucket: fb.storageBucket.trim() || `${fb.projectId.trim()}.appspot.com`,
         appId: fb.appId.trim(),
         messagingSenderId: fb.messagingSenderId.trim() || undefined,
+        databaseId: fbDbId.trim() || undefined,
       }
     : { kind: 'supabase', url: sbUrl.trim(), anonKey: sbKey.trim() });
 
@@ -138,11 +141,19 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
     setSigning(true);
     try {
       const be = await createBackend(cfg());
-      const r = await be.signUp(email.trim(), pw, nick.trim() || email.split('@')[0]);
+      let r = await be.signUp(email.trim(), pw, nick.trim() || email.split('@')[0]);
+      // 앞선 시도가 저장 도중 끊겨 로그인 계정만 남은 경우 — 같은 비밀번호로 들어가 이어서 진행한다
+      if (!r.ok && /이미 사용 중/.test(r.error ?? '')) {
+        const back = await be.signIn(email.trim(), pw);
+        r = back.ok ? { ok: true } : {
+          ok: false,
+          error: '이미 있는 계정입니다 — 비밀번호가 다르다면 Firebase 콘솔의 Authentication → Users에서 그 계정을 지우고 다시 시도해 주세요.',
+        };
+      }
       if (!r.ok) { setErr(`계정 만들기에 실패했습니다 — ${r.error}`); setSigning(false); return; }
       // Firebase는 첫 계정을 소유자로 등록해야 관리자가 된다 (Supabase는 트리거가 처리)
       const claim = await be.claimOwner();
-      if (!claim.ok) setErr(`계정은 만들어졌지만 관리자 등록에 실패했습니다 — ${claim.error}`);
+      if (!claim.ok) { setErr(`관리자 등록에 실패했습니다 — ${claim.error}`); setSigning(false); return; }
       setSigned(true);
     } catch (e) {
       setErr(`계정 만들기에 실패했습니다 — ${(e as { message?: string })?.message ?? ''}`);
@@ -161,6 +172,7 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
           `NEXT_PUBLIC_FIREBASE_APP_ID=${c.appId}`,
           `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${c.authDomain}`,
           `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${c.storageBucket}`,
+          ...(c.databaseId ? [`NEXT_PUBLIC_FIREBASE_DATABASE_ID=${c.databaseId}`] : []),
         ].join('\n');
   };
 
@@ -270,6 +282,11 @@ export function SetupGate({ children }: { children: React.ReactNode }) {
                       <KInput value={fb.storageBucket} onChange={e => setFb(f => ({ ...f, storageBucket: e.target.value }))} />
                     </div>
                   </div>
+                  <label className="k-label">데이터베이스 ID (비워 두세요)</label>
+                  <KInput value={fbDbId} onChange={e => setFbDbId(e.target.value)} />
+                  <p className="hint" style={{ margin: '4px 0 0' }}>
+                    Firestore를 만들 때 이름을 <b>(default)</b>가 아닌 다른 것으로 지정했을 때만 그 이름을 적습니다.
+                  </p>
                 </li>
                 <li>
                   <b>보안 규칙 붙여넣기</b>

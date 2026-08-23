@@ -33,6 +33,7 @@ function normalize(v: unknown): BackendConfig | null {
       storageBucket: o.storageBucket || `${o.projectId}.appspot.com`,
       appId: o.appId,
       messagingSenderId: o.messagingSenderId,
+      databaseId: o.databaseId || undefined,
     };
   }
   if (o.url && o.anonKey) return { kind: 'supabase', url: o.url, anonKey: o.anonKey };
@@ -64,6 +65,7 @@ function envConfig(): BackendConfig | null {
       kind: 'firebase', apiKey, projectId, appId,
       authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
+      databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ?? '',
     });
   }
   return null;
