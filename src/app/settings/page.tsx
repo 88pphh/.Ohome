@@ -882,7 +882,10 @@ function MemberPane() {
             {/* 이름 클릭 → 회원 정보 페이지 (v1.9) */}
             <b style={{ fontSize: 12.5, cursor: 'var(--cur-pointer,pointer)' }} data-tip="회원 정보 보기"
               onClick={() => router.push(`/members/${m.id}`)}>{m.nickname}</b>
-            <small style={{ color: 'var(--faint)', fontSize: 10.5 }}>{m.id}</small>
+            {/* Firebase 계정 id(uid)는 28자라 줄에서 자리를 다 먹는다 — 앞 7자만, 전체는 툴팁으로 */}
+            <small style={{ color: 'var(--faint)', fontSize: 10.5 }} data-tip={m.id.length > 7 ? m.id : undefined}>
+              {m.id.length > 7 ? `${m.id.slice(0, 7)}…` : m.id}
+            </small>
             {/* 태그 — ✕로 제거, ＋로 추가 (그룹화) */}
             {myTags.map(t => (
               <span key={t} className="pill" style={{ cursor: 'var(--cur-pointer,pointer)' }} data-tip="태그 제거"

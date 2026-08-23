@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { backend, isServerMode } from './backend';
 
-export interface MemberLite { id: string; nickname: string }
+export interface MemberLite { id: string; nickname: string; role?: 'admin' | 'member' }
 
 /** 로컬(브라우저) 계정 목록 — 서버 없이 개발할 때 */
 export function memberPool(): MemberLite[] {
@@ -30,7 +30,7 @@ export function useMembers(): MemberLite[] {
     if (!isServerMode() || !be) { setList(memberPool()); return; }
     let alive = true;
     be.listMembers()
-      .then(rows => { if (alive) setList(rows.map(r => ({ id: r.id, nickname: r.nickname }))); })
+      .then(rows => { if (alive) setList(rows.map(r => ({ id: r.id, nickname: r.nickname, role: r.role }))); })
       .catch(() => { /* 권한·네트워크 문제면 빈 목록 */ });
     return () => { alive = false; };
   }, []);

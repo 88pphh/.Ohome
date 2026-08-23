@@ -360,7 +360,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                 {i === 0 ? (
                   <>
                     <span className="pill dark">대표 · 썸네일</span>
-                    <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
+                    {/* 옆의 「대표 · 썸네일」 뱃지와 세로 크기 통일 (23px) */}
+                    <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5, lineHeight: '13px' }}
                       onClick={() => setCropOpen(true)}>✂ 썸네일 크롭</button>
                   </>
                 ) : (

@@ -14,6 +14,8 @@ import { useBlobUrl } from '@/lib/blobStore';
 import { CroppedBlobImg } from '@/components/ui/CropEditor';
 import { PageTitle } from '@/components/ui/PageText';
 import { getSetting } from '@/lib/settingStore';
+import { useMembers } from '@/lib/members';
+import { isServerMode } from '@/lib/backend';
 import { Pager } from '@/components/ui/Kit';
 
 const PER = 15;
@@ -27,14 +29,22 @@ export default function MemberDetailPage() {
   const [guestEntries] = useLocalList<GuestEntry>('ohome.guest.v1', GUEST_SEED);
   const [chars] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const { boards } = useBoards();
+  const members = useMembers();
 
   const [member, setMember] = useState<User | null | undefined>(undefined); // undefined = 로딩
   const [tags, setTags] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   useEffect(() => {
-    setMember(mockMemberInfo(id));
+    // 서버 모드에서는 가입 회원이 DB(profiles)에 있다 — 로컬 계정 목록에만 물으면 못 찾는다
+    if (isServerMode()) {
+      if (members.length === 0) return;                       // 아직 받아오는 중
+      const hit = members.find(m => m.id === id);
+      setMember(hit ? { id: hit.id, nickname: hit.nickname, role: hit.role ?? 'member' } : null);
+    } else {
+      setMember(mockMemberInfo(id));
+    }
     setTags(getSetting<Record<string, string[]>>('ohome.membertags.v1', {})[id] ?? []);
-  }, [id]);
+  }, [id, members]);
   const avatarSrc = useBlobUrl(member?.avatarUrl);
 
   if (member === undefined) return <section className="page" />;

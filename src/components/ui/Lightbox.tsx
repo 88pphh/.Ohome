@@ -11,7 +11,12 @@ export function Lightbox({ srcs, index, onClose }: {
 }) {
   const [i, setI] = useState(index);
   useEffect(() => setI(index), [index]);
-  const url = useBlobUrl(srcs[i]);
+  // 등록 폼에서 방금 고른 파일은 이번 세션에서 만든 blob: 주소다.
+  // useBlobUrl은 blob:을 (새로고침으로 죽은) 옛 참조로 보고 거부하므로 여기서는 그대로 쓴다.
+  const raw = srcs[i] ?? '';
+  const live = raw.startsWith('blob:');
+  const loaded = useBlobUrl(live ? undefined : raw);
+  const url = live ? raw : loaded;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
