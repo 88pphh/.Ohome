@@ -47,8 +47,9 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
   const storage = stMod.getStorage(app);
 
   const {
-    collection, doc, getDoc, getDocs, getDocsFromServer, setDoc, deleteDoc, query, orderBy, onSnapshot, writeBatch, limit,
+    collection, doc, getDoc, getDocs, getDocsFromServer, setDoc, deleteDoc, query, where, onSnapshot, writeBatch, limit,
   } = fsMod;
+  type Cons = ReturnType<typeof where>;
 
   // Firestore SDK는 서버에 못 닿으면 무한 재시도한다 — 쓰기가 영영 안 끝나는 것을 막는다
   const TIMEOUT = Symbol('timeout');
@@ -65,6 +66,41 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       return snap.exists() ? (snap.data() as { uid?: string; admins?: string[] }) : null;
     } catch { return null; }
   };
+
+  // 목록을 읽을 때마다 meta/owner를 다시 읽지 않도록 (읽기 횟수도 요금이다)
+  let ownerCache: { uid?: string; admins?: string[] } | null | undefined;
+  const ownerNow = async () => {
+    if (ownerCache === undefined) ownerCache = await ownerInfo();
+    return ownerCache;
+  };
+  const isAdminNow = async () => {
+    const u = auth.currentUser;
+    if (!u) return false;
+    const own = await ownerNow();
+    return own?.uid === u.uid || (own?.admins ?? []).includes(u.uid);
+  };
+  authMod.onAuthStateChanged(auth, () => { ownerCache = undefined; });
+
+  /**
+   * 로그인 상태에 맞는 목록 질의 조건.
+   *
+   * Firestore는 **규칙으로 못 읽을 문서가 섞일 수 있는 질의를 통째로 거부한다.**
+   * (Supabase의 RLS는 행을 조용히 걸러 주므로 조건 없이 읽어도 되지만, 여기서는 아니다.)
+   * 조건 없이 읽으면 비로그인 방문자에게 전체공개 글까지 하나도 안 보인다 — 목록 요청 자체가 거부되기 때문.
+   *
+   * 정렬(orderBy)은 일부러 붙이지 않는다. where + orderBy 조합은 복합 색인을 만들어야 해서
+   * 설치한 사람이 콘솔에서 색인을 추가해야 하기 때문 — 대신 받은 뒤 sort로 정렬한다.
+   */
+  const readSets = async (): Promise<Cons[][]> => {
+    const u = auth.currentUser;
+    if (!u) return [[where('visibility', '==', 'public')]];
+    if (await isAdminNow()) return [[]];                    // 관리자는 전부
+    // 회원: 전체공개+회원공개, 그리고 내가 쓴 것(비공개 포함)은 따로 받아 합친다
+    return [[where('visibility', 'in', ['public', 'member'])], [where('authorId', '==', u.uid)]];
+  };
+
+  const listQuery = (coll: string, cs: Cons[]) =>
+    (cs.length ? query(collection(db, coll), ...cs) : query(collection(db, coll)));
 
   const toUser = async (u: { uid: string; email?: string | null; displayName?: string | null } | null): Promise<BackendUser | null> => {
     if (!u) return null;
@@ -206,6 +242,7 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
         if (own?.uid) return { ok: true };   // 이미 소유자 있음
         const r = await withLimit(setDoc(doc(db, 'meta', 'owner'), { uid: u.uid, admins: [u.uid], at: Date.now() }));
         if (r === TIMEOUT) return { ok: false, error: NO_REACH };
+        ownerCache = undefined;   // 방금 관리자가 됐으니 다시 판정하게
         return { ok: true };
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },
@@ -225,11 +262,16 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
     },
 
     async fetchList<T extends ListItem>(coll: string): Promise<T[]> {
-      const snap = await getDocs(query(collection(db, coll), orderBy('sort', 'asc')));
-      return snap.docs.map(d => {
-        const raw = d.data() as { data?: Record<string, unknown> };
-        return { ...(raw.data ?? {}), id: d.id } as T;
-      });
+      const sets = await readSets();
+      const snaps = await Promise.all(sets.map(cs => getDocs(listQuery(coll, cs))));
+      // 두 질의(공개분 · 내 글)를 합치므로 문서 id로 중복을 없앤 뒤 sort로 정렬한다
+      const seen = new Map<string, { sort: number; item: T }>();
+      snaps.forEach(s => s.docs.forEach(d => {
+        if (seen.has(d.id)) return;
+        const raw = d.data() as { data?: Record<string, unknown>; sort?: number };
+        seen.set(d.id, { sort: raw.sort ?? 0, item: { ...(raw.data ?? {}), id: d.id } as T });
+      }));
+      return [...seen.values()].sort((a, b) => a.sort - b.sort).map(v => v.item);
     },
 
     async syncList<T extends ListItem>(coll: string, prev: T[], next: T[], uid: string | null) {
@@ -257,7 +299,14 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
     },
 
     subscribe(coll, onChange) {
-      return onSnapshot(query(collection(db, coll), orderBy('sort', 'asc')), () => onChange(), () => { /* 권한 없음 등은 무시 */ });
+      // 조건이 두 갈래면 구독도 두 개 — fetchList와 같은 이유(질의 전체 거부 방지)
+      let offs: Array<() => void> = [];
+      let stopped = false;
+      void readSets().then(sets => {
+        if (stopped) return;
+        offs = sets.map(cs => onSnapshot(listQuery(coll, cs), () => onChange(), () => { /* 권한 없음 등은 무시 */ }));
+      });
+      return () => { stopped = true; offs.forEach(off => off()); offs = []; };
     },
 
     async fetchSetting<T>(key: string) {
