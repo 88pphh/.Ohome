@@ -39,6 +39,40 @@ export function LiveInput({ value, onValue, ...rest }: {
   );
 }
 
+/**
+ * 한 줄에 들어가도록 글씨를 줄이는 상자 (v2.0) — 긴 이름이 두 줄로 갈라지는 것을 막는다.
+ * 말줄임(…)과 달리 이름 전체를 보여 준다. min까지 줄여도 안 들어가면 거기서 멈춘다.
+ */
+export function FitText({ children, min = 10, className, style }: {
+  children: React.ReactNode; min?: number; className?: string; style?: React.CSSProperties;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.fontSize = '';                       // 기준 크기에서 다시 계산
+      const base = parseFloat(getComputedStyle(el).fontSize) || 14;
+      let size = base;
+      while (size > min && el.scrollWidth > el.clientWidth + 1) {
+        size -= 0.5;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  return (
+    <span ref={ref} className={className}
+      // 최소 크기까지 줄여도 안 들어가는 아주 긴 이름은 …로 마무리 (잘린 채 끝나지 않게)
+      style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...style }}>
+      {children}
+    </span>
+  );
+}
+
 /* ---------- textarea — 리사이즈 핸들 제거 + 내용 따라 자동 높이 ---------- */
 export function KTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const ref = useRef<HTMLTextAreaElement>(null);

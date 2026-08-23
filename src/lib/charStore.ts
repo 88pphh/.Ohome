@@ -171,6 +171,7 @@ export interface Relation {
   aus: RelAu[];                  // AU 리스트 (첫 항목 = 원본 base)
   cp?: RelCpTag;                 // 자관 기본 CP/NCP (등록 시 선택, v1.9)
   fullFront?: string;            // 전신 모드에서 앞에 보일 캐릭터 id (v1.9 — 미리보기에서 클릭 선택)
+  pairRight?: string;            // 페어에서 오른쪽 자리에 둘 캐릭터 id (v2.0 — 없으면 등록 순서대로)
   timeline: TlItem[];            // base AU의 타임라인
   questions: QaEntry[];          // base AU의 문답
   qaPool?: string[];             // base AU의 대기 질문 풀 (v1.9 — 랜덤 출제 대기)

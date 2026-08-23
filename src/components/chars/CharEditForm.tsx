@@ -86,7 +86,8 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     const artIds = await Promise.all(arts.map(a => (a.file ? putBlob(a.file) : Promise.resolve(a.ref!))));
     onSave({
       id: initial?.id ?? (slug || newId()),
-      name: name.trim().toUpperCase(),
+      // 입력한 그대로 저장 — 예전에는 대문자로 바꿔 저장해서 소문자 이름을 쓸 수 없었다
+      name: name.trim(),
       sub: sub.trim(),
       color,
       themeMode,

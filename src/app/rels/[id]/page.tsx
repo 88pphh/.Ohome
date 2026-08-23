@@ -18,7 +18,7 @@ import { GrantsEditor } from '@/components/chars/GrantsEditor';
 import { TrpgLog, TRPG_SEED } from '@/lib/galleryStore';
 import { RpRoom, RP_SEED } from '@/lib/rpStore';
 import { useFonts } from '@/lib/fontStore';
-import { Tip, KInput, KTextarea, KSelect, KRadio } from '@/components/ui/Kit';
+import { Tip, KInput, KTextarea, KSelect, KRadio, FitText } from '@/components/ui/Kit';
 import { Modal, ConfirmModal, useConfirmDelete } from '@/components/ui/Modal';
 import { ColorField } from '@/components/ui/ColorField';
 import { DragList } from '@/components/ui/DragList';
@@ -62,9 +62,11 @@ function rgbTriple(hex: string): string {
   return `${parseInt(f.slice(0, 2), 16)},${parseInt(f.slice(2, 4), 16)},${parseInt(f.slice(4, 6), 16)}`;
 }
 
-function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
+function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side, onMoveSide }: {
   member: RelMember; char?: Character; isAdmin: boolean; onGo: () => void; onRemove: () => void;
   auUnregistered?: boolean;   // AU 선택 중인데 이 캐릭터의 AU 프로필이 미등록 (v1.9)
+  side?: 'l' | 'r';           // 페어에서 지금 어느 자리인지 (좌우 옮기기 메뉴용, v2.0)
+  onMoveSide?: () => void;
 }) {
   const { familyOf } = useFonts();   // 이름은 캐릭터 프로필에서 지정한 폰트로
   const [lb, setLb] = useState<number | null>(null);
@@ -111,8 +113,9 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
           <div className={`face ph ${char.thumbClass}`} />
         )}
         <div>
-          {/* 이름 폰트는 캐릭터 프로필에서 지정한 것을 그대로 쓴다 (사용자 요청) */}
-          <b style={{ fontFamily: familyOf(char.fontId) }}>{char.name}</b>
+          {/* 이름 폰트는 캐릭터 프로필에서 지정한 것을 그대로 쓴다.
+              긴 이름이 두 줄로 갈라지지 않게 한 줄에 맞춰 줄인다 (사용자 요청) */}
+          <b><FitText style={{ fontFamily: familyOf(char.fontId) }}>{char.name}</FitText></b>
           <small>{char.sub}{member.linkedNote ? ` · ${member.linkedNote}` : ''}</small>
         </div>
       </div>
@@ -147,6 +150,11 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
       {ctx && createPortal(
         <div className="ctx-menu on" style={{ left: ctx.x, top: ctx.y }} onClick={e => e.stopPropagation()}>
           <div className="ctx-ttl">{char.name}</div>
+          {onMoveSide && (
+            <button onClick={() => { setCtx(null); onMoveSide(); }}>
+              {side === 'r' ? '왼쪽으로 옮기기' : '오른쪽으로 옮기기'}
+            </button>
+          )}
           <button className="danger" onClick={() => { setCtx(null); onRemove(); }}>멤버 제거</button>
         </div>,
         document.body,
@@ -330,7 +338,7 @@ export default function RelDetailPage() {
       if (!mName.trim()) { toast('상대 캐릭터 이름을 입력해 주세요'); return; }
       // 상대 캐릭터 간단 등록 (own:false — 내 캐릭터 리스트에는 표시되지 않음, 4.4)
       const nc: Character = {
-        id: newId(), name: mName.trim().toUpperCase(), sub: mSub.trim(), color: mColor,
+        id: newId(), name: mName.trim(), sub: mSub.trim(), color: mColor,
         colors: [{ hex: mColor, label: '테마색' }], specs: [], tabs: [],
         basicHtml: '', visibility: 'public', thumbClass: '', own: false,
         grants: mGrants.length ? mGrants : undefined, // 회원 권한 — 역극 플레이/편집 (v1.9)
@@ -502,15 +510,34 @@ export default function RelDetailPage() {
     }));
 
   const removeMember = (cid: string) => {
-    const name = charOf(cid)?.name ?? '멤버';
+    const c = charOf(cid);
+    const name = c?.name ?? '멤버';
     del.ask(`멤버 「${name}」를 제거하시겠습니까?`,
-      () => updateRel({ members: rel.members.filter(m => m.charId !== cid) }),
-      '자관에서만 빠지며 캐릭터 자체는 삭제되지 않습니다.');
+      () => updateRel({
+        members: rel.members.filter(m => m.charId !== cid),
+        // 오른쪽 지정이 걸려 있던 캐릭터가 빠지면 지정도 함께 푼다
+        pairRight: rel.pairRight === cid ? undefined : rel.pairRight,
+      }),
+      c?.own
+        // 내 캐릭터 — 이 자관에 등록한 정보만 지운다 (사용자 확정)
+        ? '이 자관에 등록한 정보(한마디·키워드·소개·전신·색)만 지웁니다. 캐릭터 자체와 다른 자관의 정보는 그대로입니다.'
+        : '자관에서만 빠지며 캐릭터 자체는 삭제되지 않습니다.');
   };
 
+  /* 페어 좌우 배치 (v2.0 사용자 요청) — 예전에는 등록 순서가 곧 자리라, 처음 넣은 캐릭터는
+     오른쪽 카드에서 추가해도 무조건 왼쪽에 들어갔다. pairRight로 오른쪽에 둘 캐릭터를 지정한다. */
   const pairSlots: (RelMember | null)[] = isDuo
-    ? [rel.members[0] ?? null, rel.members[1] ?? null]
+    ? (rel.pairRight
+      ? [rel.members.find(m => m.charId !== rel.pairRight) ?? null,
+        rel.members.find(m => m.charId === rel.pairRight) ?? null]
+      : [rel.members[0] ?? null, rel.members[1] ?? null])
     : [];
+
+  /** 이 멤버를 반대쪽 자리로 (좌 ↔ 우) */
+  const moveSide = (cid: string) => {
+    const nowRight = pairSlots[1]?.charId === cid;
+    updateRel({ pairRight: nowRight ? undefined : cid });
+  };
 
   return (
     <section className="page page-rel-detail">
@@ -587,6 +614,7 @@ export default function RelDetailPage() {
           {pairSlots[0]
             ? <MiniProf member={pairSlots[0]} char={charOf(pairSlots[0].charId)} isAdmin={isAdmin}
                 auUnregistered={auUnregOf(pairSlots[0].charId)}
+                side="l" onMoveSide={() => moveSide(pairSlots[0]!.charId)}
                 onGo={() => router.push(charHref(pairSlots[0]!.charId))}
                 onRemove={() => removeMember(pairSlots[0]!.charId)} />
             : <EmptyCard isAdmin={isAdmin} onAdd={() => setMemberOpen(true)} />}
@@ -639,6 +667,7 @@ export default function RelDetailPage() {
           {pairSlots[1]
             ? <MiniProf member={pairSlots[1]} char={charOf(pairSlots[1].charId)} isAdmin={isAdmin}
                 auUnregistered={auUnregOf(pairSlots[1].charId)}
+                side="r" onMoveSide={() => moveSide(pairSlots[1]!.charId)}
                 onGo={() => router.push(charHref(pairSlots[1]!.charId))}
                 onRemove={() => removeMember(pairSlots[1]!.charId)} />
             : <EmptyCard isAdmin={isAdmin} onAdd={() => setMemberOpen(true)} />}

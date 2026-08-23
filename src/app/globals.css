@@ -967,6 +967,9 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .mini-prof{padding:0;overflow:hidden}
 .mini-prof .hd{display:flex;gap:12px;padding:15px 15px 11px;align-items:center;border-bottom:1px solid var(--line)}
 .mini-prof .hd .face{width:52px;height:52px;border-radius:10px;flex-shrink:0;overflow:hidden}
+/* 이름·소개 칸은 줄어들 수 있어야 한다 — 안 그러면 긴 이름이 카드를 밀어 넓혀
+   「한 줄에 맞춰 줄이기」가 넘침을 감지하지 못한다 */
+.mini-prof .hd > div{min-width:0}
 .mini-prof .hd b{font-family:var(--serif);font-size:calc(17px*var(--fs,1));letter-spacing:.16em;display:block}
 .mini-prof .hd small{font-size:calc(9.5px*var(--fs,1));color:var(--faint);letter-spacing:.1em}
 .mini-prof .specs{padding:11px 16px;font-size:calc(11.5px*var(--fs,1));color:var(--sub)}
