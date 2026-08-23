@@ -69,6 +69,11 @@ export interface Backend {
 
   /* ---- 이미지·파일 ---- */
   uploadFile(blob: Blob, ext: string): Promise<string>;   // → 공개 URL
+  /** 저장소에 있는 파일 전부 — 어디서도 참조하지 않는 파일을 찾아 지우는 데 쓴다.
+   *  글을 지워도 이미지는 저장소에 남기 때문에(참조가 다른 곳에 남아 있을 수 있어 자동 삭제는 위험)
+   *  관리자가 환경설정에서 직접 확인하고 정리한다. */
+  listFiles(): Promise<{ ref: string; size: number }[]>;
+  deleteFile(ref: string): Promise<void>;
 }
 
 /** 콘텐츠 컬렉션 이름 (localStorage 키 → 컬렉션/테이블) — 두 백엔드가 같은 이름을 쓴다 */

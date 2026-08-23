@@ -62,6 +62,22 @@ export function replaceRefs<T>(value: T, map: Map<string, string>): T {
   return value;
 }
 
+/**
+ * 어디에서도 참조하지 않는 저장소 파일 찾기 (환경설정 > 데이터 백업의 이미지 정리).
+ *
+ * 글을 지워도 이미지는 저장소에 남는다 — 같은 이미지를 다른 글이 쓰고 있을 수 있어
+ * 삭제와 동시에 지우는 것은 위험하기 때문. 대신 전체를 훑어 아무도 안 쓰는 것만 골라
+ * 관리자가 확인하고 지운다.
+ */
+export async function findOrphanFiles(be: Backend): Promise<{ ref: string; size: number }[]> {
+  const snap = await dumpAll(be);
+  const used = new Set<string>();
+  collectRefs(snap.collections, new Set(), used);
+  collectRefs(snap.settings, new Set(), used);
+  const all = await be.listFiles();
+  return all.filter(f => !used.has(f.ref));
+}
+
 /* ---------- 덤프 ---------- */
 
 /** 지금 저장소(서버 또는 브라우저)에서 전부 읽어 스냅샷 만들기 */

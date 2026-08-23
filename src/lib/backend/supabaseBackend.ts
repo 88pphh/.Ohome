@@ -188,5 +188,29 @@ export async function createSupabaseBackend(
       if (error) throw error;
       return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
     },
+
+    async listFiles() {
+      const out: { ref: string; size: number }[] = [];
+      const PAGE = 100;
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await sb.storage.from(BUCKET).list('', { limit: PAGE, offset });
+        if (error) throw error;
+        const rows = data ?? [];
+        rows.forEach(f => out.push({
+          ref: sb.storage.from(BUCKET).getPublicUrl(f.name).data.publicUrl,
+          size: (f.metadata as { size?: number } | null)?.size ?? 0,
+        }));
+        if (rows.length < PAGE) break;
+      }
+      return out;
+    },
+
+    async deleteFile(ref) {
+      // 저장한 값은 공개 URL — 버킷 안 파일명만 떼어 지운다
+      const name = decodeURIComponent(ref.split('?')[0].split('/').pop() ?? '');
+      if (!name) return;
+      const { error } = await sb.storage.from(BUCKET).remove([name]);
+      if (error) throw error;
+    },
   };
 }

@@ -47,10 +47,10 @@ import { useToast } from '@/components/ui/Toast';
 import { PageTitle, EditableDesc, getPageText, setPageText } from '@/components/ui/PageText';
 import { putBlob } from '@/lib/blobStore';
 import { getSetting, setSetting, pushLocalSettings, unsyncedSettingKeys } from '@/lib/settingStore';
-import { isServerMode, createBackend } from '@/lib/backend';
+import { isServerMode, createBackend, backend } from '@/lib/backend';
 import type { BackendConfig, BackendKind } from '@/lib/backend/types';
 import { validateConfig, configFileText, saveLocalConfig, parseFirebaseSnippet } from '@/lib/serverConfig';
-import { migrateTo } from '@/lib/transfer';
+import { migrateTo, findOrphanFiles } from '@/lib/transfer';
 
 const CATEGORIES = [
   '디자인', '메인 페이지', '위젯', '메뉴 관리', '게시판 관리', '자관 질문', '커미션', 'TRPG', '감상타래', '메모장',
@@ -1145,6 +1145,40 @@ function DataPane() {
   const [unsynced, setUnsynced] = useState<string[]>([]);
   useEffect(() => { setUnsynced(unsyncedSettingKeys()); }, []);
 
+  // 사용하지 않는 이미지 정리 (v2.0) — 글을 지워도 저장소에는 파일이 남는다.
+  // 같은 이미지를 다른 글이 쓰고 있을 수 있어 자동 삭제는 위험하므로, 훑어서 보여 주고 관리자가 지운다.
+  const [orphans, setOrphans] = useState<{ ref: string; size: number }[] | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [cleanAsk, setCleanAsk] = useState(false);
+  const orphanMB = (orphans ?? []).reduce((s, f) => s + f.size, 0) / 1048576;
+
+  const scanOrphans = async () => {
+    const be = backend();
+    if (!be) { toast('서버에 연결돼 있지 않습니다'); return; }
+    setScanning(true);
+    try {
+      const rows = await findOrphanFiles(be);
+      setOrphans(rows);
+      toast(rows.length ? `쓰지 않는 이미지 ${rows.length}개를 찾았습니다` : '정리할 이미지가 없습니다');
+    } catch {
+      toast('이미지 목록을 읽지 못했습니다 — 저장소 권한(규칙)을 확인해 주세요');
+    }
+    setScanning(false);
+  };
+
+  const cleanOrphans = async () => {
+    const be = backend();
+    if (!be || !orphans) return;
+    setScanning(true);
+    let n = 0;
+    for (const f of orphans) {
+      try { await be.deleteFile(f.ref); n += 1; } catch { /* 개별 실패는 건너뜀 */ }
+    }
+    setOrphans(null);
+    setScanning(false);
+    toast(`이미지 ${n}개를 지웠습니다`);
+  };
+
   // 이 브라우저에 저장돼 있던 사이트 설정을 서버로 올린다 (연결 직후 1회면 충분)
   const doPush = async () => {
     setPushing(true);
@@ -1267,6 +1301,26 @@ function DataPane() {
             disabled={pushing} onClick={doPush}>{pushing ? '올리는 중…' : '↑ 설정 올리기'}</button>
         </div>
       )}
+      {/* 쓰지 않는 이미지 정리 (v2.0) — 글을 지워도 저장소 파일은 남는다 */}
+      {serverOn && (
+        <div className="set-row" style={{ flexWrap: 'wrap' }}>
+          <div className="l"><b>쓰지 않는 이미지 정리</b>
+            <small>글을 지워도 이미지는 저장소에 남습니다 — 어디에서도 쓰지 않는 파일만 골라 지웁니다</small></div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {orphans && (
+              <span className="hint">
+                {orphans.length > 0 ? `${orphans.length}개 · ${orphanMB.toFixed(1)}MB` : '정리할 것 없음'}
+              </span>
+            )}
+            <button className="btn btn-ghost" style={{ padding: '9px 18px', opacity: scanning ? 0.5 : 1 }}
+              disabled={scanning} onClick={scanOrphans}>{scanning ? '확인 중…' : '찾아보기'}</button>
+            {orphans && orphans.length > 0 && (
+              <button className="btn btn-accent" style={{ padding: '9px 18px', opacity: scanning ? 0.5 : 1 }}
+                disabled={scanning} onClick={() => setCleanAsk(true)}>{orphans.length}개 지우기</button>
+            )}
+          </div>
+        </div>
+      )}
       {/* 백업 두 갈래 (v1.9 사용자 확정) — 회원 계정 포함 여부 선택 */}
       <div className="set-row" style={{ flexWrap: 'wrap' }}>
         <div className="l"><b>백업 내보내기</b><small>글·캐릭터·설정 + 이미지 → zip · 회원 계정(가입자·가입코드) 포함 여부 선택</small></div>
@@ -1277,6 +1331,14 @@ function DataPane() {
             disabled={busy} onClick={() => doExport(true)}>↓ 회원까지</button>
         </div>
       </div>
+      {/* Firebase Storage는 다른 주소에서 파일을 읽는 것을 기본적으로 막는다 —
+          홈에서 보는 데는 지장이 없지만 백업·이전은 파일을 직접 받아와야 해서 한 번 열어 줘야 한다 */}
+      {serverOn && backend()?.kind === 'firebase' && (
+        <p className="hint" style={{ margin: '-2px 0 12px' }}>
+          Firebase는 <b>저장소 CORS를 한 번 열어야</b> 백업 zip에 이미지가 담깁니다 — 안 하면 글·설정만 담깁니다.
+          설치 가이드의 「백업」 항목에 브라우저에서 끝내는 방법이 있습니다.
+        </p>
+      )}
       <div className="set-row" style={{ flexWrap: 'wrap' }}>
         <div className="l"><b>백업 가져오기 (복원)</b><small>현재 데이터를 백업 내용으로 덮어씁니다 — 복원 후 자동 새로고침</small></div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1399,6 +1461,14 @@ function DataPane() {
           ))}
         </div>
       </Modal>
+
+      <ConfirmModal open={cleanAsk} title={`쓰지 않는 이미지 ${orphans?.length ?? 0}개를 지울까요?`}
+        body={`저장소에서 ${orphanMB.toFixed(1)}MB를 비웁니다. 지금 글·캐릭터·설정 어디에서도 참조하지 않는 파일만 골랐지만, 지운 파일은 복구할 수 없습니다. 걱정되면 먼저 백업을 받아 두세요.`}
+        onClose={() => setCleanAsk(false)}
+        buttons={[
+          { label: '지우기', kind: 'accent', onClick: () => { setCleanAsk(false); void cleanOrphans(); } },
+          { label: 'CANCEL', kind: 'ghost', onClick: () => setCleanAsk(false) },
+        ]} />
 
       <ConfirmModal open={resetAsk} title="선택한 항목을 초기화할까요?"
         body={`지울 항목: ${[...RESET_CONTENT, ...RESET_EXTRA].filter(g => picked.includes(g.key)).map(g => g.label).join(' · ')}\n삭제한 내용은 복구할 수 없습니다.`}
@@ -1819,6 +1889,9 @@ function MenuPane() {
 function TrpgPane() {
   const [settings, patch] = useTrpgSettings();
   const [ms, patchMenu] = useMenuSettings();   // 플레이기록 표시 열 (4.16 — 저장 위치는 메뉴 설정)
+  // 비밀번호 걸린 로그의 안내 문구 (pagetext 'trpg-lock-desc')
+  const [lockDesc, setLockDesc] = useState('');
+  useEffect(() => { setLockDesc(getPageText('trpg-lock-desc', '비밀번호를 입력하면 열람할 수 있습니다')); }, []);
   const patchStatus = (k: DotoriStatus, p: Partial<(typeof settings.statuses)[DotoriStatus]>) =>
     patch({ statuses: { ...settings.statuses, [k]: { ...settings.statuses[k], ...p } } });
   // 균등 칸 그리드 — 항목 폭이 라벨 길이에 안 흔들려 PC/모바일 두 줄이 세로로 정렬됨 (v1.9)
@@ -1832,6 +1905,16 @@ function TrpgPane() {
   );
   return (
     <div className="set-sec">
+      {/* 비밀번호 걸린 로그의 안내 문구 — 관리자는 그 화면을 볼 수 없어 여기서 편집 (사용자 요청) */}
+      <h3>로그 열람 안내 문구</h3>
+      <div className="d">비밀번호를 건 로그에 들어갔을 때 보이는 문구입니다 — 관리자에게는 그 화면이 뜨지 않아 여기서 고칩니다</div>
+      <div className="set-row" style={{ alignItems: 'center' }}>
+        <div className="l"><b>비밀번호 안내</b><small>비우면 기본 문구로 표시됩니다</small></div>
+        <KInput value={lockDesc}
+          onChange={e => { setLockDesc(e.target.value); setPageText('trpg-lock-desc', e.target.value); }}
+          placeholder="비밀번호를 입력하면 열람할 수 있습니다" style={{ width: 300 }} />
+      </div>
+
       <h3>도토리 상태 카테고리</h3>
       <div className="d">라벨과 뱃지 색(배경/테두리/글씨) — 카드 뱃지는 공수표·일정 확정만 표시</div>
       {DOTORI_STATUS_KEYS.map(k => {

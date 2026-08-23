@@ -9,7 +9,7 @@ import { TrpgLog, TRPG_SEED, isHtmlBody, decodeLogText, logNo, saveLogBody } fro
 import { Relation, REL_SEED, Character, CHAR_SEED, charGrant } from '@/lib/charStore';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { getBlob, putBlob, useBlobUrl } from '@/lib/blobStore';
-import { PageTitle } from '@/components/ui/PageText';
+import { PageTitle, EditableDesc } from '@/components/ui/PageText';
 import { KInput, KSelect, KDate, KTextarea } from '@/components/ui/Kit';
 import { ColorField } from '@/components/ui/ColorField';
 import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
@@ -180,7 +180,9 @@ export default function TrpgDetailPage() {
     // 비밀번호 게이트 — 맞으면 이 세션 동안 열람 유지
     return (
       <section className="page">
-        <div className="page-head"><PageTitle>TRPG LOG</PageTitle><p>비밀번호를 입력하면 열람할 수 있습니다</p></div>
+        {/* 안내 문구는 환경설정 > TRPG에서 수정 — 관리자는 이 화면을 볼 수 없다 */}
+        <div className="page-head"><PageTitle>TRPG LOG</PageTitle>
+          <EditableDesc k="trpg-lock-desc" def="비밀번호를 입력하면 열람할 수 있습니다" always /></div>
         <div className="panel" style={{ maxWidth: 420, margin: '0 auto', padding: 26, display: 'grid', gap: 10 }}>
           <KInput type="password" placeholder="비밀번호" value={pwTry} onChange={e => setPwTry(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') tryUnlock(); }} />

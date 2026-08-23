@@ -336,6 +336,20 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       });
       return await stMod.getDownloadURL(r);
     },
+
+    async listFiles() {
+      // 저장하는 주소가 다운로드 URL이므로 목록도 같은 형태로 돌려줘야 대조가 된다
+      const res = await stMod.listAll(stMod.ref(storage, 'ohome'));
+      return Promise.all(res.items.map(async it => {
+        const [ref, meta] = await Promise.all([stMod.getDownloadURL(it), stMod.getMetadata(it)]);
+        return { ref, size: meta.size ?? 0 };
+      }));
+    },
+
+    async deleteFile(ref) {
+      // Firebase SDK는 다운로드 URL로도 참조를 만들 수 있다
+      await stMod.deleteObject(stMod.ref(storage, ref));
+    },
   };
 
   // (deleteDoc은 삭제 배치에서 doc 단위로 쓰지 않아 참조만 유지)
