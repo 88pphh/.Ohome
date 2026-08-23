@@ -42,6 +42,19 @@ function FullImg({ refId, scale, offX = 0, offY = 0 }: { refId: string; scale: n
   );
 }
 
+/** 캐릭터 대표 이미지 — 등록돼 있으면 실제 이미지, 없을 때만 기존 플레이스홀더 */
+function CharFace({ c, className, style }: {
+  c?: Character; className?: string; style?: React.CSSProperties;
+}) {
+  const rep = c?.thumbId ?? c?.arts?.[0];
+  if (!rep) return <div className={`${className ?? ''} ph ${c?.thumbClass ?? ''}`} style={style} />;
+  return (
+    <div className={className} style={{ position: 'relative', overflow: 'hidden', ...style }}>
+      <CroppedBlobImg fileRef={rep} crop={c?.thumbCrop} />
+    </div>
+  );
+}
+
 /** hex → "r,g,b" (말풍선 --cc 용) */
 function rgbTriple(hex: string): string {
   const m = hex.replace('#', '');
@@ -54,6 +67,21 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
   auUnregistered?: boolean;   // AU 선택 중인데 이 캐릭터의 AU 프로필이 미등록 (v1.9)
 }) {
   const [lb, setLb] = useState<number | null>(null);
+  // 멤버 제거는 우클릭 메뉴로 — 카드 아래에 상시 노출하면 정보가 아닌 것이 자리를 먹는다 (사용자 확정)
+  const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!ctx) return;
+    const close = () => setCtx(null);
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtx(null); };
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [ctx]);
   // 대표 이미지 = 프로필 사진 · 나머지 아트 = 아래 썸네일 줄 (없으면 줄 자체를 만들지 않는다)
   const arts = char?.arts ?? [];
   const rep = char?.thumbId ?? arts[0];
@@ -69,7 +97,8 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
     );
   }
   return (
-    <div className="panel mini-prof" onClick={onGo} style={{ cursor: 'var(--cur-pointer,pointer)' }}>
+    <div className="panel mini-prof" onClick={onGo} style={{ cursor: 'var(--cur-pointer,pointer)' }}
+      onContextMenu={e => { if (!isAdmin) return; e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY }); }}>
       <div className="hd">
         {rep ? (
           <div className="face" data-tip="클릭하면 원본 보기"
@@ -112,16 +141,14 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
         </div>
       )}
       {lb !== null && <Lightbox srcs={gallery} index={lb} onClose={() => setLb(null)} />}
-      <div className="foot">
-        <span>{char.name}</span>
-        <span>
-          ID {char.id}
-          {isAdmin && (
-            <span style={{ marginLeft: 8, cursor: 'var(--cur-pointer,pointer)', color: 'var(--accent)' }}
-              onClick={e => { e.stopPropagation(); onRemove(); }}>멤버 제거</span>
-          )}
-        </span>
-      </div>
+      {/* 우클릭 메뉴 — 관리자만 (멤버 제거) */}
+      {ctx && createPortal(
+        <div className="ctx-menu on" style={{ left: ctx.x, top: ctx.y }} onClick={e => e.stopPropagation()}>
+          <div className="ctx-ttl">{char.name}</div>
+          <button className="danger" onClick={() => { setCtx(null); onRemove(); }}>멤버 제거</button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -160,6 +187,21 @@ export default function RelDetailPage() {
   const [ansEdit, setAnsEdit] = useState<{ qNo: number; idx: number; text: string; note: string } | null>(null);
   // 질문에 대한 오너 설명 입력 모달 (v2.0)
   const [qNote, setQNote] = useState<{ no: number; text: string } | null>(null);
+  // 답변 우클릭 메뉴 (v2.0) — 수정·부연·삭제
+  const [ansCtx, setAnsCtx] = useState<{ x: number; y: number; idx: number } | null>(null);
+  useEffect(() => {
+    if (!ansCtx) return;
+    const close = () => setAnsCtx(null);
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setAnsCtx(null); };
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [ansCtx]);
   const [qaChar, setQaChar] = useState<string | null>(null);
   // 다인관 — 입력 캐릭터 드롭다운 (v1.9): body 포털(fixed)로 위에 표시 — qa-today 스크롤 영역에 잘리지 않게
   const [qaPickPos, setQaPickPos] = useState<{ left: number; top: number } | null>(null);
@@ -776,21 +818,14 @@ export default function RelDetailPage() {
                     const c = charOf(a.charId);
                     return (
                       <div key={i} className={`qa-ans ${sideOf(a.charId) === 'r' ? 'r' : ''}`}
-                        style={{ ['--cc' as string]: rgbTriple(c?.color ?? '#5d636d') }}>
-                        <div className="who">
-                          {c?.name}
-                          {/* 수정(본인)·부연(관리자)·삭제(본인/관리자) — v1.9 */}
-                          {(canEditAns(a) || isAdmin) && (
-                            <small style={{ cursor: 'var(--cur-pointer,pointer)', color: 'var(--accent)', marginLeft: 8, fontWeight: 400 }}
-                              onClick={() => setAnsEdit({ qNo: curQa.no, idx: i, text: a.text, note: a.note ?? '' })}>
-                              {canEditAns(a) ? '수정' : '부연'}
-                            </small>
-                          )}
-                          {canDelAns(a) && (
-                            <small style={{ cursor: 'var(--cur-pointer,pointer)', color: 'var(--faint)', marginLeft: 6, fontWeight: 400 }}
-                              onClick={() => deleteAns(curQa.no, i)}>삭제</small>
-                          )}
-                        </div>
+                        style={{ ['--cc' as string]: rgbTriple(c?.color ?? '#5d636d') }}
+                        /* 수정·부연·삭제는 우클릭 메뉴로 — 늘 떠 있으면 답변 줄이 난잡해진다 (사용자 확정) */
+                        onContextMenu={e => {
+                          if (!(canEditAns(a) || isAdmin || canDelAns(a))) return;
+                          e.preventDefault();
+                          setAnsCtx({ x: e.clientX, y: e.clientY, idx: i });
+                        }}>
+                        <div className="who">{c?.name}</div>
                         <div className="bub" {...(a.note ? { 'data-note': a.note } : {})}>{a.text}</div>
                       </div>
                     );
@@ -809,7 +844,7 @@ export default function RelDetailPage() {
                           setQaPickPos({ left: r.left, top: Math.max(8, r.top - h - 6) });
                         }
                       }}>
-                        <div className={`f ph ${charOf(qaChar ?? answerableIds[0])?.thumbClass}`} />
+                        <CharFace c={charOf(qaChar ?? answerableIds[0])} className="f" />
                         <small>{charOf(qaChar ?? answerableIds[0])?.name}{answerableIds.length > 1 ? ' ▾' : ''}</small>
                         {qaPickPos && createPortal(
                           <div className="k-sel-pop" style={{ position: 'fixed', left: qaPickPos.left, top: qaPickPos.top, minWidth: 150, zIndex: 120 }}>
@@ -818,7 +853,7 @@ export default function RelDetailPage() {
                               return (
                                 <div key={cid} style={{ display: 'flex', gap: 8, alignItems: 'center' }}
                                   onClick={e2 => { e2.stopPropagation(); setQaChar(cid); setQaPickPos(null); }}>
-                                  <span className={`ph ${c?.thumbClass}`} style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
+                                  <CharFace c={c} style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
                                   {c?.name}
                                 </div>
                               );
@@ -1113,6 +1148,28 @@ export default function RelDetailPage() {
           </div>
         )}
       </Modal>
+
+      {/* 답변 우클릭 메뉴 (v2.0) — 수정·부연·삭제 */}
+      {ansCtx && curQa && curQa.answers[ansCtx.idx] && createPortal(
+        (() => {
+          const a = curQa.answers[ansCtx.idx];
+          return (
+            <div className="ctx-menu on" style={{ left: ansCtx.x, top: ansCtx.y }} onClick={e => e.stopPropagation()}>
+              <div className="ctx-ttl">{charOf(a.charId)?.name ?? '답변'}</div>
+              {(canEditAns(a) || isAdmin) && (
+                <button onClick={() => {
+                  setAnsEdit({ qNo: curQa.no, idx: ansCtx.idx, text: a.text, note: a.note ?? '' });
+                  setAnsCtx(null);
+                }}>{canEditAns(a) ? '수정' : '오너 부연설명'}</button>
+              )}
+              {canDelAns(a) && (
+                <button className="danger" onClick={() => { const i = ansCtx.idx; setAnsCtx(null); deleteAns(curQa.no, i); }}>삭제</button>
+              )}
+            </div>
+          );
+        })(),
+        document.body,
+      )}
 
       {/* 삭제 확인 — DOM 마지막에 렌더해 다른 모달(AU 관리 등) 위에 뜨게 */}
       {del.element}

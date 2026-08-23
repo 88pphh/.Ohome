@@ -204,13 +204,24 @@ export default function TrpgDetailPage() {
 // 널 오리진에서 localStorage 접근이 예외를 던져 로그 스크립트가 죽는 것 방지 (무동작 심)
 try{void window.localStorage}catch(e){var __m={getItem:function(){return null},setItem:function(){},removeItem:function(){},clear:function(){},key:function(){return null},length:0};
 try{Object.defineProperty(window,'localStorage',{value:__m});Object.defineProperty(window,'sessionStorage',{value:__m});}catch(e2){}}
-// 높이 리포터 — 타이머 대신 MutationObserver+load 이벤트 (백그라운드 탭 스로틀링 회피)
-(function(){var p=0;function r(){try{var h=document.documentElement.scrollHeight;if(h&&h!==p){p=h;parent.postMessage({__logH:h},'*');}}catch(e3){}}
+// 높이 리포터 — 타이머 대신 MutationObserver+load 이벤트 (백그라운드 탭 스로틀링 회피).
+// documentElement.scrollHeight는 뷰포트(=iframe 현재 높이)보다 작아지지 않아, 한 번 커지면
+// 내용이 짧아도 줄어들지 못한다(짧은 로그 아래에 빈 공간이 남던 원인) → body 기준으로 잰다.
+(function(){var p=0;function r(){try{
+var b=document.body,d=document.documentElement;if(!b)return;
+// documentElement.scrollHeight는 뷰포트(=iframe 현재 높이)보다 작아지지 않아, 한 번 커지면
+// 내용이 짧아도 못 줄어든다(짧은 로그 아래에 빈 공간이 남던 원인). 내용 기준 값을 먼저 보고,
+// 아직 레이아웃 전이라 0이면 예전 방식으로 되돌려 최소한 동작은 하게 한다.
+var h=Math.max(b.scrollHeight||0,b.offsetHeight||0,d.offsetHeight||0)||d.scrollHeight||0;
+if(h&&h!==p){p=h;parent.postMessage({__logH:h},'*');}}catch(e3){}}
 document.addEventListener('DOMContentLoaded',r);addEventListener('load',r);addEventListener('resize',r);
 try{new MutationObserver(r).observe(document.documentElement,{childList:true,subtree:true,attributes:true});}catch(e4){}
 setInterval(r,800); // 창이 보이면 즉시 반영 (숨김 상태에선 레이아웃이 0이라 스킵됨)
 r();})();
-</scr${''}ipt><style>html,body{margin:0!important;padding:0!important}</style>${body}`;
+</scr${''}ipt><style>
+/* height:auto — 로그 문서가 html/body에 100%를 걸어 두면 내용과 무관하게 뷰포트만큼 커진다 */
+html,body{margin:0!important;padding:0!important;height:auto!important;min-height:0!important}
+</style>${body}`;
 
   return (
     <section className="page">
