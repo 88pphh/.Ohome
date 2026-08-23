@@ -43,6 +43,7 @@ export interface RelFormValue {
   fulls?: Record<string, string | undefined>;  // 멤버별 전신 이미지 (v1.9 — charId → blob id)
   fullScales?: Record<string, number>;         // 전신 크기 % (휠 조절)
   fullOffsets?: Record<string, { x: number; y: number }>; // 전신 위치 오프셋 % (드래그, v1.9)
+  quotes?: Record<string, string>;                              // 히어로 좌/우 한마디 문구 (v2.0)
   quoteColors?: Record<string, { fg?: string; mark?: string }>; // 히어로 대사 글씨/따옴표색 (페어, v1.9)
   fullFront?: string;                          // 앞에 보일 캐릭터 id
   pickedCharIds: string[];   // 등록 시 연동할 내 캐릭터 (수정 모드에선 빈 배열)
@@ -210,6 +211,9 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
   // 전신 위치 오프셋 % (v1.9 — 드래그로 이동, 상세와 동일 좌표계)
   const [fullOffsets, setFullOffsets] = useState<Record<string, { x: number; y: number }>>(
     () => Object.fromEntries(pairMembers.map(m => [m.charId, { x: m.fullOffX ?? 0, y: m.fullOffY ?? 0 }])));
+  // 히어로 좌/우 한마디 — 색만 정할 수 있고 문구를 고칠 곳이 없었다 (v2.0 사용자 발견)
+  const [quotes, setQuotes] = useState<Record<string, string>>(
+    () => Object.fromEntries(pairMembers.map(m => [m.charId, m.quote ?? ''])));
   // 히어로 대사 글씨/따옴표색 (페어, v1.9)
   const [quoteColors, setQuoteColors] = useState<Record<string, { fg?: string; mark?: string }>>(
     () => Object.fromEntries(pairMembers.map(m => [m.charId, { fg: m.quoteColor, mark: m.quoteMarkColor }])));
@@ -280,6 +284,7 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
         : undefined,
       fullScales: pairMembers.length ? fullScales : undefined,
       fullOffsets: pairMembers.length ? fullOffsets : undefined,
+      quotes: pairMembers.length ? quotes : undefined,
       quoteColors: pairMembers.length ? quoteColors : undefined,
       fullFront,
       pickedCharIds: picked,
@@ -446,6 +451,17 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
               </div>
             )}
             <p className="hint" style={{ margin: '4px 0 0' }}>드래그 = 위치 · 휠 = 크기 · 우클릭 = 앞으로/뒤로 — 미리보기 비율이 상세 화면과 동일합니다</p>
+
+            {/* 좌/우 한마디 문구 (v2.0 사용자 발견 — 색만 있고 문구 칸이 없었다) */}
+            <label className="k-label" style={{ margin: '10px 0 0' }}>한마디 — 상단 좌/우 대사</label>
+            {pairMembers.map((m, i) => (
+              <div key={m.charId} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <b style={{ fontSize: 12, width: 92, flexShrink: 0 }}>{i === 0 ? '왼쪽' : '오른쪽'} · {memberNames?.[m.charId] ?? m.charId}</b>
+                <KInput value={quotes[m.charId] ?? ''}
+                  onChange={e => setQuotes(s => ({ ...s, [m.charId]: e.target.value }))}
+                  placeholder="비우면 표시하지 않습니다" style={{ flex: 1 }} />
+              </div>
+            ))}
 
             {/* 히어로 대사 색 (페어, v1.9 사용자 요청) — 좌/우 캐릭터 대사 글씨색·따옴표색 */}
             <label className="k-label" style={{ margin: '10px 0 0' }}>대사 색 — 상단 좌/우 한마디</label>

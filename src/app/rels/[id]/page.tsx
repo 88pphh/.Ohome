@@ -66,6 +66,7 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
   member: RelMember; char?: Character; isAdmin: boolean; onGo: () => void; onRemove: () => void;
   auUnregistered?: boolean;   // AU 선택 중인데 이 캐릭터의 AU 프로필이 미등록 (v1.9)
 }) {
+  const { familyOf } = useFonts();   // 이름은 캐릭터 프로필에서 지정한 폰트로
   const [lb, setLb] = useState<number | null>(null);
   // 멤버 제거는 우클릭 메뉴로 — 카드 아래에 상시 노출하면 정보가 아닌 것이 자리를 먹는다 (사용자 확정)
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
@@ -91,7 +92,7 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
   if (auUnregistered) {
     return (
       <div className="panel mini-prof" onClick={onGo} style={{ cursor: 'var(--cur-pointer,pointer)', textAlign: 'center', padding: '44px 20px' }}>
-        <b style={{ fontSize: 15, letterSpacing: '.08em' }}>{char.name}</b>
+        <b style={{ fontSize: 15, letterSpacing: '.08em', fontFamily: familyOf(char.fontId) }}>{char.name}</b>
         <p className="hint" style={{ marginTop: 10 }}>이 AU의 프로필이 아직 등록되지 않았습니다<br />카드를 누르면 캐릭터 페이지에서 등록할 수 있습니다</p>
       </div>
     );
@@ -110,7 +111,8 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered }: {
           <div className={`face ph ${char.thumbClass}`} />
         )}
         <div>
-          <b>{char.name}</b>
+          {/* 이름 폰트는 캐릭터 프로필에서 지정한 것을 그대로 쓴다 (사용자 요청) */}
+          <b style={{ fontFamily: familyOf(char.fontId) }}>{char.name}</b>
           <small>{char.sub}{member.linkedNote ? ` · ${member.linkedNote}` : ''}</small>
         </div>
       </div>
@@ -661,12 +663,12 @@ export default function RelDetailPage() {
                     {unreg ? (
                       /* AU 프로필 미등록 (v1.9) — 원본 프로필 대신 등록 안내 */
                       <>
-                        <b>{findChar(chars, m.charId)?.name}</b>
+                        <b style={{ fontFamily: familyOf(findChar(chars, m.charId)?.fontId) }}>{findChar(chars, m.charId)?.name}</b>
                         <small>이 AU의 프로필 미등록 — 눌러서 등록</small>
                       </>
                     ) : (
                       <>
-                        <b>{c.name}</b><i>{c.sub}</i>
+                        <b style={{ fontFamily: familyOf(c.fontId) }}>{c.name}</b><i>{c.sub}</i>
                         <small>{c.specs.slice(0, 3).map(s => s.value).join(' · ')}</small>
                         {(m.quote || m.linkedNote || m.keywords[0]) && (
                           <span className="ext">{m.quote || m.linkedNote || m.keywords[0]}</span>
@@ -781,7 +783,7 @@ export default function RelDetailPage() {
                   return (
                     <div key={j} className={`tl-say ${sideOf(s.charId)}`}
                       style={{ ['--cc' as string]: rgbTriple(c?.color ?? '#5d636d') }}>
-                      <div className="who">{c?.name}</div>
+                      <div className="who" style={{ fontFamily: familyOf(c?.fontId) }}>{c?.name}</div>
                       <div className="bub">{s.text}</div>
                     </div>
                   );
@@ -825,7 +827,7 @@ export default function RelDetailPage() {
                           e.preventDefault();
                           setAnsCtx({ x: e.clientX, y: e.clientY, idx: i });
                         }}>
-                        <div className="who">{c?.name}</div>
+                        <div className="who" style={{ fontFamily: familyOf(c?.fontId) }}>{c?.name}</div>
                         <div className="bub" {...(a.note ? { 'data-note': a.note } : {})}>{a.text}</div>
                       </div>
                     );
@@ -845,7 +847,9 @@ export default function RelDetailPage() {
                         }
                       }}>
                         <CharFace c={charOf(qaChar ?? answerableIds[0])} className="f" />
-                        <small>{charOf(qaChar ?? answerableIds[0])?.name}{answerableIds.length > 1 ? ' ▾' : ''}</small>
+                        <small style={{ fontFamily: familyOf(charOf(qaChar ?? answerableIds[0])?.fontId) }}>
+                          {charOf(qaChar ?? answerableIds[0])?.name}{answerableIds.length > 1 ? ' ▾' : ''}
+                        </small>
                         {qaPickPos && createPortal(
                           <div className="k-sel-pop" style={{ position: 'fixed', left: qaPickPos.left, top: qaPickPos.top, minWidth: 150, zIndex: 120 }}>
                             {answerableIds.map(cid => {
@@ -854,7 +858,7 @@ export default function RelDetailPage() {
                                 <div key={cid} style={{ display: 'flex', gap: 8, alignItems: 'center' }}
                                   onClick={e2 => { e2.stopPropagation(); setQaChar(cid); setQaPickPos(null); }}>
                                   <CharFace c={c} style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
-                                  {c?.name}
+                                  <span style={{ fontFamily: familyOf(c?.fontId) }}>{c?.name}</span>
                                 </div>
                               );
                             })}

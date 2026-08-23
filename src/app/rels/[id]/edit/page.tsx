@@ -56,12 +56,13 @@ function RelEditInner() {
             fullFront: v.fullFront ?? r.fullFront,
             illustMode: v.kind === 'pair' ? r.illustMode : 'one',
             // 전신 크기·위치(공통) — 미리보기 조작 결과 (v1.9)
-            members: (v.fullScales || v.fullOffsets || v.quoteColors)
+            members: (v.fullScales || v.fullOffsets || v.quoteColors || v.quotes)
               ? r.members.map(m => ({
                 ...m,
                 fullScale: v.fullScales?.[m.charId] ?? m.fullScale,
                 fullOffX: v.fullOffsets?.[m.charId]?.x ?? m.fullOffX,
                 fullOffY: v.fullOffsets?.[m.charId]?.y ?? m.fullOffY,
+                quote: v.quotes?.[m.charId] ?? m.quote,
                 quoteColor: v.quoteColors?.[m.charId]?.fg ?? m.quoteColor,
                 quoteMarkColor: v.quoteColors?.[m.charId]?.mark ?? m.quoteMarkColor,
               }))
@@ -90,6 +91,7 @@ function RelEditInner() {
                       fullScale: v.fullScales?.[m.charId] ?? m.fullScale,
                       fullOffX: v.fullOffsets?.[m.charId]?.x ?? m.fullOffX,
                       fullOffY: v.fullOffsets?.[m.charId]?.y ?? m.fullOffY,
+                      quote: v.quotes?.[m.charId] ?? m.quote,
                       quoteColor: v.quoteColors?.[m.charId]?.fg ?? m.quoteColor,
                       quoteMarkColor: v.quoteColors?.[m.charId]?.mark ?? m.quoteMarkColor,
                     })),
