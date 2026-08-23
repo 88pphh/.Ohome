@@ -104,7 +104,9 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
 
   const toUser = async (u: { uid: string; email?: string | null; displayName?: string | null } | null): Promise<BackendUser | null> => {
     if (!u) return null;
-    let nickname = u.displayName ?? u.email ?? 'user';
+    // 이메일을 그대로 이름으로 쓰지 않는다 — 회원 목록·댓글에 남의 메일 주소가 그대로 노출된다.
+    // (프로필 저장 직후에는 displayName이 아직 비어 있어 여기로 떨어질 수 있다)
+    let nickname = u.displayName || (u.email ? u.email.split('@')[0] : 'user');
     let avatarUrl: string | undefined;
     let avatarColor: string | undefined;
     try {
