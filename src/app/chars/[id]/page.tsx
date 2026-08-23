@@ -212,8 +212,8 @@ function CharDetailInner() {
 
           {tab === 'basic' ? (
             <>
-              <h3>기본 정보</h3>
-              <div className="sub">BASIC</div>
+              {/* 기본 정보 탭은 제목을 두지 않는다 — 처음 보이는 화면이라 안내가 필요 없다
+                  (다른 탭은 무엇을 보는 중인지 알아야 하므로 제목을 그대로 둔다) */}
               <dl className="spec">
                 {eff.specs.map(s => (
                   <React.Fragment key={s.label}><dt>{s.label}</dt><dd>{s.value}</dd></React.Fragment>
