@@ -52,7 +52,12 @@ export const RESET_EXTRA: ResetGroup[] = [
   { key: 'main', label: '메인 위젯 구성', desc: '위젯 종류·배치·크기', keys: ['ohome.main.v1'] },
   { key: 'site', label: '사이트 설정', desc: '테마·폰트·메뉴·로고·게시판/커미션 설정', keys: SITE_KEYS },
   { key: 'images', label: '업로드 이미지 전체', desc: '모든 그림·썸네일 저장소', keys: [] },
-  { key: 'members', label: '회원 계정', desc: '회원 태그·가입코드·로그인 정보 (로그아웃됨)', keys: MEMBER_KEYS },
+  // 로그인 계정 자체는 서비스(Firebase Authentication / Supabase Auth) 소관이라 홈에서 지울 수 없다
+  {
+    key: 'members', label: '회원 목록',
+    desc: '홈의 회원 목록·태그·가입코드 (로그인 계정 자체는 서비스 콘솔에서 지워야 합니다)',
+    keys: MEMBER_KEYS,
+  },
 ];
 
 /* ---------- 백업 ---------- */
@@ -160,7 +165,7 @@ export async function importBackup(file: File): Promise<{ dataCount: number; blo
 /* ---------- 초기화 ---------- */
 
 /** 초기화 결과 — 실패를 조용히 삼키면 "지웠다"고 나오는데 DB에는 그대로 남는다 */
-export interface ResetReport { rows: number; files: number; failed: string[] }
+export interface ResetReport { rows: number; files: number; members: number; failed: string[] }
 
 export async function resetGroups(selected: string[]): Promise<ResetReport> {
   const all = [...RESET_CONTENT, ...RESET_EXTRA];
@@ -170,7 +175,7 @@ export async function resetGroups(selected: string[]): Promise<ResetReport> {
     g.keys.forEach(k => keys.add(k));
   }
 
-  const report: ResetReport = { rows: 0, files: 0, failed: [] };
+  const report: ResetReport = { rows: 0, files: 0, members: 0, failed: [] };
   const be = backend();
   if (be) {
     // 서버 모드 — 고른 콘텐츠 컬렉션을 비우고, 설정 키는 지운다
@@ -184,6 +189,18 @@ export async function resetGroups(selected: string[]): Promise<ResetReport> {
       } else {
         try { await be.saveSetting(key, null); } catch { report.failed.push(key); }
       }
+    }
+    // 회원 계정 — 홈의 회원 목록(profiles)을 비운다.
+    // 로그인 계정 자체(Firebase Authentication / Supabase Auth)는 관리자 키가 있어야 지울 수 있어
+    // 공개 홈에서는 불가능하다 — 콘솔에서 지워야 한다(설치 가이드 안내).
+    if (selected.includes('members')) {
+      try {
+        const me = (await be.currentUser())?.id;
+        for (const m of await be.listMembers()) {
+          if (m.id === me) continue;   // 지금 로그인한 관리자는 남긴다
+          try { await be.deleteMember(m.id); report.members += 1; } catch { report.failed.push(`profile:${m.id}`); }
+        }
+      } catch { report.failed.push('profiles'); }
     }
     // 업로드 이미지 전체 — 저장소 파일까지 실제로 지운다 (예전에는 참조만 사라지고 용량은 그대로였다)
     if (selected.includes('images')) {

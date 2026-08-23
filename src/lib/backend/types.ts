@@ -74,6 +74,12 @@ export interface Backend {
    *  관리자가 환경설정에서 직접 확인하고 정리한다. */
   listFiles(): Promise<{ ref: string; size: number }[]>;
   deleteFile(ref: string): Promise<void>;
+
+  /** 회원 프로필(닉네임·아바타) 삭제 — 홈의 회원 목록에서 사라진다.
+   *  **로그인 계정 자체는 지울 수 없다.** Firebase Authentication / Supabase Auth의 계정 삭제는
+   *  관리자 키가 있어야 하는데, 공개 홈에 그 키를 두면 누구나 계정을 지울 수 있게 된다.
+   *  계정 삭제는 각 서비스 콘솔에서 (설치 가이드에 안내). */
+  deleteMember(id: string): Promise<void>;
 }
 
 /** 콘텐츠 컬렉션 이름 (localStorage 키 → 컬렉션/테이블) — 두 백엔드가 같은 이름을 쓴다 */

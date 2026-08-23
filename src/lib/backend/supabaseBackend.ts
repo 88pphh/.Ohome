@@ -212,5 +212,11 @@ export async function createSupabaseBackend(
       const { error } = await sb.storage.from(BUCKET).remove([name]);
       if (error) throw error;
     },
+
+    async deleteMember(id) {
+      // profiles 행만 지운다 — auth.users 삭제는 service_role 키가 필요해 공개 홈에서는 불가
+      const { error } = await sb.from('profiles').delete().eq('id', id);
+      if (error) throw error;
+    },
   };
 }

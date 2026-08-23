@@ -802,10 +802,12 @@ function MemberPane() {
   const [code, setCode] = useState('');
   const [codeLoaded, setCodeLoaded] = useState(false);
   const [regVer, setRegVer] = useState(0);   // 가입 계정 삭제 후 목록 갱신용
+  const [removedIds, setRemovedIds] = useState<string[]>([]);   // 서버 모드에서 방금 지운 회원
   useEffect(() => { setCode(inviteCode()); setCodeLoaded(true); }, []);
   void regVer;
 
   const members = useMembers();
+  const serverOn2 = isServerMode();
   const registry = (() => {
     try { return JSON.parse(localStorage.getItem('ohome.mockreg.v1') ?? '{}') as Record<string, unknown>; } catch { return {}; }
   })();
@@ -830,6 +832,7 @@ function MemberPane() {
   };
   const allTags = [...new Set(Object.values(mTags).flat())];
   const filteredMembers = members.filter(m => {
+    if (removedIds.includes(m.id)) return false;   // 방금 지운 회원 (목록은 한 번만 받아 온다)
     const k = mq.trim().toLowerCase();
     const tags = mTags[m.id] ?? [];
     if (filterTag && !tags.includes(filterTag)) return false;
@@ -915,13 +918,29 @@ function MemberPane() {
             {!isBase && (
               // 회원 뱃지(.pill)와 같은 규격 — padding·글씨·radius 동일 (v1.9)
               <button className="btn btn-ghost" style={{ padding: '4px 11px', fontSize: 10.5, borderRadius: 20, lineHeight: 'normal', letterSpacing: '.04em' }}
-                onClick={() => del.ask(`회원 「${m.nickname}」 계정을 삭제하시겠습니까?`, () => {
-                  const reg = { ...registry };
-                  delete reg[m.id];
-                  try { localStorage.setItem('ohome.mockreg.v1', JSON.stringify(reg)); } catch { /* 무시 */ }
-                  setRegVer(v => v + 1);
-                  toast('계정이 삭제되었습니다');
-                }, '이 계정으로 다시 로그인할 수 없게 됩니다. 작성한 글은 그대로 남습니다.')}>DELETE</button>
+                onClick={() => del.ask(
+                  serverOn2 ? `회원 「${m.nickname}」를 목록에서 지우시겠습니까?` : `회원 「${m.nickname}」 계정을 삭제하시겠습니까?`,
+                  () => {
+                    // 서버 모드 — 회원 목록(profiles)에서 지운다. 로그인 계정은 서비스 소관이라 못 지운다.
+                    if (serverOn2) {
+                      void backend()?.deleteMember(m.id)
+                        .then(() => {
+                          setRemovedIds(v => [...v, m.id]);
+                          toast('회원 목록에서 지웠습니다 — 로그인 계정은 서비스 콘솔에서 지워 주세요');
+                        })
+                        .catch(() => toast('지우지 못했습니다 — 관리자 계정으로 로그인했는지 확인해 주세요'));
+                      return;
+                    }
+                    const reg = { ...registry };
+                    delete reg[m.id];
+                    try { localStorage.setItem('ohome.mockreg.v1', JSON.stringify(reg)); } catch { /* 무시 */ }
+                    setRegVer(v => v + 1);
+                    toast('계정이 삭제되었습니다');
+                  },
+                  serverOn2
+                    ? '홈의 회원 목록에서만 사라집니다. 로그인 계정 자체는 Firebase Authentication(또는 Supabase Auth) 콘솔에서 지워야 하고, 지우지 않으면 그 사람은 계속 로그인할 수 있습니다. 작성한 글은 그대로 남습니다.'
+                    : '이 계정으로 다시 로그인할 수 없게 됩니다. 작성한 글은 그대로 남습니다.',
+                )}>DELETE</button>
             )}
           </div>
         );
@@ -1484,7 +1503,10 @@ function DataPane() {
                 if (r.failed.length) {
                   toast(`${r.failed.length}건을 서버에서 지우지 못했습니다 — 로그인·보안 규칙을 확인해 주세요`);
                 } else if (serverOn) {
-                  toast(`서버에서 글 ${r.rows}건${r.files ? ` · 이미지 ${r.files}개` : ''}를 지웠습니다 — 새로고침합니다`);
+                  const part = [`글 ${r.rows}건`];
+                  if (r.files) part.push(`이미지 ${r.files}개`);
+                  if (r.members) part.push(`회원 ${r.members}명`);
+                  toast(`서버에서 ${part.join(' · ')}를 지웠습니다${r.members ? ' (로그인 계정은 콘솔에서 지워 주세요)' : ''}`);
                 } else {
                   toast('선택한 항목을 초기화했습니다 — 새로고침합니다');
                 }

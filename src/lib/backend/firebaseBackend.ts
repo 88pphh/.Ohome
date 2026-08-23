@@ -350,6 +350,11 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       // Firebase SDK는 다운로드 URL로도 참조를 만들 수 있다
       await stMod.deleteObject(stMod.ref(storage, ref));
     },
+
+    async deleteMember(id) {
+      // profiles 문서만 지운다 — Authentication 계정은 관리자 키가 있어야 지울 수 있다
+      await deleteDoc(doc(db, 'profiles', id));
+    },
   };
 
   // (deleteDoc은 삭제 배치에서 doc 단위로 쓰지 않아 참조만 유지)
