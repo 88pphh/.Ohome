@@ -36,6 +36,8 @@ export interface RelFormValue {
   illuOn?: string;           // 전신/일러 스위치 선택색 (미지정: 포인트색)
   nameColor?: string;        // 자관명(히어로 타이틀) 글씨색 (v1.9 사용자 요청 — 미지정: 테마)
   cpColor?: string;          // 캐치프레이즈 글씨색 (미지정: 테마)
+  cpTagBg?: string;          // CP/NCP 뱃지 배경색 (v2.0 사용자 요청)
+  cpTagFg?: string;          // CP/NCP 뱃지 글씨색
   themeMode: 'site' | 'custom'; // 페이지 테마 — 홈페이지 그대로 / 별도 테마컬러 (4.18 방식)
   themeColor?: string;          // 별도 테마컬러 (custom일 때)
   themeTone?: 'dark' | 'light'; // 테마컬러의 다크/라이트 느낌
@@ -195,6 +197,10 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
   const [txtCustom, setTxtCustom] = useState(!!(initial?.nameColor || initial?.cpColor));
   const [nameColor, setNameColor] = useState(initial?.nameColor ?? '#e8eaee');
   const [cpColor, setCpColor] = useState(initial?.cpColor ?? '#8a8f98');
+  // CP/NCP 뱃지 색 (v2.0 사용자 요청) — 미지정이면 기본 pill 색
+  const [tagCustom, setTagCustom] = useState(!!(initial?.cpTagBg || initial?.cpTagFg));
+  const [cpTagBg, setCpTagBg] = useState(initial?.cpTagBg ?? '#eef0f2');
+  const [cpTagFg, setCpTagFg] = useState(initial?.cpTagFg ?? '#5d636d');
   const [charQuery, setCharQuery] = useState('');
   // 전신 이미지 (v1.9 — 페어 · 수정 모드) — AU 편집이면 그 AU의 전신
   const pairMembers = !isNew && (initial!.kind ? initial!.kind === 'pair' : initial!.members.length === 2)
@@ -276,6 +282,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
       illuOn: illuCustom ? illuOn : undefined,
       nameColor: txtCustom ? nameColor : undefined,
       cpColor: txtCustom ? cpColor : undefined,
+      cpTagBg: tagCustom ? cpTagBg : undefined,
+      cpTagFg: tagCustom ? cpTagFg : undefined,
       themeMode,
       themeColor: themeMode === 'custom' ? themeColor : undefined,
       themeTone: themeMode === 'custom' ? themeTone : undefined,
@@ -588,6 +596,23 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                 ))}
               </div>
             </div>
+            {/* 뱃지 색 (v2.0 사용자 요청) — 자관명 위에 뜨는 CP/NCP 표시 */}
+            {!auObj && (
+              <div>
+                <KCheck label="CP 뱃지 색 직접 지정" checked={tagCustom} onChange={setTagCustom} />
+                {tagCustom && (
+                  <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
+                    <span className="cp-lb">배경</span>
+                    <ColorField value={cpTagBg} onChange={setCpTagBg} />
+                    <span className="cp-lb">글씨</span>
+                    <ColorField value={cpTagFg} onChange={setCpTagFg} />
+                    <span className="pill" style={{ background: cpTagBg, color: cpTagFg, borderColor: cpTagBg, marginLeft: 4 }}>
+                      {CP_LABEL[cp]}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="hint" style={{ margin: '2px 0 0' }}>이름 폰트 — 상세 대형 타이틀에 적용</p>
             <KSelect value={fontId} onChange={setFontId}
               options={fonts.map(f => ({ value: f.id, label: <span style={{ fontFamily: f.family }}>{f.name}</span> }))} />

@@ -51,7 +51,7 @@ function RelEditInner() {
             // 헤더는 AU 편집이면 그 AU에만 저장 — base 헤더는 유지 (v1.9 AU별 헤더 분리)
             ...(auObj ? {} : { headerImgId: v.headerImgId, headerCrop: v.headerCrop }),
             // 페이지 테마 — AU 편집이면 그 AU에만 (base 테마는 유지, v1.9)
-            ...(auObj ? {} : { themeMode: v.themeMode, themeColor: v.themeColor, themeTone: v.themeTone, illuBg: v.illuBg, illuOn: v.illuOn, nameColor: v.nameColor, cpColor: v.cpColor }),
+            ...(auObj ? {} : { themeMode: v.themeMode, themeColor: v.themeColor, themeTone: v.themeTone, illuBg: v.illuBg, illuOn: v.illuOn, nameColor: v.nameColor, cpColor: v.cpColor, cpTagBg: v.cpTagBg, cpTagFg: v.cpTagFg }),
             cp: v.cp,
             fullFront: v.fullFront ?? r.fullFront,
             illustMode: v.kind === 'pair' ? r.illustMode : 'one',

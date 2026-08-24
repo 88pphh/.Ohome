@@ -216,6 +216,22 @@ export default function RelDetailPage() {
   const [qNote, setQNote] = useState<{ no: number; text: string } | null>(null);
   // 멤버 얼굴칸(1:1) 크롭 편집 (v2.0)
   const [faceEdit, setFaceEdit] = useState<{ charId: string; ref: string; crop?: CropValue } | null>(null);
+  // 타임라인 항목 우클릭 메뉴 (v2.0 사용자 요청) — 수정·삭제. 늘 떠 있는 [삭제] 글자는 없앴다
+  const [tlCtx, setTlCtx] = useState<{ x: number; y: number; idx: number } | null>(null);
+  const [tlEditIdx, setTlEditIdx] = useState<number | null>(null);   // null이면 새로 추가
+  useEffect(() => {
+    if (!tlCtx) return;
+    const close = () => setTlCtx(null);
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setTlCtx(null); };
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [tlCtx]);
   // 답변 우클릭 메뉴 (v2.0) — 수정·부연·삭제
   const [ansCtx, setAnsCtx] = useState<{ x: number; y: number; idx: number } | null>(null);
   useEffect(() => {
@@ -379,7 +395,8 @@ export default function RelDetailPage() {
     toast('멤버가 추가되었습니다');
   };
 
-  /* ---------- 타임라인 항목 추가 (설명/한마디 중 하나 필수 — 4.5) ---------- */
+  /* ---------- 타임라인 항목 추가·수정 (설명/한마디 중 하나 필수 — 4.5) ---------- */
+  const closeTl = () => { setTlOpen(false); setTlEditIdx(null); setTEra(''); setTDesc(''); setTSays([]); };
   const addTlItem = () => {
     const says = tSays.filter(x => x.charId && x.text.trim()).map(({ charId, text }) => ({ charId, text: text.trim() }));
     if (!tDesc.trim() && says.length === 0) { toast('설명 또는 한마디 중 하나는 입력해 주세요'); return; }
@@ -388,9 +405,25 @@ export default function RelDetailPage() {
       desc: tDesc.trim() || undefined,
       says,
     };
-    patchAuData({ timeline: [...auTimeline, item] });
-    setTlOpen(false); setTEra(''); setTDesc(''); setTSays([]);
-    toast('타임라인 항목이 추가되었습니다');
+    const editing = tlEditIdx;
+    patchAuData({
+      timeline: editing == null
+        ? [...auTimeline, item]
+        : auTimeline.map((x, i) => (i === editing ? item : x)),
+    });
+    closeTl();
+    toast(editing == null ? '타임라인 항목이 추가되었습니다' : '타임라인 항목이 수정되었습니다');
+  };
+
+  /* 우클릭 > 수정 — 그 항목을 추가 모달에 그대로 올려 놓는다 */
+  const openTlEdit = (i: number) => {
+    const it = auTimeline[i];
+    if (!it) return;
+    setTEra(it.era ?? '');
+    setTDesc(it.desc ?? '');
+    setTSays(it.says.map(sy => ({ id: newId(), charId: sy.charId, text: sy.text })));
+    setTlEditIdx(i);
+    setTlOpen(true);
   };
 
   /* ---------- 질문 추가 (현재 AU에) ---------- */
@@ -620,11 +653,18 @@ export default function RelDetailPage() {
             ['--q-mark' as string]: pairSlots[0].quoteMarkColor,
           } as React.CSSProperties}>{pairSlots[0].quote}</div>
         )}
+        {/* CP/NCP 뱃지 — 자관명 위 가운데 (v2.0 사용자 요청) · 색은 자관 수정에서 */}
+        {auCpTag && (
+          <div className="cp-top">
+            <span className="pill" style={rel.cpTagBg || rel.cpTagFg
+              ? { background: rel.cpTagBg, color: rel.cpTagFg, borderColor: rel.cpTagBg }
+              : undefined}>{CP_LABEL[auCpTag]}</span>
+          </div>
+        )}
         {/* 자관명·캐치프레이즈 글씨색 — 직접 지정 시 (v1.9 사용자 요청, 미지정: 테마) */}
         <h1 style={{ fontFamily: familyOf(rel.fontId), color: rel.nameColor }}>{rel.name}</h1>
         <div className="catch" style={{ color: rel.cpColor }}>
           {au?.catchphrase || rel.catchphrase}
-          {auCpTag && <span className="pill" style={{ marginLeft: 10, verticalAlign: 'middle' }}>{CP_LABEL[auCpTag]}</span>}
         </div>
         {isDuo && pairSlots[1] && (
           <div className="quote r" style={{
@@ -831,7 +871,13 @@ export default function RelDetailPage() {
           ) : (
           <div>
             {auTimeline.map((item, i) => (
-              <div className="tl-item" key={i}>
+              /* 수정·삭제는 우클릭 메뉴로 (v2.0 사용자 요청) — 늘 떠 있는 [삭제] 글자는 없앴다 */
+              <div className="tl-item" key={i}
+                onContextMenu={e => {
+                  if (!isAdmin) return;
+                  e.preventDefault();
+                  setTlCtx({ x: e.clientX, y: e.clientY, idx: i });
+                }}>
                 {item.era && <div className="era">{item.era}</div>}
                 {item.desc && <div className="desc">{item.desc}</div>}
                 {item.says.map((s, j) => {
@@ -844,11 +890,6 @@ export default function RelDetailPage() {
                     </div>
                   );
                 })}
-                {isAdmin && (
-                  <span style={{ fontSize: 10, color: 'var(--faint)', cursor: 'var(--cur-pointer,pointer)' }}
-                    onClick={() => del.ask('타임라인 항목을 삭제하시겠습니까?',
-                      () => patchAuData({ timeline: auTimeline.filter((_, j) => j !== i) }))}>삭제</span>
-                )}
               </div>
             ))}
             {auTimeline.length === 0 && <p className="hint">타임라인이 비어 있습니다 — 우상단 [＋ ADD RECORD]로 추가</p>}
@@ -1044,12 +1085,12 @@ export default function RelDetailPage() {
       </Modal>
 
       {/* ---------- 타임라인 항목 추가 모달 (가운데 · 한마디 핑퐁 다중) ---------- */}
-      <Modal open={tlOpen} onClose={() => setTlOpen(false)} title="타임라인 항목 추가"
+      <Modal open={tlOpen} onClose={closeTl} title={tlEditIdx == null ? '타임라인 항목 추가' : '타임라인 항목 수정'}
         desc="설명 / 한마디 중 하나는 필수 · 시기 라벨은 선택 · 한마디는 여러 개 추가 가능"
         dirty={!!(tEra || tDesc || tSays.some(x => x.text))}
         actions={<>
-          <button className="btn btn-ghost" onClick={() => setTlOpen(false)}>CANCEL</button>
-          <button className="btn btn-dark" onClick={addTlItem}>ADD</button>
+          <button className="btn btn-ghost" onClick={closeTl}>CANCEL</button>
+          <button className="btn btn-dark" onClick={addTlItem}>{tlEditIdx == null ? 'ADD' : 'SAVE'}</button>
         </>}>
         <div style={{ display: 'grid', gap: 10 }}>
           <KInput placeholder="시기 라벨 (선택)" value={tEra} onChange={e => setTEra(e.target.value)} />
@@ -1210,6 +1251,21 @@ export default function RelDetailPage() {
       </Modal>
 
       {/* 답변 우클릭 메뉴 (v2.0) — 수정·부연·삭제 */}
+      {/* 타임라인 우클릭 메뉴 (v2.0) */}
+      {tlCtx && auTimeline[tlCtx.idx] && createPortal(
+        <div className="ctx-menu on" style={{ left: tlCtx.x, top: tlCtx.y }} onClick={e => e.stopPropagation()}>
+          <div className="ctx-ttl">{auTimeline[tlCtx.idx].era || '타임라인 항목'}</div>
+          <button onClick={() => { const i = tlCtx.idx; setTlCtx(null); openTlEdit(i); }}>수정</button>
+          <button className="danger" onClick={() => {
+            const i = tlCtx.idx;
+            setTlCtx(null);
+            del.ask('타임라인 항목을 삭제하시겠습니까?',
+              () => patchAuData({ timeline: auTimeline.filter((_, j) => j !== i) }));
+          }}>삭제</button>
+        </div>,
+        document.body,
+      )}
+
       {ansCtx && curQa && curQa.answers[ansCtx.idx] && createPortal(
         (() => {
           const a = curQa.answers[ansCtx.idx];

@@ -49,7 +49,7 @@ export default function RelNewPage() {
             headerImgId: v.headerImgId, headerCrop: v.headerCrop,
             themeMode: v.themeMode, themeColor: v.themeColor, themeTone: v.themeTone,
             illuBg: v.illuBg, illuOn: v.illuOn,
-            nameColor: v.nameColor, cpColor: v.cpColor,
+            nameColor: v.nameColor, cpColor: v.cpColor, cpTagBg: v.cpTagBg, cpTagFg: v.cpTagFg,
             members, thumbClass: '',
             illustMode: v.kind === 'pair' ? 'duo' : 'one',
             aus: [{ id: 'base', label: '원본', catchphrase: v.catchphrase }],

@@ -175,6 +175,8 @@ export interface Relation {
   illuOn?: string;               // 전신/일러 스위치 선택색 (미지정: 포인트색)
   nameColor?: string;            // 자관명(히어로 타이틀) 글씨색 (v1.9 — 미지정: 테마)
   cpColor?: string;              // 캐치프레이즈 글씨색 (미지정: 테마)
+  cpTagBg?: string;              // CP/NCP 뱃지 배경색 (v2.0 — 미지정: 기본 pill)
+  cpTagFg?: string;              // CP/NCP 뱃지 글씨색 (v2.0)
   thumbId?: string;              // 리스트 썸네일 (IndexedDB, 4:3 크롭)
   thumbCrop?: import("@/components/ui/CropEditor").CropValue;
   members: RelMember[];          // 2인 = 좌/우, 3인+ = 다인 리스트

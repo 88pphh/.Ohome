@@ -963,8 +963,11 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .rel-hero .quote{position:absolute;top:auto;bottom:-10px;font-family:var(--serif);font-size:calc(15px*var(--fs,1));letter-spacing:.08em;color:#d7dae0}
 .rel-hero .quote.l{left:2%}.rel-hero .quote.r{right:2%}
 .rel-hero .quote::before{content:"\201C";color:var(--q-mark,var(--accent-soft));font-size:calc(22px*var(--fs,1));margin-right:5px} /* 따옴표색 — 자관 수정에서 멤버별 지정 (v1.9) */
-.rel-hero h1{font-family:var(--serif);font-size:calc(64px*var(--fs,1));font-weight:600;letter-spacing:.3em;text-shadow:0 4px 30px rgba(0,0,0,.6)}
-.rel-hero .catch{font-size:calc(11px*var(--fs,1));letter-spacing:.7em;color:#b9bec7;margin-top:2px}
+.rel-hero .cp-top{margin-bottom:9px} /* CP/NCP 뱃지 — 자관명 위 가운데 (v2.0) */
+/* 자간(letter-spacing)은 마지막 글자 뒤에도 붙어서, 가운데정렬하면 그 절반만큼 왼쪽으로 밀린다.
+   같은 값만큼 들여써서 되돌린다 (v2.0 사용자 발견 — 「묘하게 가운데가 아닌」 원인 · 실측으로 값 확정) */
+.rel-hero h1{font-family:var(--serif);font-size:calc(64px*var(--fs,1));font-weight:600;letter-spacing:.3em;text-indent:.3em;text-shadow:0 4px 30px rgba(0,0,0,.6)}
+.rel-hero .catch{font-size:calc(11px*var(--fs,1));letter-spacing:.7em;text-indent:.7em;color:#b9bec7;margin-top:2px}
 .rel-body{display:grid;grid-template-columns:320px 1fr 320px;gap:16px;margin-top:26px;align-items:start}
 /* 간단 프로필 카드 */
 .mini-prof{padding:0;overflow:hidden}
@@ -1159,7 +1162,9 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .dy-row:last-child{border-bottom:none}
 /* 접힘: 제목 세로 중앙 / 펼침: 위 정렬 (v1.8) — 패딩은 일정하게 유지해 점프 방지 */
 .dy-row .hd{display:flex;align-items:center;gap:12px;padding:13px 2px;cursor:var(--cur-pointer,pointer);user-select:none;transition:.15s}
-.dy-row.open .hd{align-items:flex-start;padding-bottom:4px}
+/* 펼쳤을 때도 닫혔을 때와 같은 세로 정렬 — 제목이 30px 무드 아이콘 위쪽에 붙어
+   제목과 본문 사이가 벌어져 보이던 원인 (v2.0 사용자 요청) */
+.dy-row.open .hd{align-items:center;padding-bottom:3px}
 /* 부드러운 아코디언 — 내용은 항상 렌더, grid-rows 0fr→1fr 트랜지션 */
 .dy-fold{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease;}
 .dy-row.open .dy-fold{grid-template-rows:1fr}
@@ -1168,7 +1173,9 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .dy-row .dt{margin-left:auto;font-size:calc(10.5px*var(--fs,1));color:var(--faint);white-space:nowrap;flex-shrink:0}
 .dy-row .arr{width:7px;height:7px;border:solid var(--faint);border-width:0 1.5px 1.5px 0;transform:rotate(45deg);transition:.2s;flex-shrink:0;margin-top:-3px}
 .dy-row .arr.up{transform:rotate(-135deg);margin-top:3px}
-.dy-row .dy-body{padding:2px 2px 16px 44px}
+/* 제목과 본문 사이 — 첫 문단의 위 여백까지 겹쳐 벌어져 보이던 것을 줄임 (v2.0 사용자 요청) */
+.dy-row .dy-body{padding:0 2px 16px 44px}
+.dy-row .dy-body .post-body>*:first-child{margin-top:0}
 /* 다이어리 이미지 — 큰 원본 대신 썸네일 리스트, 클릭 시 뷰어 (v1.9 사용자 확정) */
 /* 배경·그림자 없이 이미지만 (v1.9 사용자 피드백) */
 .dy-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;background:none}
@@ -1196,7 +1203,7 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 /* 상세 */
 .cm-hero{text-align:center;margin:0 0 20px}
 .cm-hero h2{font-family:var(--serif);font-size:calc(34px*var(--fs,1));font-weight:600;letter-spacing:.1em;color:var(--page-title)}
-.cm-hero small{display:block;margin-top:4px;font-size:calc(10px*var(--fs,1));letter-spacing:.32em;color:var(--page-desc)}
+.cm-hero small{display:block;margin-top:4px;font-size:calc(11.5px*var(--fs,1));letter-spacing:.32em;color:var(--page-desc)}
 /* 하드코딩 배경 제거 + 이미지는 잘리지 않게 프레임 안 비율 유지 (갤러리 단일형과 동일 규칙, v1.9) */
 .cm-viewer{position:relative;aspect-ratio:16/10;border-radius:var(--radius);overflow:hidden;box-shadow:var(--sh-md)}
 .cm-viewer .nav{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:36px;height:36px;border-radius:50%;background:rgba(15,17,20,.55);color:#fff;font-size:13px;display:grid;place-items:center}
@@ -1467,6 +1474,9 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .post-body h1,.post-body h2,.post-body h3{margin:18px 0 8px;line-height:1.4}
 .post-body h1{font-size:calc(22px*var(--fs,1))}.post-body h2{font-size:calc(19px*var(--fs,1))}.post-body h3{font-size:calc(16.5px*var(--fs,1))}
 .post-body p{margin:8px 0}
+/* 빈 줄 (v2.0 사용자 발견) — 에디터가 만든 빈 문단은 내용이 없어 높이가 0이라 그냥 사라져 보였다.
+   보이지 않는 공백을 하나 넣어 한 줄만큼의 자리를 만든다 */
+.post-body p:empty::before{content:"\00a0"}
 .post-body img{max-width:100%;border-radius:9px}
 .post-body a{color:var(--accent);text-decoration:underline}
 .post-body blockquote{border-left:3px solid var(--line);padding:2px 14px;color:var(--sub);margin:10px 0}
