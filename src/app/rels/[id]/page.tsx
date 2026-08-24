@@ -463,19 +463,12 @@ export default function RelDetailPage() {
     const seen = new Set([...auQuestions.map(q => q.q), ...auQaPool]);
     const fresh = set.questions.filter(q => !seen.has(q));
     const skipped = set.questions.length - fresh.length;
-    let pool = [...auQaPool, ...fresh];
-    let questions = auQuestions;
-    // 출제 중인 질문이 하나도 없으면 즉시 첫 질문을 랜덤으로 뽑음
-    if (questions.length === 0 && pool.length > 0) {
-      const i = Math.floor(Math.random() * pool.length);
-      const q = pool[i];
-      pool = pool.filter((_, j) => j !== i);
-      questions = [{ no: 1, q, date: new Date().toISOString().slice(0, 10), answers: [] }];
-    }
-    patchAuData({ qaPool: pool, questions, qaEnabled: true });
+    // 리스트를 넣으면 대기 풀에만 담는다 — 출제는 [질문 받기]를 눌렀을 때만 (v2.0 사용자 요청).
+    // 예전엔 출제 중인 질문이 없으면 여기서 곧바로 한 문항을 뽑아 버렸다
+    patchAuData({ qaPool: [...auQaPool, ...fresh], questions: auQuestions, qaEnabled: true });
     setQsetOpen(false); setTab('qa'); setQaNo(null);
     toast(fresh.length
-      ? `「${set.name}」에서 새 질문 ${fresh.length}개가 대기 리스트에 담겼습니다${skipped ? ` (중복 ${skipped}개 제외)` : ''}`
+      ? `「${set.name}」에서 새 질문 ${fresh.length}개가 대기 리스트에 담겼습니다${skipped ? ` (중복 ${skipped}개 제외)` : ''} — [질문 받기]로 출제합니다`
       : `「${set.name}」의 질문은 전부 이미 담겨 있습니다`);
   };
 
@@ -867,11 +860,12 @@ export default function RelDetailPage() {
                       data-tip="이 질문을 버리고 다음 질문으로"
                       onClick={skipQuestion}>질문 건너뛰기</button>
                   )}
-                  {/* 현재 질문 완료 → 대기 풀에서 랜덤 출제 (v1.9) */}
+                  {/* 대기 풀에서 랜덤 출제 (v1.9) — 리스트를 넣어도 자동 출제되지 않으므로(v2.0)
+                      아직 받은 질문이 없을 때는 「질문 받기」로 문구를 바꿔 이 버튼이 시작점임을 알린다 */}
                   {auQaPool.length > 0 && (
-                    <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
+                    <button className={curQa ? 'btn btn-ghost' : 'btn btn-dark'} style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
                       data-tip={`대기 질문 ${auQaPool.length}개`}
-                      onClick={drawNextQuestion}>완료 — 다음 질문</button>
+                      onClick={drawNextQuestion}>{curQa ? '완료 — 다음 질문' : '질문 받기'}</button>
                   )}
                   <button className="btn btn-dark" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} onClick={() => setQOpen(true)}>＋ ADD QUESTION</button>
                 </>}

@@ -105,6 +105,9 @@ export const COLLECTION_OF: Record<string, string> = {
   'ohome.comm.v1': 'commissions',
   'ohome.commapply.v1': 'applicants',
   'ohome.moods.v1': 'moods',
+  // 댓글 — 글 안이 아니라 자기 문서로 (v2.0). 글 안에 두면 댓글을 달 때마다 글을 UPDATE 해야 해서
+  // 「글 수정은 작성자·관리자만」 규칙에 걸려 일반 회원이 관리자 글에 댓글을 달 수 없었다
+  'ohome.comments.v1': 'comments',
 };
 
 export const CONTENT_COLLECTIONS = Object.values(COLLECTION_OF);
