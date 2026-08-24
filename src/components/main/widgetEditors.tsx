@@ -67,9 +67,14 @@ export interface DdaySetItem { title: string; date: string; plusOne?: boolean }
 export function DdayEditor({ conf }: { conf: WidgetConf }) {
   const { updateWidget } = useMainStore();
   const toast = useToast();
+  const { fonts, familyOf } = useFonts();
   const items = (conf.settings.items as DdaySetItem[]) ?? [];
+  const fontId = conf.settings.fontId as string | undefined;
+  const color = conf.settings.color as string | undefined;
   const set = (next: DdaySetItem[]) =>
     updateWidget(conf.id, { settings: { ...conf.settings, items: next } }, { persist: true });
+  const setMeta = (patch: Record<string, unknown>) =>
+    updateWidget(conf.id, { settings: { ...conf.settings, ...patch } }, { persist: true });
   const [nt, setNt] = useState('');
   const [nd, setNd] = useState('');
 
@@ -109,6 +114,18 @@ export function DdayEditor({ conf }: { conf: WidgetConf }) {
         <button className="btn btn-dark" style={{ whiteSpace: 'nowrap' }} onClick={add}>＋ ADD</button>
       </div>
       <p className="hint" style={{ marginTop: 6 }}>+1D — 시작일을 1일로 세는 기념일 카운트 (당일 = D+1)</p>
+      {/* 날짜 표시(D-2·D+3 등) 폰트·색 (v2.0 사용자 요청) — 제목 글씨는 본문 폰트를 그대로 따라간다 */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--line)' }}>
+        <span className="cp-lb">날짜표시 폰트</span>
+        <KSelect minWidth={150} maxWidth={200} value={fontId ?? 'default'}
+          onChange={v => setMeta({ fontId: v === 'default' ? undefined : v })}
+          options={[
+            { value: 'default', label: '기본 (세리프)' },
+            ...fonts.map(f => ({ value: f.id, label: <span style={{ fontFamily: familyOf(f.id) }}>{f.name}</span> })),
+          ]} />
+        <span className="cp-lb">색</span>
+        <ColorField value={color ?? '#e6ebf2'} onChange={hex => setMeta({ color: hex })} />
+      </div>
     </div>
   );
 }

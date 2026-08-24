@@ -88,8 +88,12 @@ export default function CommApplyPage() {
   const cntC = (cid: string) => pool.filter(a => cid === 'all' || a.commId === cid).length;
 
   const statusLabel = settings.applyBadges.find(b => b.id === fStatus)?.label;
+  // 완료(done)만 일괄 휴지통 대상 (v2.0 사용자 발견) — 다른 상태 필터에서도 버튼이 뜨면서
+  // 대기·작업중인 신청까지 한꺼번에 휴지통에 들어가던 문제. "완료" 뱃지는 고정 id라 라벨을
+  // 바꿔도 안전하게 걸 수 있다
+  const canBulkTrash = fStatus === 'done';
 
-  /* 지금 보이는 신청을 한 번에 휴지통으로 (v2.0 사용자 요청 — 끝난 신청 정리용) */
+  /* 완료로 보고 있는 신청을 한 번에 휴지통으로 (v2.0 사용자 요청 — 끝난 신청 정리용) */
   const toTrash = () => {
     const ids = new Set(shown.map(a => a.id));
     if (!ids.size) return;
@@ -175,7 +179,7 @@ export default function CommApplyPage() {
             ? trashed.length > 0 && <button className="btn btn-ghost" onClick={emptyTrash}>휴지통 비우기</button>
             : (
               <>
-                {shown.length > 0 && (
+                {canBulkTrash && shown.length > 0 && (
                   <button className="btn btn-ghost" onClick={toTrash}>
                     {statusLabel ? `「${statusLabel}」 ` : ''}{shown.length}건 휴지통으로
                   </button>

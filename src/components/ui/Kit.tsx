@@ -179,8 +179,12 @@ export function KStep({ value, onChange, min = 0, max = 99, step = 1, suffix }: 
 /* ---------- 커스텀 셀렉트 (화살표 수직 중앙 정렬, v1.9) ----------
    옵션 패널은 body 포털(fixed)로 띄움 — 패널의 overflow:hidden에 잘리지 않음 */
 export interface KOption { value: string; label: React.ReactNode }
-export function KSelect({ options, value, onChange, minWidth, placeholder }: {
-  options: KOption[]; value: string; onChange: (v: string) => void; minWidth?: number; placeholder?: string;
+export function KSelect({ options, value, onChange, minWidth, maxWidth, placeholder }: {
+  options: KOption[]; value: string; onChange: (v: string) => void;
+  minWidth?: number;
+  /** 긴 이름이 들어와도 이만큼까지만 넓어지고 나머지는 … 로 줄인다 (v2.0) — 목록은 필요한 만큼 넓게 뜬다 */
+  maxWidth?: number;
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
@@ -215,11 +219,16 @@ export function KSelect({ options, value, onChange, minWidth, placeholder }: {
 
   const cur = options.find(o => o.value === value);
   return (
-    <div ref={ref} className={`k-select ${open ? 'open' : ''}`} style={minWidth ? { minWidth } : undefined}>
+    <div ref={ref} className={`k-select ${open ? 'open' : ''}`}
+      style={{ ...(minWidth ? { minWidth } : null), ...(maxWidth ? { maxWidth } : null) }}>
       <div className="cur" onClick={() => (open ? setOpen(false) : openAt())}>{cur?.label ?? placeholder ?? '선택'}</div>
       {open && pos && typeof document !== 'undefined' && createPortal(
         <div ref={popRef} className="k-sel-pop light-scroll"
-          style={{ left: pos.left, top: pos.top, width: pos.width }}>
+          /* 트리거가 좁아도 목록은 이름이 다 보이게 — 화면 오른쪽을 넘지 않는 선에서 */
+          style={{
+            left: pos.left, top: pos.top, minWidth: pos.width,
+            maxWidth: Math.max(pos.width, window.innerWidth - pos.left - 12),
+          }}>
           {options.map(o => (
             <div key={o.value} className={o.value === value ? 'sel' : ''}
               onClick={() => { onChange(o.value); setOpen(false); }}>

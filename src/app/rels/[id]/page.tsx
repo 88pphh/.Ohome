@@ -604,10 +604,12 @@ export default function RelDetailPage() {
       {(() => {
         const hdrId = isBaseAu ? rel.headerImgId : (au?.headerImgId ?? undefined);
         const hdrCrop = isBaseAu ? rel.headerCrop : au?.headerCrop;
+        // 헤더 이미지가 없으면 배경을 아예 안 그린다 (v2.0 사용자 요청) — 예전엔 데모 그라데이션이 깔렸었다
+        if (!hdrId) return null;
         return (
           <div className="rel-backdrop">
-            <div className={`img ${hdrId ? 'custom' : ''}`}>
-              {hdrId && <CroppedBlobImg fileRef={hdrId} crop={hdrCrop} ph="" />}
+            <div className="img custom">
+              <CroppedBlobImg fileRef={hdrId} crop={hdrCrop} ph="" />
             </div>
           </div>
         );

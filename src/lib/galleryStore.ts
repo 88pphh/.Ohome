@@ -132,7 +132,8 @@ export const DEFAULT_TRPG_SETTINGS: TrpgSettings = {
   },
 };
 
-export const DOTORI_STATUS_KEYS: DotoriStatus[] = ['pledge', 'undecided', 'confirmed', 'done'];
+// 일정미정이 공수표보다 먼저 오게 (v2.0 사용자 요청)
+export const DOTORI_STATUS_KEYS: DotoriStatus[] = ['undecided', 'pledge', 'confirmed', 'done'];
 
 /** 도토리 상태 뱃지 스타일 (카드 우상단 — 공수표/일정 확정만 표시) */
 export function dotoriBadgeStyle(st: DotoriStatusStyle): CSSProperties {

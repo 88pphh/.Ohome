@@ -26,8 +26,9 @@ import { siteMeta } from '@/lib/siteMeta';
  * 여기서 같은 설정을 한 번 읽어 제목을 맞춘다 (읽기 실패하면 기본값).
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const { title, subtitle } = await siteMeta();
-  const description = subtitle?.trim() || '자캐놀이용 개인 아카이브';
+  const { title, subtitle, crawlDesc } = await siteMeta();
+  // 크롤링 설명 문구 (v2.0 사용자 요청) — 환경설정에서 직접 지정 > 서브타이틀 > 기본 문구
+  const description = crawlDesc?.trim() || subtitle?.trim() || '자캐놀이용 개인 아카이브';
   return {
     title,
     description,

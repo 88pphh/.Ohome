@@ -41,6 +41,9 @@ export interface ThemeVars {
   memoBoard?: string; memoBoardBd?: string;
   // 캐릭터 탭 리스트 (v1.9 사용자 피드백) — 좌측 아이콘 탭: 배경·글씨·선택 배경·선택 글씨
   tabBg?: string; tabFg?: string; tabOnBg?: string; tabOnFg?: string;
+  // 스위치 탭 (v2.0 사용자 요청) — 게시판 말머리·갤러리 보기 전환 등. 고른 쪽은 진한 버튼색을 그대로 따라가고
+  // 여기서 정하는 것은 「안 고른 쪽」의 판 배경과 글씨색
+  segBg?: string; segFg?: string;
   // 이미지 편집(크롭) 배경 (v1.9 사용자 피드백) — 투명 PNG 위치 지정 시 보이는 판
   cropBg?: string;
   // 입력 포커스 (v1.9 사용자 요청) — 인풋·텍스트에리어·드롭다운·에디터 공통
@@ -258,6 +261,9 @@ export function themeToCssVars(t: ThemeVars): Record<string, string> {
     '--tab-fg': t.tabFg ?? '#aab0ba',
     '--tab-on-bg': t.tabOnBg ?? '#fbfbfc',
     '--tab-on-fg': t.tabOnFg ?? '#1d2025',
+    // 스위치 탭 — 안 고른 쪽 (v2.0) · 고른 쪽은 --btn-dark 3색을 그대로 쓴다
+    '--seg-bg': t.segBg ?? '#f0f1f3',
+    '--seg-fg': t.segFg ?? '#8a8f98',
     '--radius': `${t.radius}px`, '--radius-s': `${t.radiusS}px`,
   };
 }

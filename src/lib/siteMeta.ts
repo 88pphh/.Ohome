@@ -10,7 +10,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export interface SiteMeta { title: string; subtitle?: string }
+export interface SiteMeta { title: string; subtitle?: string; crawlDesc?: string }
 
 const SETTING_KEY = 'ohome.site.v1';
 const FALLBACK: SiteMeta = { title: 'O.HOME' };
@@ -49,8 +49,9 @@ function fromFirestore(doc: unknown): SiteMeta | null {
   const title = m?.title?.stringValue;
   const docTitle = m?.docTitle?.stringValue;
   const subtitle = m?.subtitle?.stringValue;
+  const crawlDesc = m?.crawlDesc?.stringValue;
   const t = (docTitle || '').trim() || (title ? `${title} — 개인홈` : '');
-  return t ? { title: t, subtitle } : null;
+  return t ? { title: t, subtitle, crawlDesc } : null;
 }
 
 /**
@@ -75,10 +76,10 @@ export async function siteMeta(): Promise<SiteMeta> {
       next: { revalidate: 300 },
     });
     if (!res.ok) return FALLBACK;
-    const rows = await res.json() as { value?: { title?: string; docTitle?: string; subtitle?: string } }[];
+    const rows = await res.json() as { value?: { title?: string; docTitle?: string; subtitle?: string; crawlDesc?: string } }[];
     const v = rows?.[0]?.value;
     const t = (v?.docTitle || '').trim() || (v?.title ? `${v.title} — 개인홈` : '');
-    return t ? { title: t, subtitle: v?.subtitle } : FALLBACK;
+    return t ? { title: t, subtitle: v?.subtitle, crawlDesc: v?.crawlDesc } : FALLBACK;
   } catch {
     return FALLBACK;   // 네트워크·권한 문제면 기본 제목으로
   }

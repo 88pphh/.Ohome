@@ -227,8 +227,12 @@ function ddayLabel(date: string, plusOne?: boolean): { label: string; passed: bo
 export function DdayWidget({ conf }: { conf: WidgetConf }) {
   const { isAdmin } = useAuth();
   const { editOn } = useMainStore();
+  const { familyOf } = useFonts();
   const [open, setOpen] = useState(false);
   const items = (conf.settings.items as DdayItem[]) ?? [];
+  // 날짜 표시(D-2·D+3 등) 폰트·색 — 미지정이면 기존 세리프 기본값 그대로 (v2.0 사용자 요청)
+  const dFontId = conf.settings.fontId as string | undefined;
+  const dColor = conf.settings.color as string | undefined;
   useEditEvent(conf.id, () => setOpen(true));   // 편집모드 우클릭 → 설정 (v1.9)
   return (
     <div className="panel widget" style={{ cursor: isAdmin ? 'pointer' : undefined }}
@@ -239,7 +243,8 @@ export function DdayWidget({ conf }: { conf: WidgetConf }) {
         return (
           <div className="dday-row" key={it.title}>
             <span>{it.title}</span>
-            <b className={d.near ? 'd-red' : ''}>{d.label}</b>
+            <b className={d.near && !dColor ? 'd-red' : ''}
+              style={{ fontFamily: dFontId ? familyOf(dFontId) : undefined, color: dColor }}>{d.label}</b>
           </div>
         );
       })}

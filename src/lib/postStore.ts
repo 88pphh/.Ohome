@@ -71,13 +71,24 @@ export function useLocalList<T extends { id?: string }>(key: string, seed: T[]):
   const [loaded, setLoaded] = useState(false);
   const latest = useRef<T[]>(list);          // diff 기준이 되는 "DB에 있다고 아는" 상태
   latest.current = list;
+  // 순번 — 서버 fetch가 여러 건 동시에 떠 있을 때, 늦게 시작한 것보다 먼저 도착한 낡은 결과가
+  // 화면을 덮어쓰지 않게 한다 (v2.0 사용자 발견 — "휴지통에 방금 넣은 게 새로고침해야 보임").
+  // 원인: 실시간 구독이 같은 변경에 두 번(로컬 반영 1회 · 서버 확정 1회) 반응해 fetch가 겹치면
+  // 나중에 시작했지만 먼저 끝난 요청이 있고, 그보다 늦게 끝나는 "시작은 먼저였던" 요청이 결과를
+  // 되돌려써 버릴 수 있다. 낙관적 갱신(update) 시점에도 순번을 올려 그 전에 나간 fetch는 전부
+  // 낡은 것으로 취급 — 막 반영한 내 변경을 이전 결과가 지우지 못하게 한다.
+  const reqId = useRef(0);
 
   useEffect(() => {
     let alive = true;
     if (server) {
       const load = () => {
+        const id = ++reqId.current;
         fetchList<T & { id: string }>(table)
-          .then(rows => { if (alive) { setList(rows); latest.current = rows; setLoaded(true); } })
+          .then(rows => {
+            if (!alive || id !== reqId.current) return;   // 그 사이 더 최신 요청이 있었으면 버림
+            setList(rows); latest.current = rows; setLoaded(true);
+          })
           .catch(() => { if (alive) setLoaded(true); });
       };
       load();
@@ -99,6 +110,8 @@ export function useLocalList<T extends { id?: string }>(key: string, seed: T[]):
 
   const update = useCallback((next: T[]) => {
     const prev = latest.current;
+    // 이 시점 이전에 나간 fetch는 전부 낡은 것으로 표시 — 뒤늦게 도착해도 이 낙관적 갱신을 덮지 않는다
+    const id = ++reqId.current;
     setList(next);            // 낙관적 반영 — 화면은 즉시 바뀐다
     latest.current = next;
     if (server) {
@@ -106,8 +119,9 @@ export function useLocalList<T extends { id?: string }>(key: string, seed: T[]):
         .catch(err => {
           // 실패하면 서버 상태로 되돌려 화면과 DB가 어긋난 채로 남지 않게
           console.error('[ohome] 저장 실패', err);
+          reqId.current = id;   // 이 복구 fetch는 유효한 최신 요청으로 인정
           fetchList<T & { id: string }>(table)
-            .then(rows => { setList(rows); latest.current = rows; })
+            .then(rows => { if (id === reqId.current) { setList(rows); latest.current = rows; } })
             .catch(() => { /* 무시 */ });
         });
       return;

@@ -3,15 +3,13 @@
 // 컬러피커: 채도/명도 스펙트럼 + 색상(hue) 슬라이더, hex와 양방향 연동
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { isValidHex, normalizeHex } from '@/lib/color';
+// setAlpha는 아래 투명도 상태 setter와 이름이 겹쳐 별칭으로 받는다
+import { isValidColor, normalizeColor, setAlpha as applyAlpha, toRgba } from '@/lib/color';
 
 /* HSV 기반 (스펙트럼 UI 관례) */
 function hexToHsv(hex: string): { h: number; s: number; v: number } {
-  const m = hex.replace('#', '');
-  const full = m.length === 3 ? m.split('').map(c => c + c).join('') : m;
-  const r = parseInt(full.slice(0, 2), 16) / 255;
-  const g = parseInt(full.slice(2, 4), 16) / 255;
-  const b = parseInt(full.slice(4, 6), 16) / 255;
+  const c = toRgba(hex);
+  const r = c.r / 255, g = c.g / 255, b = c.b / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
   let h = 0;
   if (d !== 0) {
@@ -36,16 +34,19 @@ export function ColorField({ value, onChange }: { value: string; onChange: (hex:
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const [hsv, setHsv] = useState(() => hexToHsv(value));
+  // 투명도 (v2.0 사용자 요청) — 1이면 #rrggbb, 아니면 rgba()로 저장된다
+  const [alpha, setAlpha] = useState(() => toRgba(value).a);
   const rootRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const svRef = useRef<HTMLDivElement>(null);
   const hueRef = useRef<HTMLDivElement>(null);
+  const alphaRef = useRef<HTMLDivElement>(null);
 
   // 외부 값 변경 → 내부 동기화
-  useEffect(() => { setText(value); setHsv(hexToHsv(value)); }, [value]);
+  useEffect(() => { setText(value); setHsv(hexToHsv(value)); setAlpha(toRgba(value).a); }, [value]);
 
   // 팝업 위치 — body 포털(fixed): 패널 overflow에 잘리지 않고, 아래 공간이 없으면 위로
-  const POP_W = 216, POP_H = 200;
+  const POP_W = 216, POP_H = 226;   // 투명도 슬라이더 한 줄만큼 높아짐 (v2.0)
   const openAt = () => {
     const r = rootRef.current!.getBoundingClientRect();
     const below = window.innerHeight - r.bottom;
@@ -69,11 +70,19 @@ export function ColorField({ value, onChange }: { value: string; onChange: (hex:
     };
   }, [open]);
 
+  const emit = (h: number, s: number, v: number, a: number) => {
+    const hex = hsvToHex(h, s, v);
+    const out = a >= 1 ? hex : applyAlpha(hex, a);
+    setText(out);
+    onChange(out);
+  };
   const commitHsv = (h: number, s: number, v: number) => {
     setHsv({ h, s, v });
-    const hex = hsvToHex(h, s, v);
-    setText(hex);
-    onChange(hex);
+    emit(h, s, v, alpha);
+  };
+  const commitAlpha = (a: number) => {
+    setAlpha(a);
+    emit(hsv.h, hsv.s, hsv.v, a);
   };
 
   const dragSv = (e: React.PointerEvent) => {
@@ -84,6 +93,22 @@ export function ColorField({ value, onChange }: { value: string; onChange: (hex:
       const s = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
       const v = 1 - Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height));
       commitHsv(hsv.h, s, v);
+    };
+    move(e);
+    const up = () => {
+      el.removeEventListener('pointermove', move as EventListener);
+      el.removeEventListener('pointerup', up);
+    };
+    el.addEventListener('pointermove', move as EventListener);
+    el.addEventListener('pointerup', up);
+  };
+
+  const dragAlpha = (e: React.PointerEvent) => {
+    const el = alphaRef.current!;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent | React.PointerEvent) => {
+      const r = el.getBoundingClientRect();
+      commitAlpha(Math.round(Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)) * 100) / 100);
     };
     move(e);
     const up = () => {
@@ -120,13 +145,15 @@ export function ColorField({ value, onChange }: { value: string; onChange: (hex:
         onChange={e => {
           const v = e.target.value;
           setText(v);
-          if (isValidHex(v)) onChange(normalizeHex(v));
+          // hex 말고 rgba(...)도 그대로 받는다 (v2.0 사용자 요청)
+          if (isValidColor(v)) onChange(normalizeColor(v));
         }}
       />
       <button
         type="button"
         className="color-dot"
-        style={{ background: value }}
+        /* 반투명이면 뒤의 격자가 비쳐 보이게 (v2.0) */
+        style={{ backgroundImage: `linear-gradient(${value},${value}), var(--checker)` }}
         onClick={() => (open ? setOpen(false) : openAt())}
         aria-label="색상 선택"
       />
@@ -143,6 +170,11 @@ export function ColorField({ value, onChange }: { value: string; onChange: (hex:
           </div>
           <div ref={hueRef} className="picker-hue" onPointerDown={dragHue}>
             <div className="picker-hue-cursor" style={{ left: `${(hsv.h / 360) * 100}%`, background: `hsl(${hsv.h},100%,50%)` }} />
+          </div>
+          {/* 투명도 (v2.0 사용자 요청) — 왼쪽 끝이 완전 투명 */}
+          <div ref={alphaRef} className="picker-alpha" onPointerDown={dragAlpha}
+            style={{ ['--a-to' as string]: hsvToHex(hsv.h, hsv.s, hsv.v) }}>
+            <div className="picker-hue-cursor" style={{ left: `${alpha * 100}%`, background: '#fff' }} />
           </div>
         </div>,
         document.body,

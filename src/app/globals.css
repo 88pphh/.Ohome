@@ -614,12 +614,16 @@ a{color:inherit;text-decoration:none}
 /* 컬러 필드 (5.1 — 왼쪽 hex 입력 + 오른쪽 원형 색 버튼 → 자체 컬러피커) */
 .color-field{display:inline-flex;align-items:center;gap:8px;position:relative}
 .color-field .k-input{width:96px;font-family:ui-monospace,Consolas,monospace;font-size:calc(12px*var(--fs,1));letter-spacing:.02em;padding:8px 10px}
-.color-dot{width:26px;height:26px;border-radius:50%;border:2px solid #fff;flex-shrink:0;box-shadow:0 0 0 1px var(--line),0 2px 6px rgba(0,0,0,.18);cursor:var(--cur-pointer,pointer);transition:transform .12s}
+.color-dot{width:26px;height:26px;border-radius:50%;border:2px solid #fff;flex-shrink:0;box-shadow:0 0 0 1px var(--line),0 2px 6px rgba(0,0,0,.18);cursor:var(--cur-pointer,pointer);transition:transform .12s;background-size:auto,10px 10px}
 .color-dot:hover{transform:scale(1.1)}
 .picker-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:90;padding:12px;width:216px;background:#fff;border:1px solid var(--line);border-radius:var(--radius-s);box-shadow:0 16px 44px rgba(0,0,0,.2)}
 .picker-sv{position:relative;width:100%;height:130px;border-radius:7px;cursor:crosshair;background-image:linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,transparent)}
 .picker-cursor{position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none}
 .picker-hue{position:relative;margin-top:10px;height:12px;border-radius:999px;cursor:var(--cur-pointer,pointer);background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
+/* 반투명 색을 보여 줄 때 뒤에 까는 격자 (v2.0) */
+:root{--checker:repeating-conic-gradient(#c8ccd2 0% 25%,#fff 0% 50%) 50%/10px 10px}
+.picker-alpha{height:14px;border-radius:7px;margin-top:9px;position:relative;cursor:var(--cur-pointer,pointer);
+  background-image:linear-gradient(90deg,transparent,var(--a-to,#000)),var(--checker)}
 .picker-hue-cursor{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:translate(-50%,-50%);pointer-events:none}
 
 /* 리치 에디터 (TipTap — 자체 스타일 툴바, 7장) */
@@ -940,10 +944,10 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .rel-card .nm{padding:13px 16px;position:relative}
 /* 긴 이름·캐치프레이즈는 말줄임 (v1.9) — 멤버 점(.who) 자리를 위해 오른쪽 여백 확보 */
 .rel-card .nm b{font-family:var(--serif);font-size:calc(16px*var(--fs,1));letter-spacing:.18em;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rel-card .nm span{font-size:calc(11px*var(--fs,1));color:var(--faint);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:56px}
+.rel-card .nm span{font-size:calc(11px*var(--fs,1));color:var(--faint);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:44px}
 /* 멤버 테마색 점 — 별도 줄 없이 텍스트와 겹쳐 카드 오른쪽 아래에 고정 */
-.rel-card .nm .who{position:absolute;right:14px;bottom:12px;display:flex;gap:5px}
-.rel-card .nm .who i{width:20px;height:20px;border-radius:50%;font-style:normal;box-shadow:0 0 0 2px var(--panel-solid)}
+.rel-card .nm .who{position:absolute;right:14px;bottom:12px;display:flex;gap:4px}
+.rel-card .nm .who i{width:14px;height:14px;border-radius:50%;font-style:normal;box-shadow:0 0 0 2px var(--panel-solid)} /* 카드 구석 표시라 작게 (v2.0 사용자 요청) */
 /* 자관 상세 — 헤더 이미지: 풀폭 블러 + 아래로 페이드아웃 (v1.5) */
 .page-rel-detail{position:relative;max-width:1280px}
 /* 배경 위 레이어링 — absolute로 배치되는 요소(AU·관리자 액션·모달)는 제외 */
@@ -951,13 +955,9 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .rel-backdrop{position:absolute;top:0;left:50%;transform:translateX(-50%);width:100vw;height:600px;z-index:0!important;overflow:hidden;pointer-events:none;
   -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 35%,transparent 96%);
   mask-image:linear-gradient(to bottom,#000 0%,#000 35%,transparent 96%);}
-.rel-backdrop .img{position:absolute;inset:-40px;filter:blur(16px) brightness(.8) saturate(.9);
-  background:
-    radial-gradient(340px 300px at 26% 30%,rgba(90,110,160,.55),transparent 65%),
-    radial-gradient(300px 320px at 72% 24%,rgba(150,135,110,.45),transparent 65%),
-    radial-gradient(260px 260px at 55% 70%,rgba(140,70,80,.35),transparent 65%),
-    linear-gradient(160deg,#3a4150 0%,#262b33 55%,#1a1d22 100%);}
-.rel-backdrop .img.custom{background:none}
+/* 헤더 이미지가 있을 때만 이 블록 자체가 렌더된다 (v2.0) — 예전엔 없을 때도 데모
+   그라데이션을 깔았는데, 없으면 아예 안 그리는 쪽으로 바뀌어 배경색 자체가 필요 없어졌다 */
+.rel-backdrop .img{position:absolute;inset:-40px;filter:blur(16px) brightness(.8) saturate(.9)}
 .rel-backdrop .img img{width:100%;height:100%;object-fit:cover}
 .rel-hero{position:relative;text-align:center;padding:34px 0 10px;color:#fff}
 .rel-hero .quote{position:absolute;top:auto;bottom:-10px;font-family:var(--serif);font-size:calc(15px*var(--fs,1));letter-spacing:.08em;color:#d7dae0}
@@ -983,7 +983,7 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .mini-prof .specs b{color:var(--faint);font-weight:600;min-width:34px}
 .mini-prof .foot{padding:9px 15px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;font-size:calc(9.5px*var(--fs,1));color:var(--faint)}
 .palette-row{display:flex;gap:6px;padding:0 15px 11px}
-.palette-row .gem{width:20px;height:20px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);cursor:help;position:relative}
+.palette-row .gem{display:inline-block;width:14px;height:14px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);cursor:help;position:relative}
 .kw-row{display:flex;gap:5px;flex-wrap:wrap;padding:0 15px 13px}
 .rel-desc{font-size:calc(11.5px*var(--fs,1));line-height:1.8;color:#454a52;padding:13px 16px;border-top:1px solid var(--line);white-space:pre-line}
 .card-thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:11px 15px;border-top:1px dashed var(--line)}
@@ -1547,15 +1547,14 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .gb-item .reply b{color:var(--accent);font-size:calc(11px*var(--fs,1));letter-spacing:.05em;display:block;margin-bottom:3px}
 
 /* ---------- 세그먼트 컨트롤 ---------- */
-.seg{display:inline-flex;background:rgba(255,255,255,.1);border:1px solid var(--line-dark);border-radius:9px;padding:3px}
-.seg button{padding:6px 14px;font-size:calc(11.5px*var(--fs,1));color:#aab0ba;border-radius:7px;transition:.15s}
+/* 안 고른 쪽 배경·글씨는 디자인 탭에서 (v2.0 사용자 요청) · 고른 쪽은 진한 버튼색 그대로 */
+.seg{display:inline-flex;background:var(--seg-bg,#f0f1f3);border:1px solid var(--line-dark);border-radius:9px;padding:3px}
+.seg button{padding:6px 14px;font-size:calc(11.5px*var(--fs,1));color:var(--seg-fg,#8a8f98);border-radius:7px;transition:.15s}
 /* 선택 칩 = 진한 버튼 3색 연동 (v1.9 사용자 확정 — 체크박스와 동일 토큰) */
 .seg button.on{background:var(--btn-dark,var(--panel-solid));color:var(--btn-dark-fg,var(--ink))}
-.seg.in-panel{background:#f0f1f3;border-color:transparent}
-.seg.in-panel button{color:var(--faint)}
-.seg.in-panel button.on{background:var(--btn-dark,var(--ink));color:var(--btn-dark-fg,#fff)}
-.mini-seg{display:inline-flex;background:#f0f1f3;border-radius:7px;padding:2px}
-.mini-seg button{padding:4px 9px;font-size:calc(10px*var(--fs,1));border-radius:5px;color:var(--faint);transition:.13s}
+.seg.in-panel{border-color:transparent}
+.mini-seg{display:inline-flex;background:var(--seg-bg,#f0f1f3);border-radius:7px;padding:2px}
+.mini-seg button{padding:4px 9px;font-size:calc(10px*var(--fs,1));border-radius:5px;color:var(--seg-fg,#8a8f98);transition:.13s}
 .mini-seg button.on{background:var(--btn-dark,var(--ink));color:var(--btn-dark-fg,#fff)}
 .mini-seg.icon-seg button{padding:4px 7px}
 .mini-seg.icon-seg svg{width:12px;height:12px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
