@@ -54,12 +54,31 @@ export default function TrpgDetailPage() {
   const l = logs.find(x => x.id === id);
   const bd = bodies.find(x => x.id === id);   // 분리 저장된 본문 — 권한이 없으면 애초에 안 온다 (undefined)
 
+  // 접근권한 (4.3) — 관리자 / 공개범위 충족 / 비밀번호 입력자 /
+  // 연동 자관의 상대방(멤버 캐릭터에 권한이 부여된 회원)은 무조건 열람 (3차 회원-캐릭터 연결, v1.9)
+  const logRel = rels.find(r => r.id === l?.relId);
+  const isRelPartner = !!user && !!logRel && logRel.members.some(m => {
+    const ch = allChars.find(c => c.id === m.charId);
+    return ch ? !!charGrant(ch, user.id) : false;
+  });
+  const baseAllowed = !!l && (isAdmin || isRelPartner
+    || l.visibility === 'public' || (l.visibility === 'member' && !!user));
+
   // 비밀번호 열람 (4.3) — 세션 동안 유지
   const [unlocked, setUnlocked] = useState(false);
   const [pwTry, setPwTry] = useState('');
   useEffect(() => {
     try { if (sessionStorage.getItem(`trpg-unlock:${id}`) === '1') setUnlocked(true); } catch { /* 무시 */ }
   }, [id]);
+
+  // 이 로그를 볼 수 없으면(없거나, 권한도 비밀번호도 없으면) 홈으로 — 예전엔 이 자리에 "열람 권한이
+  // 없습니다" 문구만 남아 있었는데, 로그아웃 등으로 권한을 잃은 직후엔 계속 그 화면에 머무를 이유가
+  // 없다는 사용자 요청으로 홈으로 보낸다 (v2.0)
+  useEffect(() => {
+    if (!loaded) return;
+    if (!l) { router.replace('/'); return; }
+    if (!baseAllowed && !unlocked && !l.password) router.replace('/');
+  }, [loaded, l, baseAllowed, unlocked, router]);
   const tryUnlock = () => {
     if (l?.password && pwTry === l.password) {
       setUnlocked(true);
@@ -195,32 +214,10 @@ export default function TrpgDetailPage() {
     }, 1800);
   };
 
-  if (!loaded) return <section className="page" />;
-  if (!l) {
-    return (
-      <section className="page">
-        <div className="page-head"><PageTitle>TRPG LOG</PageTitle><p>로그를 찾을 수 없습니다</p></div>
-      </section>
-    );
-  }
-
-  // 접근권한 (4.3) — 관리자 / 공개범위 충족 / 비밀번호 입력자 /
-  // 연동 자관의 상대방(멤버 캐릭터에 권한이 부여된 회원)은 무조건 열람 (3차 회원-캐릭터 연결, v1.9)
-  const logRel = rels.find(r => r.id === l?.relId);
-  const isRelPartner = !!user && !!logRel && logRel.members.some(m => {
-    const ch = allChars.find(c => c.id === m.charId);
-    return ch ? !!charGrant(ch, user.id) : false;
-  });
-  const baseAllowed = isAdmin || isRelPartner
-    || l.visibility === 'public' || (l.visibility === 'member' && !!user);
+  // 없거나 볼 수 없으면 위 useEffect가 홈으로 보낸다 — 그 사이엔 빈 화면만 (v2.0)
+  if (!loaded || !l) return <section className="page" />;
   if (!baseAllowed && !unlocked) {
-    if (!l.password) {
-      return (
-        <section className="page">
-          <div className="page-head"><PageTitle>TRPG LOG</PageTitle><p>열람 권한이 없습니다</p></div>
-        </section>
-      );
-    }
+    if (!l.password) return <section className="page" />;
     // 비밀번호 게이트 — 맞으면 이 세션 동안 열람 유지
     return (
       <section className="page">

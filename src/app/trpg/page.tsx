@@ -17,7 +17,8 @@ import { useToast } from '@/components/ui/Toast';
 
 import { useSiteSettings } from '@/lib/siteStore';
 import { useMainStore } from '@/lib/mainStore';
-import { useCardSort, mergeOrder } from '@/lib/cardSort';
+import { mergeOrder } from '@/lib/cardSort';
+import { DragList } from '@/components/ui/DragList';
 
 export default function TrpgPage() {
   const router = useRouter();
@@ -89,7 +90,44 @@ export default function TrpgPage() {
   // 새 로그는 앞에 넣으므로 기본은 지금까지처럼 최신순이고, № 번호는 표시용으로만 남는다.
 
   // 편집모드 카드 드래그 정렬 (v2.0 — 캐릭터 목록과 같은 방식)
-  const sort = useCardSort(visible, next => setLogs(mergeOrder(logs, next)), editOn && isAdmin);
+  // 드래그 정렬 — 다른 페이지들과 같은 방식으로 (v2.0 사용자 요청: "다른 페이지들 드래그앤드롭
+  // 참고해서 똑같이 구현").
+  // · 티켓형(세로 한 줄 목록)은 다른 목록형 페이지와 완전히 같은 DragList — 손잡이를 들어 올려
+  //   부드럽게 밀어내고 놓으면 정확한 자리로 안착.
+  // · 기본형(2열 그리드)은 DragList가 세로 한 줄 전제라 그대로 못 쓴다 — 자리 미리보기는 그대로 두되,
+  //   저장(서버 쓰기)은 손을 뗄 때 한 번만 하도록 이 페이지에서 직접 구현했다. 예전 cardSort는 지나는
+  //   자리마다 저장을 불러서(끄는 동안 수십 번) 서버 모드에서 뚝뚝 끊겨 보였다 — 그 원인 제거
+  const gridSort = editOn && isAdmin;
+  const [gridPreview, setGridPreview] = useState<TrpgLog[] | null>(null);
+  const gridFromRef = useRef<number | null>(null);
+  const basicShown = gridPreview ?? visible;
+  const gridDragProps = (i: number): React.HTMLAttributes<HTMLDivElement> => {
+    if (!gridSort) return {};
+    return {
+      draggable: true,
+      onDragStart: () => { gridFromRef.current = i; setGridPreview(null); },
+      onDragOver: e => {
+        e.preventDefault();
+        const from = gridFromRef.current;
+        if (from == null || from === i) return;
+        const cur = gridPreview ?? visible;
+        const next = [...cur];
+        const [moved] = next.splice(from, 1);
+        next.splice(i, 0, moved);
+        gridFromRef.current = i;
+        setGridPreview(next);
+      },
+      onDrop: e => e.preventDefault(),
+      onDragEnd: () => {
+        gridFromRef.current = null;
+        setGridPreview(p => {
+          if (p) setLogs(mergeOrder(logs, p));   // 놓는 순간 딱 한 번만 저장
+          return null;
+        });
+      },
+      style: { cursor: 'var(--cur-grab,grab)' },
+    };
+  };
 
   const decodeText = decodeLogText; // 공용 유틸 (galleryStore)
 
@@ -148,8 +186,8 @@ export default function TrpgPage() {
       : undefined;
 
   // sp: 편집모드 드래그 정렬 props (다른 목록과 같은 방식, v2.0)
-  const Ticket = ({ l, sp }: { l: TrpgLog; sp?: React.HTMLAttributes<HTMLDivElement> }) => (
-    <div className="ticket" {...sp}
+  const Ticket = ({ l }: { l: TrpgLog }) => (
+    <div className="ticket"
       onClick={() => { if (!editOn) router.push(`/trpg/${l.id}`); }}>
       <div className="stub-line" />
       <div className={`wide ${!l.thumbId && !l.thumbColor ? `ph ${l.ph}` : ''}`} style={thumbStyle(l)}>
@@ -159,6 +197,8 @@ export default function TrpgPage() {
       </div>
       <div className="stub">
         <div className="sc-title" style={l.serifTitle ? { fontFamily: 'var(--serif)', letterSpacing: '.12em' } : undefined}>
+          {/* 다른 목록형 페이지와 같은 드래그 손잡이 — 잡아 들어야 끌리게 (v2.0) */}
+          {editOn && <span className="drag-h" style={{ marginRight: 8 }}>⠿</span>}
           {l.title}
         </div>
         {/* 편집모드에서만 — 지금 목록 숨김이라 관리자에게만 예외로 보이는 중임을 표시 (v2.0) */}
@@ -189,13 +229,22 @@ export default function TrpgPage() {
       <div className="trpg-layout">
         <div>
           {skin === 'ticket' && !isMobile
-            ? visible.map((l, i) => <Ticket key={l.id} l={l} sp={sort(i)} />)
+            ? (
+              // 다른 목록형 페이지와 같은 DragList — 손잡이를 들어 부드럽게 밀어내고 놓으면 안착 (v2.0)
+              <DragList items={visible} keyOf={l => l.id}
+                onReorder={next => setLogs(mergeOrder(logs, next))}
+                disabled={!(editOn && isAdmin)}
+                render={l => <Ticket l={l} />} />
+            )
             : (
-              // 기본형 — 한 줄에 두 개, 번호 없이 제목만 (v2.0 사용자 확정)
+              // 기본형 — 한 줄에 두 개, 번호 없이 제목만 (v2.0 사용자 확정).
+              // DragList는 세로 한 줄 목록 전제라 2열 그리드엔 못 쓴다 — 자리 미리보기는 그대로 두고
+              // 저장은 손을 뗄 때 한 번만 하도록 이 페이지에서 직접 구현 (gridDragProps, 위 참조)
               <div className="panel flush trpg-basic">
-                {visible.map((l, i) => (
-                  <div key={l.id} className="list-item" {...sort(i)}
+                {basicShown.map((l, i) => (
+                  <div key={l.id} className="list-item" {...gridDragProps(i)}
                     onClick={() => { if (!editOn) router.push(`/trpg/${l.id}`); }}>
+                    {editOn && <span className="drag-h">⠿</span>}
                     <div className={`th ${!l.thumbId && !l.thumbColor ? `ph ${l.ph}` : ''}`} style={{ ...thumbStyle(l), position: 'relative' }}>
                       {l.thumbId && <CroppedBlobImg fileRef={l.thumbId} crop={l.thumbCrop} />}
                     </div>
