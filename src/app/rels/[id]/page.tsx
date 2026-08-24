@@ -137,8 +137,12 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side,
       <div className="specs">
         {char.specs.map(s => <div key={s.label}><b>{s.label}</b> {s.value}</div>)}
       </div>
+      {/* 캐릭터의 지금 색 팔레트를 그대로 읽는다 (v2.0 사용자 발견).
+          예전엔 멤버를 추가할 때 복사해 둔 member.palette 스냅샷을 보여 줘서, 캐릭터 쪽에서 색을
+          지우거나 더 넣어도 자관 페이지는 추가 당시 상태에 멈춰 있었다("지웠는데 안 사라져",
+          "더 등록해도 추가로 안 떠"의 원인). 옛 저장분은 캐릭터에 색이 하나도 없을 때만 fallback */}
       <div className="palette-row" data-tip="캐릭터 테마색 팔레트">
-        {member.palette.map(p => (
+        {(char.colors?.length ? char.colors : member.palette).map(p => (
           <Tip key={p.hex + p.label} tip={p.label}>
             <span className="gem" style={{ background: p.hex }} />
           </Tip>
@@ -375,7 +379,10 @@ export default function RelDetailPage() {
       // 상대 캐릭터 간단 등록 (own:false — 내 캐릭터 리스트에는 표시되지 않음, 4.4)
       const nc: Character = {
         id: newId(), name: mName.trim(), sub: mSub.trim(), color: mColor,
-        colors: [{ hex: mColor, label: '테마색' }], specs: [], tabs: [],
+        // 입력한 색은 대표 테마색(color)으로만 쓴다 — 예전엔 팔레트(colors)에도 「테마색」이라는
+        // 이름으로 한 칸 자동 등록해서, 포인트 컬러로 넣은 값이 팔레트에 멋대로 들어가 있었다
+        // (v2.0 사용자 요청). 팔레트는 캐릭터 수정에서 직접 넣는다
+        colors: [], specs: [], tabs: [],
         basicHtml: '', visibility: 'public', thumbClass: '', own: false,
         grants: mGrants.length ? mGrants : undefined, // 회원 권한 — 역극 플레이/편집 (v1.9)
       };
@@ -387,7 +394,10 @@ export default function RelDetailPage() {
     updateRel({
       members: [...rel.members, {
         charId: cid, quote: mQuote.trim(), keywords: [], desc: '',
-        palette: ch?.colors ?? [{ hex: mColor, label: '테마색' }],
+        // 팔레트는 캐릭터 쪽을 그대로 읽어 쓴다 — 여기서 복사해 두면 나중에 캐릭터 색을 바꿔도
+        // 자관 페이지가 따라오지 않는다. 입력한 색을 「테마색」이라는 이름으로 팔레트에 자동
+        // 등록하던 것도 없앴다 (v2.0 사용자 요청 — 포인트 컬러로 넣은 값이 테마색으로 들어가 버림)
+        palette: [],
         linkedNote: mMode === 'new' ? '상대 캐릭터' : undefined,
       }],
     });
