@@ -69,7 +69,9 @@ export function DdayEditor({ conf }: { conf: WidgetConf }) {
   const toast = useToast();
   const { fonts, familyOf } = useFonts();
   const items = (conf.settings.items as DdaySetItem[]) ?? [];
-  const fontId = conf.settings.fontId as string | undefined;
+  // 'default'는 폰트 라이브러리의 실제 폰트 id(기본 프리텐다드)라 가짜 센티널로 못 쓴다 —
+  // 미지정이면 이미 있는 잠금 폰트 'serif'(기본 세리프)를 그대로 기본값으로 (v2.0 사용자 발견)
+  const fontId = (conf.settings.fontId as string | undefined) ?? 'serif';
   const color = conf.settings.color as string | undefined;
   const set = (next: DdaySetItem[]) =>
     updateWidget(conf.id, { settings: { ...conf.settings, items: next } }, { persist: true });
@@ -117,12 +119,9 @@ export function DdayEditor({ conf }: { conf: WidgetConf }) {
       {/* 날짜 표시(D-2·D+3 등) 폰트·색 (v2.0 사용자 요청) — 제목 글씨는 본문 폰트를 그대로 따라간다 */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--line)' }}>
         <span className="cp-lb">날짜표시 폰트</span>
-        <KSelect minWidth={150} maxWidth={200} value={fontId ?? 'default'}
-          onChange={v => setMeta({ fontId: v === 'default' ? undefined : v })}
-          options={[
-            { value: 'default', label: '기본 (세리프)' },
-            ...fonts.map(f => ({ value: f.id, label: <span style={{ fontFamily: familyOf(f.id) }}>{f.name}</span> })),
-          ]} />
+        <KSelect minWidth={150} value={fontId}
+          onChange={v => setMeta({ fontId: v })}
+          options={fonts.map(f => ({ value: f.id, label: <span style={{ fontFamily: familyOf(f.id) }}>{f.name}</span> }))} />
         <span className="cp-lb">색</span>
         <ColorField value={color ?? '#e6ebf2'} onChange={hex => setMeta({ color: hex })} />
       </div>

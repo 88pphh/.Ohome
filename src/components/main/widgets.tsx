@@ -231,7 +231,8 @@ export function DdayWidget({ conf }: { conf: WidgetConf }) {
   const [open, setOpen] = useState(false);
   const items = (conf.settings.items as DdayItem[]) ?? [];
   // 날짜 표시(D-2·D+3 등) 폰트·색 — 미지정이면 기존 세리프 기본값 그대로 (v2.0 사용자 요청)
-  const dFontId = conf.settings.fontId as string | undefined;
+  // 'serif'는 폰트 라이브러리의 실제(잠금) 폰트라 편집기의 기본 옵션과 값이 늘 일치한다
+  const dFontId = (conf.settings.fontId as string | undefined) ?? 'serif';
   const dColor = conf.settings.color as string | undefined;
   useEditEvent(conf.id, () => setOpen(true));   // 편집모드 우클릭 → 설정 (v1.9)
   return (
@@ -244,7 +245,7 @@ export function DdayWidget({ conf }: { conf: WidgetConf }) {
           <div className="dday-row" key={it.title}>
             <span>{it.title}</span>
             <b className={d.near && !dColor ? 'd-red' : ''}
-              style={{ fontFamily: dFontId ? familyOf(dFontId) : undefined, color: dColor }}>{d.label}</b>
+              style={{ fontFamily: familyOf(dFontId), color: dColor }}>{d.label}</b>
           </div>
         );
       })}

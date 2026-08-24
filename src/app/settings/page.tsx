@@ -81,7 +81,7 @@ function FontRoleRow({ role }: { role: FontRole }) {
       <div className="l"><b>{ROLE_LABEL[role].label}</b><small>{ROLE_LABEL[role].desc}</small></div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {/* 폰트 이름이 길어도 줄이 넘어가지 않게 상한을 둔다 — 넘치면 … (v2.0 사용자 요청) */}
-        <KSelect minWidth={170} maxWidth={230} value={cfg.id} onChange={v => setRole(role, { id: v })}
+        <KSelect minWidth={170} value={cfg.id} onChange={v => setRole(role, { id: v })}
           options={[
             ...(role === 'dropdown' ? [{ value: FOLLOW_MENU, label: <span>메뉴 폰트와 동일</span> }] : []),
             ...(role === 'pagetitle' ? [{ value: FOLLOW_TITLE, label: <span>타이틀 폰트와 동일</span> }] : []),

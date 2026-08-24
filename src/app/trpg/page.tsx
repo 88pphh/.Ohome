@@ -43,6 +43,7 @@ export default function TrpgPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [nNo, setNNo] = useState('');          // № 자리 표시 텍스트 — 비우면 자동 № 0XX
   const [nVis, setNVis] = useState<'public' | 'member' | 'private'>('public'); // 접근권한
+  const [nListHidden, setNListHidden] = useState(false);   // 목록 표시 여부 (v2.0 — 접근권한과 별개)
   const [nPw, setNPw] = useState('');          // 열람 비밀번호 (선택)
   const [nTitle, setNTitle] = useState('');
   const [nCatch, setNCatch] = useState('');
@@ -72,6 +73,9 @@ export default function TrpgPage() {
   }, [logs]);
 
   const visible = logs
+    // 목록 숨김 — 관리자도 편집모드가 아니면 안 보인다(목록을 정리해 두는 용도라, v2.0 사용자 요청).
+    // 편집모드에서는 관리자에게만 예외로 보여 되돌릴 수 있게 한다
+    .filter(l => !l.listHidden || (isAdmin && editOn))
     // 비밀번호가 있는 로그는 리스트에 노출 (상세에서 비밀번호 입력으로 열람 — 4.3 접근권한)
     .filter(l => isAdmin || l.visibility === 'public' || (l.visibility === 'member' && user) || !!l.password)
     .filter(l => filter === 'all' || (filter === 'none' ? !l.relId : l.relId === filter))
@@ -117,9 +121,10 @@ export default function TrpgPage() {
     };
     log.visibility = nVis;
     log.password = nPw.trim() || undefined;
+    log.listHidden = nListHidden;
     setLogs([log, ...logs]);
     setAddOpen(false);
-    setNNo(''); setNVis('public'); setNPw(''); setNTitle(''); setNCatch(''); setNWriter(''); setNWith(''); setNBody(''); setNFileName(''); setNDate(''); setNFile(null);
+    setNNo(''); setNVis('public'); setNPw(''); setNListHidden(false); setNTitle(''); setNCatch(''); setNWriter(''); setNWith(''); setNBody(''); setNFileName(''); setNDate(''); setNFile(null);
     setNThumb(null); setNThumbUrl(''); setNThumbCrop(undefined);
     toast(nFile ? '로그가 등록되었습니다 — 원본 파일도 보관됩니다' : '로그가 등록되었습니다');
   };
@@ -144,6 +149,8 @@ export default function TrpgPage() {
         <div className="sc-title" style={l.serifTitle ? { fontFamily: 'var(--serif)', letterSpacing: '.12em' } : undefined}>
           {l.title}
         </div>
+        {/* 편집모드에서만 — 지금 목록 숨김이라 관리자에게만 예외로 보이는 중임을 표시 (v2.0) */}
+        {editOn && l.listHidden && <span className="pill" style={{ marginTop: 4 }}>숨김</span>}
         {l.catchphrase && <div className="sc-catch">{l.catchphrase}</div>}
         {!isAdmin && l.password && !(l.visibility === 'public' || (l.visibility === 'member' && user)) && (
           <div className="row"><b>열람</b> 비밀번호 필요</div>
@@ -181,6 +188,8 @@ export default function TrpgPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <b>{l.title}</b>
+                      {/* 편집모드에서만 — 목록 숨김이라 관리자에게만 예외로 보이는 중 (v2.0) */}
+                      {editOn && l.listHidden && <span className="pill" style={{ marginLeft: 6 }}>숨김</span>}
                       <small>{[l.writer, l.withText].filter(Boolean).join(' · ')}{l.date ? ` · ${l.date.replace(/-/g, '.')}` : ''}</small>
                     </div>
                   </div>
@@ -255,6 +264,16 @@ export default function TrpgPage() {
                 { value: 'private', label: '나만보기' },
               ]} />
             <KInput placeholder="열람 비밀번호 (선택)" value={nPw} onChange={e => setNPw(e.target.value)} style={{ flex: 1 }} />
+          </div>
+          {/* 목록 표시 — 접근권한과 별개 (v2.0 사용자 요청). 숨겨도 직접 링크·비밀번호로는 그대로 열림 */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="cp-lb">목록</span>
+            <KSelect minWidth={140} value={nListHidden ? 'hidden' : 'show'}
+              onChange={v => setNListHidden(v === 'hidden')}
+              options={[
+                { value: 'show', label: '목록에 표시' },
+                { value: 'hidden', label: '목록에서 숨기기' },
+              ]} />
           </div>
 
           {/* 썸네일 (선택) — 이미지 업로드 또는 단색/그라데이션 */}

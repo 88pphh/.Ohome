@@ -69,6 +69,7 @@ export default function TrpgDetailPage() {
   const [e, setE] = useState({
     noText: '', title: '', catchphrase: '', writer: '', withText: '',
     relId: 'none', date: '', visibility: 'public' as TrpgLog['visibility'], password: '',
+    listHidden: false,   // 목록 표시 여부 (v2.0 — 접근권한과 별개)
   });
   // 본문 교체
   const [bodyMode, setBodyMode] = useState<'keep' | 'file' | 'text'>('keep');
@@ -120,6 +121,7 @@ export default function TrpgDetailPage() {
       relId: e.relId === 'none' ? undefined : e.relId,
       date: e.date || undefined,
       visibility: e.visibility, password: e.password.trim() || undefined,
+      listHidden: e.listHidden,
       bodyHtml: bodyDisp === 'auto' ? undefined : bodyDisp === 'html',
       ...bodyPatch, ...thumbPatch,
     } : x));
@@ -254,7 +256,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
             setE({
               noText: l.noText ?? '', title: l.title, catchphrase: l.catchphrase ?? '', writer: l.writer,
               withText: l.withText, relId: l.relId ?? 'none', date: l.date ?? '',
-              visibility: l.visibility, password: l.password ?? '',
+              visibility: l.visibility, password: l.password ?? '', listHidden: !!l.listHidden,
             });
             // 본문·썸네일 교체 상태 초기화 (기본: 현재 것 유지)
             setBodyMode('keep'); setEFile(null); setEText(bodyText ?? '');
@@ -349,6 +351,16 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
                 { value: 'private', label: '나만보기' },
               ]} />
             <KInput placeholder="열람 비밀번호 (선택)" value={e.password} onChange={ev => setE(s => ({ ...s, password: ev.target.value }))} style={{ flex: 1 }} />
+          </div>
+          {/* 목록 표시 — 접근권한과 별개 (v2.0 사용자 요청) */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="cp-lb">목록</span>
+            <KSelect minWidth={140} value={e.listHidden ? 'hidden' : 'show'}
+              onChange={v => setE(s => ({ ...s, listHidden: v === 'hidden' }))}
+              options={[
+                { value: 'show', label: '목록에 표시' },
+                { value: 'hidden', label: '목록에서 숨기기' },
+              ]} />
           </div>
 
           {/* 썸네일 교체 — 기본은 현재 썸네일 유지 */}

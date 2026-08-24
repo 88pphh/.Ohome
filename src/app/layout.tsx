@@ -45,6 +45,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <head>
+        {/* 테마 FOUC 방지 — <body> 안에 있으면 body 배경이 :root의 다크 기본값으로 먼저 페인트될 여지가
+            있다(사용자 발견 — "처음 접속할 때 기본 다크모드가 깜빡") — body 자체가 파싱되는 순간 CSS만으로도
+            그려질 수 있기 때문. <head> 맨 앞으로 옮겨 렌더 차단 구간(첫 페인트 전) 안에서 먼저 실행되게 한다 (v2.0) */}
+        <script dangerouslySetInnerHTML={{
+          __html: `(function(){try{var m=JSON.parse(localStorage.getItem('ohome.themeCss.v1'));if(m){var s=document.documentElement.style;for(var k in m)s.setProperty(k,m[k]);}}catch(e){}})();`,
+        }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Noto+Serif+KR:wght@500;700&display=swap"
@@ -52,10 +58,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        {/* 테마 FOUC 방지 — 저장해 둔 CSS 변수 맵을 첫 페인트 전에 적용 (기본 다크 → 사용자 테마 깜빡임 제거) */}
-        <script dangerouslySetInnerHTML={{
-          __html: `(function(){try{var m=JSON.parse(localStorage.getItem('ohome.themeCss.v1'));if(m){var s=document.documentElement.style;for(var k in m)s.setProperty(k,m[k]);}}catch(e){}})();`,
-        }} />
         {/* 서버 연결 확정 후에 앱을 그림 — 설정(ohome.config.json/로컬/env)을 한 번 읽는다 (v2.0) */}
         <ServerBoot>
         <ThemeProvider>
