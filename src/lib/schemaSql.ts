@@ -60,7 +60,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- ── 6. 콘텐츠 테이블 19종 ────────────────────────────────────
+-- ── 6. 콘텐츠 테이블 20종 ────────────────────────────────────
 -- 항목 하나 = 행 하나 (행 단위 권한·실시간). 항목의 세부 필드는 data(jsonb)에 담고,
 -- 권한·정렬·필터에 쓰는 값만 별도 컬럼으로 뽑아 둔다.
 do $$
@@ -84,7 +84,8 @@ declare content_tables text[] := array[
   'commissions',  -- 커미션
   'applicants',   -- 신청자
   'moods',        -- 무드 목록
-  'comments'      -- 댓글 (v2.0 — 글 안이 아니라 자기 행으로. 글을 수정하지 않고 댓글을 달 수 있게)
+  'comments',     -- 댓글 (v2.0 — 글 안이 아니라 자기 행으로. 글을 수정하지 않고 댓글을 달 수 있게)
+  'qa_answers'    -- 자관 문답 답변 (v2.0 — 같은 이유로 자관 안이 아니라 자기 행으로)
 ];
 begin
   foreach t in array content_tables loop
@@ -98,6 +99,11 @@ begin
         created_at  timestamptz not null default now(),
         updated_at  timestamptz not null default now()
       )$f$, t);
+
+    -- 편집 권한을 받은 회원 (v2.0) — 캐릭터 grants의 「편집까지」 대상. 이미 만든 테이블에도 붙는다
+    execute format($f$
+      alter table public.%I add column if not exists editor_ids text[] not null default '{}'::text[]
+    $f$, t);
 
     execute format('alter table public.%I enable row level security', t);
     execute format('create index if not exists %I on public.%I (sort)', t || '_sort_idx', t);
@@ -117,16 +123,18 @@ begin
     execute format($p$
       create policy "insert" on public.%I for insert to authenticated with check (true)$p$, t);
 
-    -- 수정: 본인 또는 관리자 · 삭제: 본인 또는 관리자
+    -- 수정·삭제: 본인 · 편집 권한을 받은 회원(editor_ids) · 관리자
     execute format('drop policy if exists "update" on public.%I', t);
     execute format($p$
       create policy "update" on public.%I for update to authenticated
-        using (author_id = auth.uid() or public.is_admin())$p$, t);
+        using (author_id = auth.uid() or public.is_admin()
+               or auth.uid()::text = any(editor_ids))$p$, t);
 
     execute format('drop policy if exists "delete" on public.%I', t);
     execute format($p$
       create policy "delete" on public.%I for delete to authenticated
-        using (author_id = auth.uid() or public.is_admin())$p$, t);
+        using (author_id = auth.uid() or public.is_admin()
+               or auth.uid()::text = any(editor_ids))$p$, t);
   end loop;
 end $$;
 

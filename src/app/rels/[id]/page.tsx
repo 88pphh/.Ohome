@@ -11,6 +11,7 @@ import { useLocalList, newId } from '@/lib/postStore';
 import {
   Relation, REL_SEED, Character, CHAR_SEED, RelMember, QaEntry, QaAnswer, TlItem, findChar, Visibility, CharGrant,
   RelAu, RelCpTag, charWithAu, charGrant,
+  QaAnswerRow, QA_KEY, QA_SEED, MergedAnswer, answersFor,
 } from '@/lib/charStore';
 import { RelQuestionSet, RELQ_SEED, RELQ_KEY, CP_LABEL } from '@/lib/relqStore';
 import { putBlob } from '@/lib/blobStore';
@@ -281,6 +282,9 @@ export default function RelDetailPage() {
   const [auCatch, setAuCatch] = useState('');
   const [auCp, setAuCp] = useState<RelCpTag>('cp');       // 새 AU의 CP/NCP (v1.9)
   const [qsets] = useLocalList<RelQuestionSet>(RELQ_KEY, RELQ_SEED); // 자관 질문 세트 (환경설정)
+  // 문답 답변은 자관과 따로 저장한다 (v2.0) — 자관 안에 두면 답할 때 자관을 UPDATE 해야 해서
+  // 관리자가 만든 자관에 일반 회원이 답을 달 수 없었다 (댓글과 같은 뿌리)
+  const [qaRows, setQaRows] = useLocalList<QaAnswerRow>(QA_KEY, QA_SEED);
   const [qsetOpen, setQsetOpen] = useState(false);        // QUESTIONS 섹션 추가 — 질문 리스트 선택 모달
   const [delAsk, setDelAsk] = useState(false);   // 자관 삭제 확인
   const del = useConfirmDelete();                // 멤버·타임라인 등 개별 삭제 확인
@@ -323,6 +327,10 @@ export default function RelDetailPage() {
   const auCpTag: RelCpTag | undefined = au?.cp ?? rel?.cp;
   const qaOn = (isBaseAu ? rel?.qaEnabled : au?.qaEnabled) ?? auQuestions.length > 0;
   const curQa: QaEntry | undefined = auQuestions.find(q => q.no === (qaNo ?? auQuestions[0]?.no));
+  /** 질문 하나의 답변 — 옛 자관 안의 것 + 따로 저장된 것 (v2.0). 화면·수정·삭제는 이 목록의 순번을 쓴다 */
+  const answersOf = (no: number): MergedAnswer[] =>
+    answersFor(qaRows, rel?.id ?? '', au?.id ?? 'base', no, auQuestions.find(q => q.no === no)?.answers ?? []);
+  const curAnswers = curQa ? answersOf(curQa.no) : [];
   // 전신이 하나도 등록되지 않았으면 전신 모드를 두지 않는다 —
   // 빈 자리에 「○○ 전신」 자리표시자를 세우는 대신 대표 일러스트만 보여 준다 (사용자 확정)
   const fullRefOf = (cid: string) =>
@@ -503,10 +511,11 @@ export default function RelDetailPage() {
         qaPool = auQaPool.filter((_, j) => j !== i);
       }
       patchAuData({ questions, qaPool, qaEnabled: true });
+      setQaRows(qaRows.filter(r => !(r.relId === rel.id && r.auId === (au?.id ?? 'base') && r.no === cur.no)));
       setQaNo(questions[0]?.no ?? null);
       toast(auQaPool.length > 0 ? '건너뛰고 다음 질문을 출제했습니다' : '건너뛰었습니다 — 대기 중인 질문이 없습니다');
-    }, cur.answers.length > 0
-      ? `이미 달린 답변 ${cur.answers.length}개도 함께 사라집니다. 건너뛴 질문은 다시 나오지 않습니다.`
+    }, answersOf(cur.no).length > 0
+      ? `이미 달린 답변 ${answersOf(cur.no).length}개도 함께 사라집니다. 건너뛴 질문은 다시 나오지 않습니다.`
       : '건너뛴 질문은 다시 나오지 않습니다.',
     '건너뛰기');
   };
@@ -524,11 +533,11 @@ export default function RelDetailPage() {
     const cid = qaChar ?? answerableIds[0];
     if (!text || !cid || !curQa) return;
     if (!canAnswerAs(cid)) { toast('이 캐릭터로 답할 권한이 없습니다'); return; }
-    patchAuData({
-      questions: auQuestions.map(q => q.no === curQa.no
-        ? { ...q, answers: [...q.answers, { charId: cid, text, authorId: user?.id }] }
-        : q),
-    });
+    // 자관은 건드리지 않는다 — 답변만 자기 행으로 (v2.0)
+    setQaRows([...qaRows, {
+      id: newId(), relId: rel.id, auId: au?.id ?? 'base', no: curQa.no,
+      charId: cid, text, authorId: user?.id, date: new Date().toISOString(),
+    }]);
     setQaText('');
   };
 
@@ -546,26 +555,35 @@ export default function RelDetailPage() {
 
   const canEditAns = (a: QaAnswer) => (a.authorId ? a.authorId === user?.id : isAdmin);
   const canDelAns = (a: QaAnswer) => isAdmin || (!!a.authorId && a.authorId === user?.id);
+  // 분리 저장분(rowId)과 옛 자관 안의 답변(legacyIdx)을 모두 다룬다 (v2.0)
   const saveAnsEdit = () => {
     if (!ansEdit) return;
-    patchAuData({
-      questions: auQuestions.map(q => q.no === ansEdit.qNo
-        ? {
-          ...q,
-          answers: q.answers.map((a, i) => (i === ansEdit.idx
-            ? { ...a, text: ansEdit.text.trim() || a.text, note: ansEdit.note.trim() || undefined }
-            : a)),
-        }
-        : q),
-    });
+    const target = answersOf(ansEdit.qNo)[ansEdit.idx];
+    if (!target) { setAnsEdit(null); return; }
+    const patch = { text: ansEdit.text.trim() || target.text, note: ansEdit.note.trim() || undefined };
+    if (target.rowId) {
+      setQaRows(qaRows.map(r => (r.id === target.rowId ? { ...r, ...patch } : r)));
+    } else {
+      patchAuData({
+        questions: auQuestions.map(q => q.no === ansEdit.qNo
+          ? { ...q, answers: q.answers.map((a, i) => (i === target.legacyIdx ? { ...a, ...patch } : a)) }
+          : q),
+      });
+    }
     setAnsEdit(null);
   };
-  const deleteAns = (qNo: number, idx: number) =>
-    del.ask('이 답변을 삭제하시겠습니까?', () => patchAuData({
-      questions: auQuestions.map(q => q.no === qNo
-        ? { ...q, answers: q.answers.filter((_, i) => i !== idx) }
-        : q),
-    }));
+  const deleteAns = (qNo: number, idx: number) => {
+    const target = answersOf(qNo)[idx];
+    if (!target) return;
+    del.ask('이 답변을 삭제하시겠습니까?', () => {
+      if (target.rowId) setQaRows(qaRows.filter(r => r.id !== target.rowId));
+      else patchAuData({
+        questions: auQuestions.map(q => q.no === qNo
+          ? { ...q, answers: q.answers.filter((_, i) => i !== target.legacyIdx) }
+          : q),
+      });
+    });
+  };
 
   const removeMember = (cid: string) => {
     const c = charOf(cid);
@@ -660,7 +678,12 @@ export default function RelDetailPage() {
         body="타임라인·문답·AU 정보가 함께 삭제되며 복구할 수 없습니다. 연동된 캐릭터 자체는 삭제되지 않습니다."
         onClose={() => setDelAsk(false)}
         buttons={[
-          { label: 'DELETE', kind: 'accent', onClick: () => { setRels(rels.filter(r => r.id !== rel.id)); router.push('/rels'); } },
+          { label: 'DELETE', kind: 'accent', onClick: () => {
+            setRels(rels.filter(r => r.id !== rel.id));
+            // 자관에 달렸던 문답 답변도 함께 (v2.0 — 따로 저장이라 남기면 주인 없는 줄이 된다)
+            setQaRows(qaRows.filter(r => r.relId !== rel.id));
+            router.push('/rels');
+          } },
           { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
         ]} />
 
@@ -936,7 +959,7 @@ export default function RelDetailPage() {
                   {curQa.note && <div className="qa-note">{curQa.note}</div>}
                   {/* 날짜만, 오른쪽 정렬 (v1.9 사용자 피드백) */}
                   <div className="qa-date" style={{ textAlign: 'right' }}>{curQa.date.replace(/-/g, '.')}</div>
-                  {curQa.answers.map((a, i) => {
+                  {curAnswers.map((a, i) => {
                     const c = charOf(a.charId);
                     return (
                       <div key={i} className={`qa-ans ${sideOf(a.charId) === 'r' ? 'r' : ''}`}
@@ -1011,7 +1034,7 @@ export default function RelDetailPage() {
                 {qaFiltered.map(q => (
                   <div key={q.no} className={`qa-item ${curQa?.no === q.no ? 'on' : ''}`} onClick={() => setQaNo(q.no)}>
                     <b>Q.{String(q.no).padStart(3, '0')} {q.q}</b>
-                    <small>{q.date.slice(5).replace('-', '.')} · 답변 {q.answers.length}</small>
+                    <small>{q.date.slice(5).replace('-', '.')} · 답변 {answersOf(q.no).length}</small>
                   </div>
                 ))}
               </div>
@@ -1233,7 +1256,7 @@ export default function RelDetailPage() {
       </Modal>
       {/* 답변 수정·오너 부연 (v1.9) — 텍스트는 작성자 본인, 부연설명은 관리자 */}
       <Modal open={ansEdit !== null} onClose={() => setAnsEdit(null)} small
-        title={ansEdit && canEditAns(curQa?.answers[ansEdit.idx] ?? { charId: '', text: '' }) ? '답변 수정' : '오너 부연설명'}
+        title={ansEdit && canEditAns(curAnswers[ansEdit.idx] ?? { charId: '', text: '' }) ? '답변 수정' : '오너 부연설명'}
         dirty={!!ansEdit}
         actions={<>
           <button className="btn btn-ghost" onClick={() => setAnsEdit(null)}>CANCEL</button>
@@ -1241,7 +1264,7 @@ export default function RelDetailPage() {
         </>}>
         {ansEdit && (
           <div style={{ display: 'grid', gap: 9 }}>
-            {canEditAns(curQa?.answers[ansEdit.idx] ?? { charId: '', text: '' }) && (
+            {canEditAns(curAnswers[ansEdit.idx] ?? { charId: '', text: '' }) && (
               <KTextarea value={ansEdit.text} onChange={e => setAnsEdit(s => s && { ...s, text: e.target.value })}
                 style={{ minHeight: 60 }} />
             )}
@@ -1289,9 +1312,9 @@ export default function RelDetailPage() {
         document.body,
       )}
 
-      {ansCtx && curQa && curQa.answers[ansCtx.idx] && createPortal(
+      {ansCtx && curQa && curAnswers[ansCtx.idx] && createPortal(
         (() => {
-          const a = curQa.answers[ansCtx.idx];
+          const a = curAnswers[ansCtx.idx];
           return (
             <div className="ctx-menu on" style={{ left: ansCtx.x, top: ansCtx.y }} onClick={e => e.stopPropagation()}>
               <div className="ctx-ttl">{charOf(a.charId)?.name ?? '답변'}</div>

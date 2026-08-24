@@ -135,6 +135,44 @@ export interface QaEntry {
   note?: string;   // 질문에 대한 오너 설명 — 질문 아래에 표시 (관리자만 작성, v2.0)
 }
 
+/**
+ * 문답 답변 한 줄 = 자기 문서 하나 (v2.0).
+ *
+ * 예전에는 답변이 자관(Relation) 문서 안 배열에 들어 있었다. 그래서 **답변을 달려면 자관을
+ * UPDATE 해야 했고**, 「수정은 작성자 또는 관리자만」 규칙에 걸려 관리자가 만든 자관에는
+ * 일반 회원이 답을 달 수 없었다 — 댓글이 지워지던 것과 똑같은 뿌리다 (v2.0 사용자 발견).
+ *
+ * 답변을 따로 저장하면 자관을 건드릴 필요가 없고, 각 답변이 자기 authorId를 가지므로
+ * 「내 답변은 내가 수정·삭제」가 규칙 그대로 성립한다.
+ */
+export const QA_KEY = 'ohome.qaanswers.v1';
+
+export interface QaAnswerRow extends QaAnswer {
+  id: string;
+  relId: string;   // 자관 id
+  auId: string;    // AU id (원본은 'base')
+  no: number;      // 질문 번호
+  date: string;    // 정렬용
+}
+
+export const QA_SEED: QaAnswerRow[] = [];
+
+/** 화면에서 다루는 답변 — 어디에 저장돼 있는지(분리 행 / 옛 자관 안 배열)를 함께 들고 다닌다 */
+export type MergedAnswer = QaAnswer & { rowId?: string; legacyIdx?: number };
+
+/** 질문 하나의 답변 — 옛 자관 안의 것 먼저, 그 뒤 분리 저장분 (달린 순서) */
+export function answersFor(
+  rows: QaAnswerRow[], relId: string, auId: string, no: number, legacy: QaAnswer[] = [],
+): MergedAnswer[] {
+  return [
+    ...legacy.map((a, i) => ({ ...a, legacyIdx: i })),
+    ...rows
+      .filter(r => r.relId === relId && r.auId === auId && r.no === no)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(r => ({ ...r, rowId: r.id })),
+  ];
+}
+
 /** CP/NCP 구분 (v1.9) — CP=커플, NCP=커플 아님. 자관 기본값 + AU마다 별개 지정 가능 */
 export type RelCpTag = 'cp' | 'ncp';
 
