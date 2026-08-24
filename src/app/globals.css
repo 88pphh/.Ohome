@@ -621,9 +621,9 @@ a{color:inherit;text-decoration:none}
 .picker-cursor{position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none}
 .picker-hue{position:relative;margin-top:10px;height:12px;border-radius:999px;cursor:var(--cur-pointer,pointer);background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
 /* 반투명 색을 보여 줄 때 뒤에 까는 격자 (v2.0) */
-:root{--checker:repeating-conic-gradient(#c8ccd2 0% 25%,#fff 0% 50%) 50%/10px 10px}
+:root{--checker:repeating-conic-gradient(#c8ccd2 0% 25%,#fff 0% 50%)}
 .picker-alpha{height:14px;border-radius:7px;margin-top:9px;position:relative;cursor:var(--cur-pointer,pointer);
-  background-image:linear-gradient(90deg,transparent,var(--a-to,#000)),var(--checker)}
+  background-image:linear-gradient(90deg,transparent,var(--a-to,#000)),var(--checker);background-size:auto,8px 8px}
 .picker-hue-cursor{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:translate(-50%,-50%);pointer-events:none}
 
 /* 리치 에디터 (TipTap — 자체 스타일 툴바, 7장) */
