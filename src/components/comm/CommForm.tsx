@@ -246,7 +246,7 @@ export function CommForm({ initial, settings, onSave, onCancel }: {
           <div style={{ display: 'grid', gap: 9 }}>
             <KInput placeholder="커미션 이름" value={name} onChange={e => setName(e.target.value)}
               style={{ fontFamily: familyOf(titleFontId) }} />
-            <KInput placeholder="영문 서브" value={sub} onChange={e => setSub(e.target.value)} />
+            <KInput placeholder="서브 타이틀 (선택)" value={sub} onChange={e => setSub(e.target.value)} />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <KSelect minWidth={120} value={badgeId} onChange={setBadgeId}
                 options={settings.commBadges.map(b => ({ value: b.id, label: b.label }))} />

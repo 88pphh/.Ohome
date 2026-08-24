@@ -62,11 +62,14 @@ export const newId = () => Date.now().toString(36) + Math.random().toString(36).
  *  다른 사람의 변경은 실시간 구독으로 받아 온다. (로컬 모드는 storage 이벤트로 탭 간 동기화)
  */
 export function useLocalList<T extends { id?: string }>(key: string, seed: T[]): [T[], (next: T[]) => void, boolean] {
-  const [list, setList] = useState<T[]>(seed);
-  const [loaded, setLoaded] = useState(false);
   const server = isServerMode() && !!TABLE_OF[key];
   const table = TABLE_OF[key];
-  const latest = useRef<T[]>(seed);          // diff 기준이 되는 "DB에 있다고 아는" 상태
+  // 서버 모드에선 시드를 화면에 내보내지 않는다 (v2.0 사용자 발견) — 서버 목록을 받아오기 전까지
+  // 예시 데이터가 잠깐 보였다 사라지는 깜빡임의 원인이었다. 시드는 로컬 모드의 시작값일 뿐이고,
+  // 서버 모드에서 시드를 기준으로 삼으면 저장할 때 없는 행을 지우려 드는 문제도 있었다.
+  const [list, setList] = useState<T[]>(() => (server ? [] : seed));
+  const [loaded, setLoaded] = useState(false);
+  const latest = useRef<T[]>(list);          // diff 기준이 되는 "DB에 있다고 아는" 상태
   latest.current = list;
 
   useEffect(() => {

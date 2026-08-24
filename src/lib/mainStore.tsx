@@ -304,3 +304,30 @@ export function useMainStore(): MainCtx {
   if (!ctx) throw new Error('useMainStore must be used within MainStoreProvider');
   return ctx;
 }
+
+/* ---------- 이미지 위젯 슬라이드 (v2.0) ---------- */
+
+export interface DecoSlide {
+  id: string;
+  imgId: string;
+  crop?: import('@/components/ui/CropEditor').CropValue;
+  link?: string;
+}
+
+/**
+ * 이미지 위젯의 장면 목록.
+ * 예전에는 이미지 한 장(imgId/crop/link)만 담았다 — 그 저장분도 한 장짜리 목록으로 읽어
+ * 화면·편집기가 슬라이드 하나로만 다루면 되게 한다.
+ */
+export function decoSlides(settings: Record<string, unknown>): DecoSlide[] {
+  const list = settings.slides as DecoSlide[] | undefined;
+  if (Array.isArray(list) && list.length) return list.filter(s => s?.imgId);
+  const imgId = settings.imgId as string | undefined;
+  if (!imgId) return [];
+  return [{
+    id: 'legacy',
+    imgId,
+    crop: settings.crop as DecoSlide['crop'],
+    link: settings.link as string | undefined,
+  }];
+}

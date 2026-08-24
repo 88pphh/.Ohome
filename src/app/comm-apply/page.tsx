@@ -2,17 +2,20 @@
 // 신청자 리스트 (4.18 v1.9) — 마감일 크게 + 상태 뱃지(고정폭) + 신청자/신청일 + 커미션 종류 +
 // 잠금 픽토그램(커스텀 툴팁) · 우측 필터 사이드(상태별+커미션별 동시 적용) ·
 // 드래그 정렬은 편집모드에서만 · 공개범위는 환경설정 > 커미션 탭
-import React, { useState } from 'react';
+// v2.0: 휴지통 — 끝난 신청을 한 번에 치우고, 보관 기간(환경설정 > 커미션) 동안은 되돌릴 수 있다.
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useMainStore } from '@/lib/mainStore';
 import { useLocalList } from '@/lib/postStore';
 import {
   Applicant, APPLY_SEED, CommItem, COMM_SEED, useCommSettings, badgeStyle, maskName,
-  applyVis, APPLY_VIS_LABEL,
+  applyVis, APPLY_VIS_LABEL, inTrash, trashExpired, trashLeft,
 } from '@/lib/commStore';
 import { SearchBar, Tip } from '@/components/ui/Kit';
 import { DragList } from '@/components/ui/DragList';
+import { useConfirmDelete } from '@/components/ui/Modal';
+import { useToast } from '@/components/ui/Toast';
 import { EditableDesc, PageTitle } from '@/components/ui/PageText';
 
 /** 잠금 픽토그램 (선 아이콘) */
@@ -31,12 +34,24 @@ export default function CommApplyPage() {
   const router = useRouter();
   const { user, isAdmin } = useAuth();
   const { editOn } = useMainStore();
+  const toast = useToast();
+  const del = useConfirmDelete();   // 모든 삭제는 경고 모달 (v1.9)
   const [apps, setApps, loaded] = useLocalList<Applicant>('ohome.commapply.v1', APPLY_SEED);
   const [comms] = useLocalList<CommItem>('ohome.comm.v1', COMM_SEED);
   const [settings, , setLoaded] = useCommSettings();
   const [q, setQ] = useState('');
   const [fStatus, setFStatus] = useState<string>('all');
   const [fComm, setFComm] = useState<string>('all');
+
+  const trashDays = settings.trashDays ?? 30;
+
+  // 보관 기간이 지난 신청은 목록을 열 때 정리한다 (v2.0) — 쓰기 권한이 있는 관리자만
+  useEffect(() => {
+    if (!loaded || !setLoaded || !isAdmin) return;
+    const gone = trashExpired(apps, trashDays);
+    if (gone.length) setApps(apps.filter(a => !gone.includes(a)));
+    // 목록이 바뀔 때마다 확인 — 조건이 맞을 때만 한 번 지운다
+  }, [loaded, setLoaded, isAdmin, apps, trashDays, setApps]);
 
   if (!loaded || !setLoaded) return <section className="page" />;
 
@@ -55,16 +70,55 @@ export default function CommApplyPage() {
   // 비권한자에게는 마스킹된 표기 (공개 글자 수만큼만 — 4.18 v1.9)
   const dispName = (a: Applicant) => (isAdmin ? a.name : maskName(a.name, a.nameOpen ?? 1));
 
+  // 휴지통은 관리자만 볼 수 있다 — 목록에서는 빠진 신청이다
+  const trashView = fStatus === 'trash' && isAdmin;
+  const trashed = apps.filter(inTrash);
+  const live = apps.filter(a => !inTrash(a));
+  const pool = trashView ? trashed : live;
+
   const query = q.trim().toLowerCase();
-  const shown = apps
-    .filter(a => fStatus === 'all' || a.badgeId === fStatus)
+  const shown = pool
+    .filter(a => trashView || fStatus === 'all' || a.badgeId === fStatus)
     .filter(a => fComm === 'all' || a.commId === fComm)
     // 검색도 보이는 표기 기준 — 마스킹된 글자로 이름이 새지 않게
     .filter(a => !query || dispName(a).toLowerCase().includes(query));
 
   const commName = (id?: string) => comms.find(x => x.id === id)?.name ?? '';
-  const cntS = (sid: string) => apps.filter(a => sid === 'all' || a.badgeId === sid).length;
-  const cntC = (cid: string) => apps.filter(a => cid === 'all' || a.commId === cid).length;
+  const cntS = (sid: string) => live.filter(a => sid === 'all' || a.badgeId === sid).length;
+  const cntC = (cid: string) => pool.filter(a => cid === 'all' || a.commId === cid).length;
+
+  const statusLabel = settings.applyBadges.find(b => b.id === fStatus)?.label;
+
+  /* 지금 보이는 신청을 한 번에 휴지통으로 (v2.0 사용자 요청 — 끝난 신청 정리용) */
+  const toTrash = () => {
+    const ids = new Set(shown.map(a => a.id));
+    if (!ids.size) return;
+    del.ask(
+      `${statusLabel ? `「${statusLabel}」 ` : '지금 목록에 보이는 '}신청 ${ids.size}건을 휴지통으로 옮기시겠습니까?`,
+      () => {
+        const at = new Date().toISOString();
+        setApps(apps.map(a => (ids.has(a.id) ? { ...a, trashedAt: at } : a)));
+        toast(`${ids.size}건을 휴지통으로 옮겼습니다`);
+      },
+      `휴지통에서 되돌릴 수 있고, ${trashDays}일이 지나면 사라집니다.`,
+      '휴지통으로',   // 지우는 게 아니라 옮기는 것이라 확인 버튼 문구도 그렇게
+    );
+  };
+
+  const restore = (a: Applicant) => {
+    setApps(apps.map(x => (x.id === a.id ? { ...x, trashedAt: undefined } : x)));
+    toast('목록으로 되돌렸습니다');
+  };
+
+  const dropOne = (a: Applicant) =>
+    del.ask(`${dispName(a)} 님의 신청을 완전히 삭제하시겠습니까?`,
+      () => { setApps(apps.filter(x => x.id !== a.id)); toast('삭제되었습니다'); },
+      '되돌릴 수 없습니다.');
+
+  const emptyTrash = () =>
+    del.ask(`휴지통의 신청 ${trashed.length}건을 완전히 삭제하시겠습니까?`,
+      () => { setApps(live); toast('휴지통을 비웠습니다'); },
+      '되돌릴 수 없습니다.');
 
   const row = (a: Applicant) => {
     const badge = settings.applyBadges.find(b => b.id === a.badgeId);
@@ -76,8 +130,8 @@ export default function CommApplyPage() {
       <div className="ap-row" key={a.id}
         style={{ width: '100%', cursor: 'var(--cur-pointer,pointer)' }}
         onClick={() => { if (!editOn) router.push(`/comm-apply/${a.id}`); }}>
-        {/* 드래그 핸들 — 편집모드에서만 표시 */}
-        {editOn && <span className="drag-h">⠿</span>}
+        {/* 드래그 핸들 — 편집모드에서만 표시 (휴지통에선 순서를 만질 일이 없다) */}
+        {editOn && !trashView && <span className="drag-h">⠿</span>}
         <div className="dl">
           <small>DEADLINE</small>
           <b>{a.deadline ? a.deadline.replace(/-/g, '.') : '—'}</b>
@@ -92,12 +146,20 @@ export default function CommApplyPage() {
           )}
         </div>
         <span className="kind">{commName(a.commId)}</span>
-        <span className="lock" onClick={e => e.stopPropagation()}>
-          {/* 공개범위 안내만 — 내용은 툴팁에 노출하지 않음 (비공개 의미 유지, 사용자 확정) */}
-          <Tip dd tip={APPLY_VIS_LABEL[vis]}>
-            <span style={{ color: canSee ? 'var(--accent)' : 'var(--faint)' }}><LockIcon open={canSee} /></span>
-          </Tip>
-        </span>
+        {trashView ? (
+          <span className="ap-trash" onClick={e => e.stopPropagation()}>
+            <small>{trashLeft(a, trashDays)}일 남음</small>
+            <button className="btn btn-ghost" onClick={() => restore(a)}>되돌리기</button>
+            <button className="btn btn-ghost" onClick={() => dropOne(a)}>완전삭제</button>
+          </span>
+        ) : (
+          <span className="lock" onClick={e => e.stopPropagation()}>
+            {/* 공개범위 안내만 — 내용은 툴팁에 노출하지 않음 (비공개 의미 유지, 사용자 확정) */}
+            <Tip dd tip={APPLY_VIS_LABEL[vis]}>
+              <span style={{ color: canSee ? 'var(--accent)' : 'var(--faint)' }}><LockIcon open={canSee} /></span>
+            </Tip>
+          </span>
+        )}
       </div>
     );
   };
@@ -109,14 +171,25 @@ export default function CommApplyPage() {
         <EditableDesc k="commapply-desc" def="신청 순번 공개 리스트 — 내용은 비공개" />
         <div className="head-actions">
           <SearchBar placeholder="신청자 검색" onSearch={setQ} />
-          {isAdmin && <button className="btn btn-dark" onClick={() => router.push('/comm-apply/new')}>＋ ADD APPLICANT</button>}
+          {isAdmin && (trashView
+            ? trashed.length > 0 && <button className="btn btn-ghost" onClick={emptyTrash}>휴지통 비우기</button>
+            : (
+              <>
+                {shown.length > 0 && (
+                  <button className="btn btn-ghost" onClick={toTrash}>
+                    {statusLabel ? `「${statusLabel}」 ` : ''}{shown.length}건 휴지통으로
+                  </button>
+                )}
+                <button className="btn btn-dark" onClick={() => router.push('/comm-apply/new')}>＋ ADD APPLICANT</button>
+              </>
+            ))}
         </div>
       </div>
 
       <div className="ap-layout">
         {/* overflow visible — 잠금 아이콘 커스텀 툴팁이 카드 밖으로 나올 수 있게 */}
         <div className="panel" style={{ padding: '8px 18px', overflow: 'visible' }}>
-          {editOn && isAdmin ? (
+          {editOn && isAdmin && !trashView ? (
             <DragList items={shown} keyOf={a => a.id}
               onReorder={list => {
                 // 필터 없는 상태 기준으로만 저장 (부분 필터 중엔 그 순서를 앞으로)
@@ -127,7 +200,11 @@ export default function CommApplyPage() {
           ) : (
             shown.map(a => row(a))
           )}
-          {shown.length === 0 && <p className="hint" style={{ padding: 14 }}>표시할 신청이 없습니다</p>}
+          {shown.length === 0 && (
+            <p className="hint" style={{ padding: 14 }}>
+              {trashView ? '휴지통이 비어 있습니다' : '표시할 신청이 없습니다'}
+            </p>
+          )}
         </div>
 
         {/* 우측 필터 사이드 — 상태별 + 커미션 종류별 동시 적용 (4.18) */}
@@ -139,6 +216,12 @@ export default function CommApplyPage() {
               {b.label} <small>{cntS(b.id)}</small>
             </div>
           ))}
+          {/* 휴지통 — 관리자에게만, 보관 기간이 지나면 자동으로 사라진다 (v2.0) */}
+          {isAdmin && (
+            <div className={`tag ${trashView ? 'on' : ''}`} onClick={() => setFStatus(trashView ? 'all' : 'trash')}>
+              휴지통 <small>{trashed.length}</small>
+            </div>
+          )}
           <h4 style={{ marginTop: 18 }}>커미션 종류</h4>
           <div className={`tag ${fComm === 'all' ? 'on' : ''}`} onClick={() => setFComm('all')}>전체 <small>{cntC('all')}</small></div>
           {comms.map(cm => (
@@ -148,6 +231,7 @@ export default function CommApplyPage() {
           ))}
         </div>
       </div>
+      {del.element}
     </section>
   );
 }

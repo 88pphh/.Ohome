@@ -2,7 +2,7 @@
 // 메인 위젯 렌더러 (4.0) — DIARY/LATEST/UPCOMING 등은 해당 기능(2·3차) 전까지 데모 데이터
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { WidgetConf, useMainStore, WIDGET_META } from '@/lib/mainStore';
+import { WidgetConf, useMainStore, WIDGET_META, decoSlides } from '@/lib/mainStore';
 import { useAuth } from '@/lib/auth';
 import { useMenuSettings, buildMenu } from '@/lib/menuStore';
 import { useBoards } from '@/lib/boardStore';
@@ -411,17 +411,26 @@ export function DecoWidget({ conf }: { conf: WidgetConf }) {
   const { editOn } = useMainStore();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const imgId = conf.settings.imgId as string | undefined;
-  const crop = conf.settings.crop as CropValue | undefined;
   const rounded = (conf.settings.rounded as boolean) ?? true;
-  const link = (conf.settings.link as string) ?? '';
   const fit = (conf.settings.fit as 'cover' | 'contain') ?? 'cover';   // 꽉 채움(잘림) / 비율 유지 (v1.9)
+  // 여러 장 슬라이드 (v2.0) — 한 장만 넣던 옛 저장분도 같은 목록으로 읽힌다
+  const slides = decoSlides(conf.settings);
+  const sec = (conf.settings.interval as number) ?? 5;
+  const [idx, setIdx] = useState(0);
+  const cur = slides[Math.min(idx, slides.length - 1)];
+  // 자동 넘김 — 편집 중이거나 설정 모달이 열려 있으면 멈춘다 (위치를 맞추는 중이라)
+  useEffect(() => {
+    if (slides.length < 2 || editOn || open) return;
+    const t = setInterval(() => setIdx(i => (i + 1) % slides.length), Math.max(1, sec) * 1000);
+    return () => clearInterval(t);
+  }, [slides.length, sec, editOn, open]);
+  useEffect(() => { if (idx >= slides.length) setIdx(0); }, [slides.length, idx]);
   useEditEvent(conf.id, () => setOpen(true));   // 편집은 편집모드 우클릭 「설정」 전용 (v1.9 사용자 확정)
-  // 링크 이동 (v1.9 — 이미지+링크를 위젯 테두리 없이)
+  // 링크 이동 (v1.9 — 이미지+링크를 위젯 테두리 없이) — 링크는 장면마다 따로 (v2.0)
   const onBody = () => {
     if (editOn) return;
-    if (imgId && link) {
-      const l = normalizeInternalLink(link);
+    if (cur?.link) {
+      const l = normalizeInternalLink(cur.link);
       if (/^https?:\/\//.test(l)) window.open(l, '_blank');
       else router.push(l);
     }
@@ -432,21 +441,29 @@ export function DecoWidget({ conf }: { conf: WidgetConf }) {
         position: 'relative', width: '100%', height: '100%', minHeight: 80, overflow: 'hidden',
         aspectRatio: conf.h == null ? '1/1' : undefined, // 크기 동결 전 기본 정사각
         borderRadius: rounded ? 'var(--radius)' : 0,
-        cursor: !editOn && imgId && link ? 'var(--cur-pointer,pointer)' : undefined,
+        cursor: !editOn && cur?.link ? 'var(--cur-pointer,pointer)' : undefined,
       }}
       onClick={onBody}>
-      {imgId
+      {cur
         ? (fit === 'contain'
-          ? <ContainImg fileRef={imgId} rounded={rounded} />
-          : <CroppedBlobImg fileRef={imgId} crop={crop} ph="" />)
+          ? <ContainImg key={cur.id} fileRef={cur.imgId} rounded={rounded} />
+          : <CroppedBlobImg key={cur.id} fileRef={cur.imgId} crop={cur.crop} ph="" />)
         : (
           <div className="ph" style={{ position: 'absolute', inset: 0 }}>
             <span style={{ fontSize: 10 }}>{isAdmin ? 'DECO — 편집모드에서 우클릭 → 설정' : 'DECO'}</span>
           </div>
         )}
+      {/* 여러 장일 때만 지금 몇 번째인지 표시 — 눌러서 바로 넘길 수도 있다 (v2.0) */}
+      {slides.length > 1 && !editOn && (
+        <div className="deco-dots" onClick={e => e.stopPropagation()}>
+          {slides.map((sl, i) => (
+            <i key={sl.id} className={i === idx ? 'on' : ''} onClick={() => setIdx(i)} />
+          ))}
+        </div>
+      )}
       <div onClick={e => e.stopPropagation()}>
         <Modal open={open} onClose={() => setOpen(false)} small title="장식 이미지"
-          desc="업로드 · 위치 크롭(현재 위젯 비율) · 둥근 모서리 — 원본은 잘리지 않음">
+          desc="여러 장을 넣으면 순서대로 넘어갑니다 — 위치 크롭은 현재 위젯 비율 기준, 원본은 잘리지 않음">
           {open && <DecoEditor conf={conf} onClose={() => setOpen(false)} />}
         </Modal>
       </div>

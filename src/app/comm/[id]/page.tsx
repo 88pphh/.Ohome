@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/ThemeProvider';
 import { useLocalList } from '@/lib/postStore';
 import {
-  CommItem, COMM_SEED, useCommSettings, badgeStyle, fmtPrice, slotView, SLOT_CHARS,
+  CommItem, COMM_SEED, useCommSettings, badgeStyle, fmtPrice, slotView, SLOT_CHARS, slotCount, slotTip,
 } from '@/lib/commStore';
 import { useFonts } from '@/lib/fontStore';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -137,14 +137,14 @@ export default function CommDetailPage() {
         <div className="price">₩{fmtPrice(c.priceMin)}{c.priceMax > c.priceMin && ` – ₩${fmtPrice(c.priceMax)}`}</div>
         {c.deadlineNote && <div className="due">{c.deadlineNote}</div>}
         <div className="slot-row">
-          <Tip tip={`현재 남은 슬롯은 ${sv.remain}개 입니다`}>
+          <Tip tip={slotTip(sv, settings)}>
             <span className="slots" style={{ letterSpacing: '.12em' }}>
               {Array.from({ length: sv.total }, (_, i) => (
                 <span key={i} style={{ color: i < sv.used ? c.slotColor : 'var(--faint)' }}>
                   {i < sv.used ? sc.filled : sc.empty}
                 </span>
               ))}
-              <b style={{ marginLeft: 8, letterSpacing: '.04em' }}>SLOT {sv.used}/{sv.total}</b>
+              <b style={{ marginLeft: 8, letterSpacing: '.04em' }}>SLOT {slotCount(sv, settings)}/{sv.total}</b>
             </span>
           </Tip>
           {c.contactUrl && (

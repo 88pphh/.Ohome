@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
 import {
-  CommItem, COMM_SEED, useCommSettings, badgeStyle, fmtPrice, slotView, SLOT_CHARS,
+  CommItem, COMM_SEED, useCommSettings, badgeStyle, fmtPrice, slotView, SLOT_CHARS, slotCount, slotTip,
 } from '@/lib/commStore';
 import { SearchBar, Tip, KStep } from '@/components/ui/Kit';
 import { Modal } from '@/components/ui/Modal';
@@ -76,11 +76,14 @@ export default function CommListPage() {
                 <div className="price">
                   ₩{fmtPrice(c.priceMin)}{c.priceMax > c.priceMin && ` – ₩${fmtPrice(c.priceMax)}`}
                 </div>
-                <Tip tip={`현재 남은 슬롯은 ${sv.remain}개 입니다`}>
-                  <small className="slot" style={{ color: c.slotColor }}>
-                    {SLOT_CHARS[c.slotShape].filled} {sv.used}/{sv.total}
-                  </small>
-                </Tip>
+                {/* 슬롯 숫자는 환경설정에서 「채워진/남은」 중 고른 기준으로 (v2.0) */}
+                <div className="slotline">
+                  <Tip tip={slotTip(sv, settings)}>
+                    <small className="slot" style={{ color: c.slotColor }}>
+                      {SLOT_CHARS[c.slotShape].filled} {slotCount(sv, settings)}/{sv.total}
+                    </small>
+                  </Tip>
+                </div>
               </div>
             </div>
           );

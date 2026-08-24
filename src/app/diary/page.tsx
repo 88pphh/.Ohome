@@ -19,7 +19,9 @@ function MoodIcon({ mood, size = 30 }: { mood?: Mood; size?: number }) {
   return (
     <span style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      display: 'grid', placeItems: 'center', fontSize: size * 0.45,
+      // 줄높이를 1로 눌러야 글자 상자가 아니라 글자 자체가 가운데로 온다 (v2.0 사용자 발견)
+      display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+      fontSize: size * 0.45,
       background: moodTint(mood?.color ?? '#888'), color: mood?.color ?? 'var(--sub)',
     }}>{mood?.icon ?? '·'}</span>
   );

@@ -9,12 +9,8 @@ export interface Mood {
   color: string;     // 아이콘 색 (배경은 자동 틴트)
 }
 
-export const MOOD_SEED: Mood[] = [
-  { id: 'm1', name: '후련함', icon: '☀', color: '#b39b6b' },
-  { id: 'm2', name: '차분함', icon: '☂', color: '#4c6a8e' },
-  { id: 'm3', name: '설렘', icon: '♥', color: '#a63a45' },
-  { id: 'm4', name: '피곤함', icon: '☾', color: '#6b7280' },
-];
+/** 무드는 처음부터 비어 있다 (v2.0) — 예시 4종은 프로토타입 잔재라 환경설정에서 직접 만든다 */
+export const MOOD_SEED: Mood[] = [];
 
 /* ---------- 일기 ---------- */
 export interface DiaryPost {

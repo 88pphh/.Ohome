@@ -464,6 +464,24 @@ function DesignPane() {
           <KStep value={state.vars.ddShadow ?? 100} min={0} max={200} step={10} suffix="%" onChange={v => setVar('ddShadow', v)} />
         </div>
       </div>
+
+      <SpellCheckRow />
+    </div>
+  );
+}
+
+/** 맞춤법 검사 밑줄 (v2.0 사용자 요청) — 페이지 전체의 빨간 물결줄을 끈다.
+ *  다른 로고·탭제목 설정과 같은 드래프트/SAVE 흐름을 탄다. */
+function SpellCheckRow() {
+  const { site, set } = useSiteDraft();
+  const off = !!site.noSpell;
+  return (
+    <div className="set-row">
+      <div className="l"><b>맞춤법 검사 밑줄</b><small>입력칸·에디터에 브라우저가 그리는 빨간 물결줄 — 끄면 사이트 전체에서 보이지 않습니다</small></div>
+      <div className="mini-seg">
+        <button className={!off ? 'on' : ''} onClick={() => set({ noSpell: false })}>표시</button>
+        <button className={off ? 'on' : ''} onClick={() => set({ noSpell: true })}>숨김</button>
+      </div>
     </div>
   );
 }
@@ -1051,7 +1069,9 @@ function MoodPane() {
             <div className="l" style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
               <span className="drag-h">⠿</span>
               <span style={{
-                width: 30, height: 30, borderRadius: '50%', display: 'grid', placeItems: 'center',
+                width: 30, height: 30, borderRadius: '50%',
+                // 줄높이 1 — 상자가 아니라 글자를 가운데로 (v2.0 사용자 발견)
+                display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
                 background: moodTint(m.color), color: m.color, fontSize: 14,
               }}>{m.icon}</span>
             </div>
@@ -2219,6 +2239,14 @@ function CommPane() {
       </div>
 
       <div className="set-row">
+        <div className="l"><b>슬롯 표시 기준</b><small>리스트·상세에 3/5로 적을 때 앞 숫자를 무엇으로 볼지 — 운영 방식에 따라 다릅니다</small></div>
+        <div className="mini-seg">
+          <button className={(st.slotDisplay ?? 'used') === 'used' ? 'on' : ''} onClick={() => patch({ slotDisplay: 'used' })}>채워진 슬롯</button>
+          <button className={st.slotDisplay === 'remain' ? 'on' : ''} onClick={() => patch({ slotDisplay: 'remain' })}>남은 슬롯</button>
+        </div>
+      </div>
+
+      <div className="set-row">
         <div className="l"><b>신청자 리스트 공개범위</b><small>리스트 자체의 공개 — 각 신청 내용은 별개(관리자/허용된 본인만)</small></div>
         <KSelect minWidth={130} value={st.applyVisibility} onChange={v => patch({ applyVisibility: v as CommSettings['applyVisibility'] })}
           options={[
@@ -2226,6 +2254,11 @@ function CommPane() {
             { value: 'member', label: '멤버공개' },
             { value: 'private', label: '비공개' },
           ]} />
+      </div>
+
+      <div className="set-row">
+        <div className="l"><b>신청 휴지통 보관 기간</b><small>휴지통으로 옮긴 신청을 며칠 두었다가 없앨지 — 기간이 지나면 목록을 열 때 자동으로 사라집니다</small></div>
+        <KStep value={st.trashDays ?? 30} min={1} max={365} suffix="일" onChange={v => patch({ trashDays: v })} />
       </div>
 
       <h3 style={{ marginTop: 26 }}>커미션 뱃지</h3>

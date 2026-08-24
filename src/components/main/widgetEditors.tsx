@@ -2,7 +2,7 @@
 // 위젯 설정 공용 에디터 (5장 「위젯」 카테고리 · 메인 위젯 관리 모달 공유)
 // 같은 mainStore를 갱신하므로 메인에서 바꾸든 환경설정에서 바꾸든 즉시 서로 반영됨
 import React, { useEffect, useState } from 'react';
-import { WidgetConf, useMainStore } from '@/lib/mainStore';
+import { WidgetConf, useMainStore, decoSlides, DecoSlide } from '@/lib/mainStore';
 import { KInput, KTextarea, KCheck, KStep, KDate } from '@/components/ui/Kit';
 import { DragList } from '@/components/ui/DragList';
 import { CropEditor, CropValue, CropImg, CroppedBlobImg } from '@/components/ui/CropEditor';
@@ -158,42 +158,99 @@ export function TodoEditor({ conf }: { conf: WidgetConf }) {
 
 /* (v1.9) 이미지 위젯은 장식 이미지(deco — 업로드·크롭·링크)로 일원화되어 제거됨 */
 
-/* ---------- 장식 이미지 — settings: imgId / crop / rounded ----------
-   패널 없이 이미지만 박아넣는 장식용. 원본 보존 + 위치 크롭(현재 위젯 비율 기준) */
+/* ---------- 장식 이미지 — settings: slides[] / interval / rounded / fit ----------
+   패널 없이 이미지만 박아넣는 장식용. 원본 보존 + 위치 크롭(현재 위젯 비율 기준).
+   여러 장을 넣으면 순서대로 넘어가는 슬라이드가 된다 (v2.0) — 링크는 장면마다 따로 걸 수 있다. */
+
+/** 장면 한 장의 위치 크롭 — 저장된 원본을 불러와 현재 위젯 비율로 맞춘다 */
+function DecoCrop({ sl, ratio, onClose, onApply }: {
+  sl: DecoSlide; ratio: number; onClose: () => void; onApply: (c: CropValue) => void;
+}) {
+  const src = useBlobUrl(sl.imgId);
+  if (!src) return null;
+  return <CropEditor open src={src} aspect={ratio} aspectLabel="현재 위젯 비율" initial={sl.crop} onClose={onClose} onApply={onApply} />;
+}
+
 export function DecoEditor({ conf, onClose }: { conf: WidgetConf; onClose?: () => void }) {
   const { updateWidget } = useMainStore();
   const toast = useToast();
-  const [cropOpen, setCropOpen] = useState(false);
-  const imgId = conf.settings.imgId as string | undefined;
-  const crop = conf.settings.crop as CropValue | undefined;
+  const del = useConfirmDelete();   // 삭제는 언제나 경고 모달 (v1.9)
+  const [cropFor, setCropFor] = useState<string | null>(null);   // 위치 조정 중인 장면 id
+  const [swapFor, setSwapFor] = useState<string | null>(null);   // 이미지 교체 대상 (null이면 새로 추가)
   const rounded = (conf.settings.rounded as boolean) ?? true;
   const fit = (conf.settings.fit as 'cover' | 'contain') ?? 'cover';   // 꽉 채움 / 비율 유지 (v1.9 사용자 요청)
+  const sec = (conf.settings.interval as number) ?? 5;
   const ratio = (conf.w ?? 240) / (conf.h ?? 240);
-  const loaded = useBlobUrl(imgId);
+  const slides = decoSlides(conf.settings);
   const inputId = `decoF-${conf.id}`;
 
   const set = (patch: Record<string, unknown>) =>
     updateWidget(conf.id, { settings: { ...conf.settings, ...patch } }, { persist: true });
+  // 목록으로 저장할 때 한 장만 담던 옛 값은 비운다 — 두 군데 남으면 어느 쪽이 진짜인지 알 수 없다
+  const setSlides = (list: DecoSlide[]) =>
+    set({ slides: list, imgId: undefined, crop: undefined, link: undefined });
+  const patchSlide = (id: string, p: Partial<DecoSlide>) =>
+    setSlides(slides.map(x => (x.id === id ? { ...x, ...p } : x)));
+
+  const row = (sl: DecoSlide, i: number) => (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 0', borderBottom: '1px dashed var(--line)', width: '100%' }}>
+      {slides.length > 1 && <span className="drag-h">⠿</span>}
+      {/* 눌러서 이 장면의 이미지를 다른 것으로 교체 */}
+      <div style={{ width: 84, aspectRatio: String(ratio), borderRadius: 7, overflow: 'hidden', position: 'relative', flexShrink: 0, border: '1.5px dashed var(--line)', cursor: 'var(--cur-pointer,pointer)' }}
+        onClick={() => { setSwapFor(sl.id); document.getElementById(inputId)?.click(); }}>
+        <CroppedBlobImg fileRef={sl.imgId} crop={fit === 'contain' ? undefined : sl.crop} ph="" />
+      </div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
+        {/* 풀주소를 붙여넣어도 사이트 오리진을 떼고 상대경로로 (v1.9) */}
+        <KInput placeholder="링크 (선택 — 클릭 시 이동)" value={sl.link ?? ''}
+          onChange={e => patchSlide(sl.id, { link: normalizeInternalLink(e.target.value) || undefined })} />
+        {fit === 'cover' && (
+          <button className="btn btn-ghost" style={{ height: 24, padding: '0 9px', fontSize: 10, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}
+            onClick={() => setCropFor(sl.id)}>✂ 위치</button>
+        )}
+      </div>
+      <button className="btn btn-ghost" style={{ height: 24, padding: '0 11px', fontSize: 10.5, display: 'inline-flex', alignItems: 'center' }}
+        onClick={() => del.ask(`${i + 1}번째 이미지를 위젯에서 빼시겠습니까?`,
+          () => setSlides(slides.filter(x => x.id !== sl.id)),
+          '원본 파일은 지워지지 않습니다.')}>DELETE</button>
+    </div>
+  );
+
+  const cropTarget = slides.find(x => x.id === cropFor);
 
   return (
     <div style={{ display: 'grid', gap: 9 }}>
-      <div style={{ width: 160, aspectRatio: String(ratio), borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1.5px dashed var(--line)', cursor: 'var(--cur-pointer,pointer)' }} onClick={() => document.getElementById(inputId)?.click()}>
-        {imgId
-          ? (fit === 'contain' && loaded
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={loaded} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
-            : <CroppedBlobImg fileRef={imgId} crop={crop} ph="" />)
-          : <div className="ph" style={{ position: 'absolute', inset: 0 }}><span style={{ fontSize: 9 }}>IMAGE</span></div>}
-      </div>
-      <input id={inputId} type="file" accept="image/*" style={{ display: 'none' }}
+      <input id={inputId} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={async e => {
-          const f = e.target.files?.[0];
+          const files = Array.from(e.target.files ?? []);
           e.target.value = '';
-          if (!f) return;
-          set({ imgId: await putBlob(f), crop: undefined });
-          setCropOpen(true);
-          toast('이미지가 저장되었습니다 — 위치를 조정해 주세요');
+          const target = swapFor;
+          setSwapFor(null);
+          if (!files.length) return;
+          if (target) {
+            // 교체 — 위치는 다시 잡아야 하므로 크롭을 비우고 바로 조정 화면을 연다
+            patchSlide(target, { imgId: await putBlob(files[0]), crop: undefined });
+            if (fit === 'cover') setCropFor(target);
+            toast('이미지가 교체되었습니다');
+            return;
+          }
+          const added: DecoSlide[] = [];
+          for (const f of files) added.push({ id: `d${Date.now().toString(36)}-${slides.length + added.length}`, imgId: await putBlob(f) });
+          setSlides([...slides, ...added]);
+          // 한 장만 넣었으면 이어서 위치를 잡게 해준다
+          if (added.length === 1 && fit === 'cover') setCropFor(added[0].id);
+          toast(added.length > 1 ? `이미지 ${added.length}장이 추가되었습니다` : '이미지가 저장되었습니다 — 위치를 조정해 주세요');
         }} />
+
+      {slides.length === 0
+        ? (
+          <div className="ph" style={{ width: 160, aspectRatio: String(ratio), borderRadius: 8, border: '1.5px dashed var(--line)', cursor: 'var(--cur-pointer,pointer)' }}
+            onClick={() => { setSwapFor(null); document.getElementById(inputId)?.click(); }}>
+            <span style={{ fontSize: 9 }}>IMAGE</span>
+          </div>
+        )
+        : <DragList items={slides} keyOf={sl => sl.id} onReorder={setSlides} render={row} />}
+
       {/* 표시 방식 (v1.9 사용자 요청) — 꽉 채움(위젯을 채우고 잘릴 수 있음) / 비율 유지(안 잘림, 여백 생길 수 있음) */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <span className="cp-lb">표시</span>
@@ -201,31 +258,33 @@ export function DecoEditor({ conf, onClose }: { conf: WidgetConf; onClose?: () =
           <button className={fit === 'cover' ? 'on' : ''} onClick={() => set({ fit: undefined })}>꽉 채움 (잘림)</button>
           <button className={fit === 'contain' ? 'on' : ''} onClick={() => set({ fit: 'contain' })}>비율 유지 (안 잘림)</button>
         </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        {imgId && (
+        {/* 넘길 이미지가 있을 때만 간격을 묻는다 */}
+        {slides.length > 1 && (
           <>
-            {fit === 'cover' && (
-              <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
-                onClick={() => setCropOpen(true)}>✂ 위치</button>
-            )}
-            <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
-              onClick={() => set({ imgId: undefined, crop: undefined })}>이미지 제거</button>
+            <span className="cp-lb">전환 간격</span>
+            <KStep value={sec} min={2} max={60} suffix="초" onChange={v => set({ interval: v })} />
           </>
         )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
+          onClick={() => { setSwapFor(null); document.getElementById(inputId)?.click(); }}>＋ 이미지 추가</button>
         <KCheck label="둥근 모서리" checked={rounded} onChange={v => set({ rounded: v })} />
         {onClose && <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={onClose}>CLOSE</button>}
       </div>
-      {/* 링크 (v1.9) — 테두리 없는 이미지+링크: 클릭 시 이동, 풀주소는 상대경로로 정규화 */}
-      <KInput placeholder="링크 (선택 — 클릭 시 이동)" value={(conf.settings.link as string) ?? ''}
-        onChange={e => set({ link: normalizeInternalLink(e.target.value) || undefined })} />
-      <p className="hint" style={{ margin: 0 }}>원본은 잘리지 않고 위치·확대만 저장 — 위젯 크기를 바꾸면 [✂ 위치]로 다시 맞출 수 있습니다</p>
 
-      {cropOpen && loaded && (
-        <CropEditor open src={loaded} aspect={ratio} aspectLabel="현재 위젯 비율" initial={crop}
-          onClose={() => setCropOpen(false)}
-          onApply={c => { set({ crop: c }); setCropOpen(false); }} />
+      <p className="hint" style={{ margin: 0 }}>
+        원본은 잘리지 않고 위치·확대만 저장 — 위젯 크기를 바꾸면 [✂ 위치]로 다시 맞출 수 있습니다.
+        여러 장을 넣으면 위 순서대로 넘어가고, 썸네일을 누르면 그 장면의 이미지를 교체합니다
+      </p>
+
+      {cropTarget && (
+        <DecoCrop sl={cropTarget} ratio={ratio}
+          onClose={() => setCropFor(null)}
+          onApply={c => { patchSlide(cropTarget.id, { crop: c }); setCropFor(null); }} />
       )}
+      {del.element}
     </div>
   );
 }

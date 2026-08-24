@@ -124,7 +124,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       {/* 로고 — 텍스트·서브타이틀·정렬은 환경설정 > 디자인 (5.2) */}
-      <div className="brand" data-tip="메인으로" onClick={() => nav('/')}>
+      <div className="brand" onClick={() => nav('/')}>
         {siteLoaded && site.title}
         {siteLoaded && site.subtitle && <small className={`al-${site.align}`}>{site.subtitle}</small>}
       </div>

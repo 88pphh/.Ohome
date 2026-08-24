@@ -10,6 +10,7 @@ export interface SiteSettings {
   subtitle: string;          // 로고 아랫줄 (서브타이틀)
   align: 'left' | 'center' | 'right'; // 서브타이틀 정렬 (프로토타입 정렬 아이콘)
   docTitle?: string;         // 브라우저 탭 제목 (v1.9 사용자 요청 — 비우면 「로고 텍스트 — 개인홈」)
+  noSpell?: boolean;         // 맞춤법 검사 밑줄 숨김 (v2.0 사용자 요청 — 페이지 전체)
 }
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {

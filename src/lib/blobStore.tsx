@@ -34,8 +34,67 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+/* ---------- 업로드 진행 상태 (v2.0) ----------
+   서버가 느릴 때 아무 반응이 없어 보여서 사용자가 업로드를 다시 누르게 된다.
+   지금 몇 건이 올라가는 중인지 알려 화면에 표시할 수 있게 한다. */
+export const UPLOAD_EVT = 'ohome-upload';
+let uploading = 0;
+const bump = (n: number) => {
+  uploading = Math.max(0, uploading + n);
+  window.dispatchEvent(new Event(UPLOAD_EVT));
+};
+
+/** 지금 올라가는 중인 파일 수 */
+export function useUploading(): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const h = () => setN(uploading);
+    h();
+    window.addEventListener(UPLOAD_EVT, h);
+    return () => window.removeEventListener(UPLOAD_EVT, h);
+  }, []);
+  return n;
+}
+
+/* 같은 파일을 두 번 올리지 않게 (v2.0 사용자 발견) — 업로드가 느려서 다시 누르면
+   같은 이미지가 여러 장 생기던 문제. 내용이 같으면 앞선 업로드의 결과를 그대로 돌려준다.
+   (올라가는 중이면 그 약속을 함께 기다린다 — 두 번 올라가지 않는다) */
+const sent = new Map<string, Promise<string>>();
+
+async function hashOf(blob: Blob): Promise<string | null> {
+  try {
+    const buf = await blob.arrayBuffer();
+    const d = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null;   // 보안 컨텍스트가 아니면 해시를 못 구한다 — 그땐 그냥 올린다
+  }
+}
+
 /** Blob 저장 → 참조 문자열 반환 (서버 모드: 공개 URL · 로컬 모드: 파일 id) */
 export async function putBlob(blob: Blob): Promise<string> {
+  const key = await hashOf(blob);
+  const hit = key ? sent.get(key) : undefined;
+  if (hit) return hit;
+  const job = putBlobNew(blob);
+  if (key) {
+    sent.set(key, job);
+    // 실패한 업로드는 캐시에 남기지 않는다 — 다시 시도할 수 있어야 한다
+    job.catch(() => sent.delete(key));
+  }
+  return job;
+}
+
+async function putBlobNew(blob: Blob): Promise<string> {
+  bump(1);
+  try {
+    return await putBlobRaw(blob);
+  } finally {
+    bump(-1);
+  }
+}
+
+async function putBlobRaw(blob: Blob): Promise<string> {
   const be = isServerMode() ? backend() : null;
   if (be) return be.uploadFile(blob, extOf(blob));   // 서버 모드 — 공개 URL 반환
   const id = newId();

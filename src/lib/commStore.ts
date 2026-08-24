@@ -46,7 +46,7 @@ export const SLOT_CHARS: Record<SlotShape, { filled: string; empty: string }> = 
 export interface CommItem {
   id: string;
   name: string;
-  sub: string;                 // 영문 서브
+  sub: string;                 // 서브 타이틀
   badgeId: string;             // 상태 뱃지
   priceMin: number; priceMax: number;
   deadlineNote: string;        // 마감일 기준 문구
@@ -84,6 +84,27 @@ export interface Applicant {
   selfId?: string;             // 본인 열람 허용일 때 지정된 회원 id (미지정 구버전 데이터는 로그인 회원 허용)
   allowSelf?: boolean;         // (구) 본인 열람 허용 — contentVis 마이그레이션용
   submitFileId?: string;       // 신청자가 제출한 신청서 HTML 파일 (선택, v1.9 — blob 저장·격리 렌더)
+  trashedAt?: string;          // 휴지통에 넣은 시각 (ISO) — 목록에서 감춰지고 보관 기간이 지나면 사라진다 (v2.0)
+}
+
+/** 휴지통에 들어가 있는가 (v2.0) */
+export const inTrash = (a: Applicant) => !!a.trashedAt;
+
+/** 보관 기간이 지난 신청 — 자동으로 지울 대상 (v2.0) */
+export function trashExpired(apps: Applicant[], days: number, now = Date.now()): Applicant[] {
+  const keep = Math.max(1, days) * 86400000;
+  return apps.filter(a => {
+    if (!a.trashedAt) return false;
+    const t = Date.parse(a.trashedAt);
+    return Number.isFinite(t) && now - t > keep;
+  });
+}
+
+/** 휴지통에 남은 날짜 — 0이면 오늘 사라진다 (v2.0) */
+export function trashLeft(a: Applicant, days: number, now = Date.now()): number {
+  const t = Date.parse(a.trashedAt ?? '');
+  if (!Number.isFinite(t)) return days;
+  return Math.max(0, Math.ceil((t + Math.max(1, days) * 86400000 - now) / 86400000));
 }
 
 /** 내용 공개범위 — 구 allowSelf 저장분 자동 해석 */
@@ -119,12 +140,14 @@ export interface CommSettings {
   commBadges: CommBadge[];
   applyBadges: CommBadge[];
   applyVisibility: Visibility; // 신청자 리스트 공개범위
+  trashDays: number;           // 신청 휴지통 보관 기간(일) — 지나면 자동으로 사라짐 (v2.0)
+  slotDisplay?: 'used' | 'remain'; // 슬롯을 「채워진 수」로 볼지 「남은 수」로 볼지 (v2.0 — 운영 방식마다 다름)
 }
 
 export const DEFAULT_COMM_SETTINGS: CommSettings = {
   ratio: '3:4', badgeShape: 'pill', totalSlot: 5, totalUsed: 2,
   commBadges: DEFAULT_COMM_BADGES, applyBadges: DEFAULT_APPLY_BADGES,
-  applyVisibility: 'public',
+  applyVisibility: 'public', trashDays: 30, slotDisplay: 'used',
 };
 
 const SET_KEY = 'ohome.commset.v1';
@@ -160,6 +183,18 @@ export function slotView(c: CommItem, s: CommSettings): { remain: number; total:
   const ownRemain = Math.max(0, c.slotTotal - c.slotUsed);
   if (c.slotMode === 'included') return { remain: Math.min(ownRemain, sharedRemain), total: c.slotTotal, used: c.slotUsed };
   return { remain: ownRemain, total: c.slotTotal, used: c.slotUsed };
+}
+
+/** 슬롯 표시 숫자 (v2.0) — 채워진 기준이면 3/5, 남은 기준이면 2/5 */
+export function slotCount(sv: { remain: number; total: number; used: number }, s: CommSettings): number {
+  return (s.slotDisplay ?? 'used') === 'remain' ? sv.remain : sv.used;
+}
+
+/** 슬롯 툴팁 문구 — 표시 기준과 반대쪽 숫자를 알려 준다 (v2.0) */
+export function slotTip(sv: { remain: number; total: number; used: number }, s: CommSettings): string {
+  return (s.slotDisplay ?? 'used') === 'remain'
+    ? `채워진 슬롯은 ${sv.used}개 입니다`
+    : `현재 남은 슬롯은 ${sv.remain}개 입니다`;
 }
 
 /** 뱃지 스타일 (모양은 설정, 텍스트는 항상 정중앙 — 4.18) */

@@ -260,7 +260,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         <div className="panel widget" style={{ marginBottom: 14 }}>
           <h4>기본</h4>
           <div style={{ display: 'grid', gap: 9 }}>
-            <KInput placeholder="이름 (영문 대표명)" value={name} onChange={e => setName(e.target.value)}
+            <KInput placeholder="이름" value={name} onChange={e => setName(e.target.value)}
               style={{ fontFamily: familyOf(fontId) }} />
             {/* 페이지 주소 (v1.9) — /chars/{slug}, 비우면 자동 · 중복이면 경고 */}
             {isNew && (
@@ -275,7 +275,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
                 )}
               </div>
             )}
-            <KInput placeholder="한 줄 소개 (한글명 · 소속)" value={sub} onChange={e => setSub(e.target.value)} />
+            <KInput placeholder="한 줄 소개 (선택)" value={sub} onChange={e => setSub(e.target.value)} />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span className="cp-lb">대표 테마색</span>
               <ColorField value={color} onChange={setColor} />
@@ -356,9 +356,9 @@ function TabEditView({ tab, onChange, onDelete, onBack }: {
         {/* 아이콘 — 클릭하면 특수문자 프리셋, 직접 입력도 가능 (v1.9) */}
         <SymbolInput value={tab.icon} maxLength={2} style={{ width: 56, textAlign: 'center' }}
           onChange={v => onChange({ icon: v })} />
-        <KInput placeholder="Title" value={tab.title}
+        <KInput placeholder="탭 제목" value={tab.title}
           onChange={e => onChange({ title: e.target.value })} />
-        <KInput placeholder="Subtitle" value={tab.subtitle ?? ''}
+        <KInput placeholder="소제목 (선택)" value={tab.subtitle ?? ''}
           onChange={e => onChange({ subtitle: e.target.value })} />
       </div>
       {/* 리치 에디터 (TipTap) — 툴바로 서식·이미지 삽입, 출력은 HTML */}

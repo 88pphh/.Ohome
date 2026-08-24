@@ -14,6 +14,8 @@ import { ImgProtect } from '@/components/shell/ImgProtect';
 import { SetupGate } from '@/components/shell/SetupGate';
 import { DocTitle } from '@/components/shell/DocTitle';
 import { SettingSync } from '@/components/shell/SettingSync';
+import { UploadBusy } from '@/components/shell/UploadBusy';
+import { SpellCheck } from '@/components/shell/SpellCheck';
 import { PageFrame } from '@/lib/pageRefresh';
 import { ServerBoot } from '@/components/shell/ServerBoot';
 import { siteMeta } from '@/lib/siteMeta';
@@ -79,6 +81,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <DocTitle />
                   {/* 설정이 서버에 저장되지 않았을 때 알림 (v2.0) — 조용히 실패하면 원인을 알 수 없다 */}
                   <SettingSync />
+                  {/* 이미지 올리는 중 표시 (v2.0) — 느린 업로드를 다시 누르지 않게 */}
+                  <UploadBusy />
+                  {/* 맞춤법 검사 밑줄 숨김 — 디자인 탭 (v2.0) */}
+                  <SpellCheck />
                   </SetupGate>
                 </BgmStoreProvider>
               </MainStoreProvider>

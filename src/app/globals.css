@@ -815,7 +815,8 @@ body.edit-on .main-grid{grid-template-columns:230px 1fr 260px}
 .todo-row.done span{text-decoration:line-through;color:var(--faint)}
 .diary-mini{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);cursor:var(--cur-pointer,pointer)}
 .diary-mini:last-child{border:none}
-.diary-mini .mood{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:calc(14px*var(--fs,1));flex-shrink:0}
+/* line-height를 1로 눌러야 글자 상자가 아니라 글자 자체가 가운데로 온다 (v2.0 사용자 발견) */
+.diary-mini .mood{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;font-size:calc(14px*var(--fs,1));flex-shrink:0}
 .diary-mini .t{font-size:calc(12px*var(--fs,1));min-width:0;overflow:hidden}
 .diary-mini .t .tt{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .diary-mini .t small{display:block;color:var(--faint);font-size:calc(10px*var(--fs,1));margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1186,10 +1187,12 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .cm-card .th{position:relative;overflow:hidden;border-radius:var(--radius) var(--radius) 0 0}
 .cm-card .cm-badge{position:absolute;top:9px;right:9px;z-index:3}
 .cm-card .bd{padding:14px 16px 16px}
-.cm-card .nm{display:block;font-size:calc(14px*var(--fs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* 긴 제목 말줄임 (v1.9) */
-.cm-card .sub{display:block;font-size:calc(9.5px*var(--fs,1));letter-spacing:.18em;color:var(--faint);margin-top:2px}
-.cm-card .price{margin-top:8px;font-family:var(--serif);font-size:calc(15px*var(--fs,1));letter-spacing:.03em}
-.cm-card .slot{display:inline-block;margin-top:5px;font-size:calc(10.5px*var(--fs,1));font-weight:700;letter-spacing:.08em}
+/* 글씨는 한 단계씩 크게, 금액·슬롯은 오른쪽 정렬 (v2.0 사용자 요청) */
+.cm-card .nm{display:block;font-size:calc(15.5px*var(--fs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* 긴 제목 말줄임 (v1.9) */
+.cm-card .sub{display:block;font-size:calc(10.5px*var(--fs,1));letter-spacing:.18em;color:var(--faint);margin-top:2px}
+.cm-card .price{margin-top:8px;font-family:var(--serif);font-size:calc(16.5px*var(--fs,1));letter-spacing:.03em;text-align:right}
+.cm-card .slotline{text-align:right}
+.cm-card .slot{display:inline-block;margin-top:5px;font-size:calc(11.5px*var(--fs,1));font-weight:700;letter-spacing:.08em}
 /* 상세 */
 .cm-hero{text-align:center;margin:0 0 20px}
 .cm-hero h2{font-family:var(--serif);font-size:calc(34px*var(--fs,1));font-weight:600;letter-spacing:.1em;color:var(--page-title)}
@@ -1225,12 +1228,18 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 /* 폭이 줄면 이름 영역만 계속 줄어듦(말줄임) — 중간뷰에서도 뱃지·종류가 내려가지 않음 (v1.9 사용자 확정) */
 .ap-row .who b{display:block;font-size:calc(13px*var(--fs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ap-row .who small{display:block;font-size:calc(10px*var(--fs,1));color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 휴지통에서 보이는 남은 기간 + 되돌리기/완전삭제 (v2.0) */
+.ap-row .ap-trash{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.ap-row .ap-trash small{font-size:calc(10px*var(--fs,1));color:var(--faint);white-space:nowrap}
+.ap-row .ap-trash .btn{height:24px;padding:0 10px;font-size:calc(10.5px*var(--fs,1));display:inline-flex;align-items:center}
+
 /* 모바일에서만 진행상태·커미션종류가 아랫줄로 (v1.9 사용자 확정) */
 @media (max-width:620px){
   .ap-row{display:grid;grid-template-columns:auto 1fr 28px;gap:3px 12px;align-items:center}
   .ap-row .dl{grid-row:1;grid-column:1;width:auto}
   .ap-row .who{grid-row:1;grid-column:2;min-width:0}
   .ap-row .lock{grid-row:1;grid-column:3}
+  .ap-row .ap-trash{grid-row:3;grid-column:1/4;justify-content:flex-end}
   .ap-row .bwrap{grid-row:2;grid-column:1;width:auto;justify-content:start;display:flex}
   .ap-row .kind{grid-row:2;grid-column:2/4;white-space:normal}
 }
@@ -1662,3 +1671,13 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .cal-mlist .ev-row .dt{font-size:calc(11px*var(--fs,1));color:var(--sub);letter-spacing:.03em;width:74px;flex-shrink:0}
 .cal-mlist .ev-row .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cal-mlist .ev-row i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* 이미지 위젯 슬라이드 표시점 (v2.0) — 배너와 같은 모양, 위젯이 작으니 조금 작게 */
+.deco-dots{position:absolute;right:8px;bottom:8px;display:flex;gap:4px;z-index:3}
+.deco-dots i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.5);box-shadow:0 0 3px rgba(0,0,0,.35);transition:.2s;cursor:var(--cur-pointer,pointer)}
+.deco-dots i.on{background:#fff;width:13px;border-radius:3px}
+
+/* 이미지 올리는 중 알림 (v2.0) — 토스트와 같은 자리·모양, 조금 위 */
+.up-busy{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);z-index:121;display:flex;align-items:center;gap:9px;padding:10px 18px;border-radius:999px;background:var(--dd-bg);color:var(--dd-fg);font-size:calc(12.5px*var(--fs,1));box-shadow:0 10px 30px rgba(0,0,0,.3);border:1px solid var(--line-dark);backdrop-filter:blur(8px)}
+.up-spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--line-dark);border-top-color:var(--accent);animation:upSpin .7s linear infinite;flex-shrink:0}
+@keyframes upSpin{to{transform:rotate(360deg)}}

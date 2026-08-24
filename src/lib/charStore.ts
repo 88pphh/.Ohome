@@ -14,7 +14,7 @@ export interface CharTab {
 
 export interface Character {
   id: string;
-  name: string;          // 영문 대표명 (전용 폰트 적용 대상)
+  name: string;          // 대표 이름 (전용 폰트 적용 대상)
   sub: string;           // 한글명 · 소속 한 줄
   color: string;         // 대표 테마색 (말풍선·리스트 점)
   // 상세 페이지 테마 (v1.9 사용자 확정) — custom이면 대표 테마색으로 홈 팔레트 임시 전환 (4.18 방식)
