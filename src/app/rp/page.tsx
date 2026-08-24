@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLocalList, newId } from '@/lib/postStore';
 import {
   RpRoom, RpMessage, RP_SEED, hexRgb, rpLastDate, rpHasNew,
-  RpMessageRow, RP_MSG_KEY, RP_MSG_SEED, messagesFor, rpMarkRead,
+  RpMessageRow, RP_MSG_KEY, RP_MSG_SEED, messagesFor, rpMarkRead, rpMemberIds,
 } from '@/lib/rpStore';
 import { Character, CHAR_SEED, Relation, REL_SEED, charGrant } from '@/lib/charStore';
 import { Modal, ConfirmModal, useConfirmDelete } from '@/components/ui/Modal';
@@ -43,6 +43,9 @@ export default function RpPage() {
   const [msgRows, setMsgRows] = useLocalList<RpMessageRow>(RP_MSG_KEY, RP_MSG_SEED);
   // 방 하나의 발화 — 옛 방 안의 것 + 분리 저장분
   const msgsOf = (r: RpRoom) => messagesFor(msgRows, r.id, r.messages);
+  // 참여 회원 — 기반 자관이 있으면 그 자관 캐릭터의 권한자에서 자동으로 (v2.0 사용자 확정).
+  // 계산해서 쓰므로 권한이 다른 사람에게 넘어가면 그 자관 기반 역극 전체에 바로 반영된다
+  const memberIdsOf = (r: RpRoom) => rpMemberIds(r, rels, chars);
   const [chars] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
   const [selId, setSelId] = useState<string | null>(null);
@@ -53,10 +56,10 @@ export default function RpPage() {
 
   // 참여자에게만 존재 노출 (확정 — 관리자도 비참여 방은 보지 않음)
   const allMine = useMemo(() => (user
-    ? rooms.filter(r => r.memberIds.includes(user.id))
+    ? rooms.filter(r => memberIdsOf(r).includes(user.id))
       .sort((a, b) => rpLastDate(b, messagesFor(msgRows, b.id, b.messages))
         .localeCompare(rpLastDate(a, messagesFor(msgRows, a.id, a.messages))))
-    : []), [rooms, user, msgRows]);
+    : []), [rooms, user, msgRows, rels, chars]);
   const myRooms = useMemo(() => allMine.filter(r => fStatus === 'all' || r.status === fStatus), [allMine, fStatus]);
   const sel = myRooms.find(r => r.id === selId) ?? myRooms[0];
   const cntS = (s: 'all' | 'ongoing' | 'done') =>
@@ -112,7 +115,7 @@ export default function RpPage() {
     rpMarkRead(sel.id, user.id, m.date);
     setText('');
     // 알림 (4.13) — 나를 제외한 참여자에게, 방 단위로 묶어서 (디스코드 DM은 봇 연동 시)
-    sel.memberIds.filter(id => id !== user.id).forEach(id =>
+    memberIdsOf(sel).filter(id => id !== user.id).forEach(id =>
       pushNotif({
         type: 'rp', toUserId: id, href: '/rp', dedupeKey: `rp:${sel.id}`,
         title: `역극 「${sel.title}」 새 메시지`,
@@ -150,6 +153,14 @@ export default function RpPage() {
   const [nRel, setNRel] = useState('none');
   const [nMembers, setNMembers] = useState<string[]>([]);
   const pool = useMembers();
+  // 개설 모달에서 보여 줄 자동 참여자 (개설자 제외) — 권한자를 이름으로 (v2.0)
+  const newRelGrantNames = (() => {
+    if (nRel === 'none') return [] as string[];
+    const ids = rpMemberIds(
+      { relId: nRel, createdBy: user?.id ?? '', memberIds: [] } as unknown as RpRoom, rels, chars);
+    return ids.filter(id => id !== user?.id)
+      .map(id => pool.find(pp => pp.id === id)?.nickname ?? id);
+  })();
   const createRoom = () => {
     if (!user) return;
     if (!nTitle.trim()) { toast('방 제목을 입력해 주세요'); return; }
@@ -270,18 +281,24 @@ ${rows}
       .map(m => chars.find(c => c.id === m.charId)?.name)
       .filter(Boolean) as string[];
   };
-  const roomSub = (r: RpRoom) => {
+  /** 방 소제목 (v2.0 사용자 확정) — 페어면 캐릭터 이름 둘만, 다인관이면 자관명만.
+   *  「~기반」 같은 군더더기와 회원 계정 표기는 넣지 않는다 */
+  const roomLabel = (r: RpRoom) => {
+    const rel = rels.find(x => x.id === r.relId);
+    if (!rel) return '자유 개설';
     const names = relCharNames(r.relId);
-    const parts = [
-      relName(r.relId) ? `${relName(r.relId)} 기반` : '자유 개설',
-      ...(names.length ? names : [`${r.memberIds.length}인`]),
-      r.status === 'done' ? (r.isPublic ? '완결 · 공개 전환됨' : '완결') : '진행중',
-    ];
-    return parts.join(' · ');
+    const isPair = rel.kind === 'pair' || rel.members.length === 2;
+    return isPair && names.length ? names.join(' · ') : rel.name;
   };
+  const roomSub = (r: RpRoom) => [
+    roomLabel(r),
+    r.status === 'done' ? (r.isPublic ? '완결 · 공개 전환됨' : '완결') : '진행중',
+  ].join(' · ');
 
+  // 회원 계정(오너) 이름은 화면에 내지 않는다 — 계정은 접근 권한용일 뿐 (v2.0 사용자 요청).
+  // 본인 발화는 캐릭터가 아니므로 「플레이어」로 표기 (HTML 내보내기와 같은 표기)
   const speakerLabel = speaker === 'desc' ? '지문 (DESC)' : speaker === 'player'
-    ? user.nickname : (chars.find(c => c.id === speaker)?.name ?? '');
+    ? '플레이어' : (chars.find(c => c.id === speaker)?.name ?? '');
   const speakerChar = chars.find(c => c.id === speaker);
 
   return (
@@ -327,12 +344,7 @@ ${rows}
               <div className="rp-head">
                 <div>
                   <b>{sel.title}</b>
-                  <small>
-                    {relName(sel.relId) ? `${relName(sel.relId)} 기반 · ` : '자유 개설 · '}
-                    {relCharNames(sel.relId).length
-                      ? relCharNames(sel.relId).join(' · ')
-                      : `${sel.memberIds.length}인`}
-                  </small>
+                  <small>{roomLabel(sel)}</small>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <span className="pill">{sel.status === 'done' ? (sel.isPublic ? '완결 · 공개' : '완결') : '진행중'}</span>
@@ -383,13 +395,15 @@ ${rows}
                     );
                   }
                   const ch = chars.find(c => c.id === m.charId);
-                  const name = m.kind === 'player'
-                    ? (pool.find(p => p.id === m.authorId)?.nickname ?? m.authorId)
-                    : (ch?.name ?? '');
-                  // 영역 고정 (사용자 확정): 내 캐릭터(캐릭터 메뉴에 등록된 자캐, own)는 무조건 오른쪽,
-                  // 상대 캐릭터는 무조건 왼쪽 — 누가 발화했는지와 무관. 플레이어 발화만 작성자 기준.
-                  // 삭제된 캐릭터는 발화 당시 기록(charOwn)으로 영역 유지.
-                  const rightSide = m.kind === 'player' ? mine : (ch ? !!ch.own : !!m.charOwn);
+                  // 회원 계정 이름 대신 「플레이어」 (v2.0 사용자 요청)
+                  const name = m.kind === 'player' ? '플레이어' : (ch?.name ?? '');
+                  // 영역은 「보는 사람」 기준 (v2.0 사용자 확정): 내가 권한을 가진 캐릭터가 오른쪽,
+                  // 아닌 캐릭터가 왼쪽. 관리자에게는 자캐(own)가 자기 캐릭터다.
+                  // 그래서 같은 방이라도 사람마다 좌우가 반대로 보인다(각자 자기 쪽이 오른쪽).
+                  // 삭제된 캐릭터는 발화 당시 기록(charOwn)으로 판단.
+                  const rightSide = m.kind === 'player'
+                    ? mine
+                    : (ch ? (!!charGrant(ch, user.id) || (!!ch.own && isAdmin)) : (!!m.charOwn && isAdmin));
                   return (
                     <div key={m.id} className={`msg ${rightSide ? 'me' : ''}`} style={{ ['--cc' as string]: hexRgb(ch?.color) }}>
                       <Face ch={ch} className="face" />
@@ -431,7 +445,7 @@ ${rows}
                         ))}
                         <button onClick={() => { setSpeaker('player'); setPickOpen(false); }}>
                           <span className="f" style={{ display: 'grid', placeItems: 'center', color: 'var(--sub)' }}>◉</span>
-                          {user.nickname}
+                          플레이어
                         </button>
                         <button onClick={() => { setSpeaker('desc'); setPickOpen(false); }}>
                           <span className="f" style={{ display: 'grid', placeItems: 'center', color: 'var(--sub)' }}>❝</span>
@@ -492,13 +506,24 @@ ${rows}
           </div>
           <div>
             <label className="k-label" style={{ marginBottom: 7 }}>참여 회원</label>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {pool.filter(p => p.id !== user.id).map(p => (
-                <KCheck key={p.id} label={p.nickname}
-                  checked={nMembers.includes(p.id)}
-                  onChange={v => setNMembers(ms => v ? [...ms, p.id] : ms.filter(x => x !== p.id))} />
-              ))}
-            </div>
+            {nRel === 'none' ? (
+              /* 자유 개설일 때만 직접 고른다 */
+              <div style={{ display: 'grid', gap: 8 }}>
+                {pool.filter(p => p.id !== user.id).map(p => (
+                  <KCheck key={p.id} label={p.nickname}
+                    checked={nMembers.includes(p.id)}
+                    onChange={v => setNMembers(ms => v ? [...ms, p.id] : ms.filter(x => x !== p.id))} />
+                ))}
+              </div>
+            ) : (
+              /* 자관 기반이면 그 자관 캐릭터의 권한자가 자동 참여 (v2.0 사용자 확정) —
+                 나중에 권한이 다른 사람에게 넘어가도 이 방에 그대로 따라온다 */
+              <p className="hint" style={{ margin: 0 }}>
+                {newRelGrantNames.length
+                  ? `이 자관 캐릭터에 권한이 있는 회원이 자동으로 참여합니다 — ${newRelGrantNames.join(' · ')}`
+                  : '아직 이 자관 캐릭터에 권한을 준 회원이 없습니다 — 캐릭터 수정의 「회원 권한」에서 지정하면 이 방에도 자동으로 반영됩니다'}
+              </p>
+            )}
           </div>
         </div>
       </Modal>

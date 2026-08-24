@@ -24,6 +24,34 @@ export interface RpRoom {
   messages: RpMessage[];
 }
 
+/**
+ * 이 방의 참여 회원 (v2.0 사용자 확정).
+ *
+ * 기반 자관이 있으면 **회원을 직접 고르지 않고** 그 자관 멤버 캐릭터에 권한이 있는 사람이
+ * 자동으로 참여자가 된다. 저장된 목록이 아니라 볼 때마다 계산하므로, 캐릭터 권한을 다른
+ * 사람에게 넘기면 그 자관 기반 역극들에 **따로 손대지 않아도 즉시 반영**된다
+ * (방 문서를 고쳐 돌아다닐 필요가 없다 — 남의 방은 어차피 고칠 수도 없다).
+ *
+ * 자유 개설(자관 없음) 방은 예전처럼 저장된 memberIds를 쓴다. 개설자는 언제나 참여자.
+ */
+export function rpMemberIds(
+  r: RpRoom,
+  rels: { id: string; members: { charId: string }[] }[],
+  chars: { id: string; grants?: { userId: string }[] }[],
+): string[] {
+  const ids = new Set<string>();
+  if (r.createdBy) ids.add(r.createdBy);
+  if (r.relId) {
+    const rel = rels.find(x => x.id === r.relId);
+    rel?.members.forEach(m => {
+      chars.find(c => c.id === m.charId)?.grants?.forEach(g => ids.add(g.userId));
+    });
+    return [...ids];
+  }
+  (r.memberIds ?? []).forEach(id => ids.add(id));
+  return [...ids];
+}
+
 /** hex → "r,g,b" (말풍선 저알파 배경용 — 6장 말풍선 색상 규칙) */
 export function hexRgb(hex?: string): string {
   const h = (hex ?? '#5d636d').replace('#', '');
