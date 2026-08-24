@@ -929,36 +929,37 @@ function MemberPane() {
       <h3>회원/보안</h3>
       <div className="d">가입코드와 회원 목록 관리</div>
 
-      <h3 style={{ marginTop: 20 }}>가입코드</h3>
-      <div className="d">회원가입 시 입력해야 하는 초대코드 — 아는 사람에게만 공유</div>
-      {/* 오른쪽 정렬 (v1.9) */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
-        <KInput value={code} onChange={e => setCode(e.target.value)} style={{ width: 220 }} />
-        <button className="btn btn-dark" disabled={!codeLoaded}
-          onClick={() => {
-            if (!code.trim()) { toast('가입코드를 입력해 주세요'); return; }
-            setInviteCode(code);
-            toast('가입코드가 변경되었습니다');
-          }}>SAVE</button>
+      {/* 다른 탭 행들과 같은 .set-row — 라벨은 왼쪽, 입력·버튼은 같은 줄 오른쪽 (v2.0 사용자 지적:
+          예전엔 라벨·설명·컨트롤이 각자 줄을 차지해 다른 탭과 통일감이 없고 줄바꿈도 보기 안 좋았다) */}
+      <div className="set-row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+        <div className="l"><b>가입코드</b><small>회원가입 시 입력해야 하는 초대코드 — 아는 사람에게만 공유</small></div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <KInput value={code} onChange={e => setCode(e.target.value)} style={{ width: 220 }} />
+          <button className="btn btn-dark" disabled={!codeLoaded}
+            onClick={() => {
+              if (!code.trim()) { toast('가입코드를 입력해 주세요'); return; }
+              setInviteCode(code);
+              toast('가입코드가 변경되었습니다');
+            }}>SAVE</button>
+        </div>
       </div>
 
-      <hr style={{ margin: '24px 0', border: 'none', borderTop: '1.5px solid var(--line)' }} />
-
-      <h3>회원 목록</h3>
+      <h3 style={{ marginTop: 26 }}>회원 목록</h3>
       <div className="d">기본 계정(관리자·지인회원)은 삭제할 수 없습니다 — 태그로 그룹화</div>
-      {/* 검색은 오른쪽 정렬, 태그 필터 칩은 왼쪽 (v1.9) */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-        {allTags.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {allTags.map(t => (
-              <span key={t} className={`pill${filterTag === t ? ' dark' : ''}`} style={{ cursor: 'var(--cur-pointer,pointer)' }}
-                onClick={() => { setFilterTag(f => (f === t ? null : t)); setMPage(1); }}>{t}</span>
-            ))}
-          </div>
-        )}
+      <div className="set-row" style={{ flexWrap: 'wrap' }}>
+        <div className="l">
+          {allTags.length > 0 ? (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {allTags.map(t => (
+                <span key={t} className={`pill${filterTag === t ? ' dark' : ''}`} style={{ cursor: 'var(--cur-pointer,pointer)' }}
+                  onClick={() => { setFilterTag(f => (f === t ? null : t)); setMPage(1); }}>{t}</span>
+              ))}
+            </div>
+          ) : <b>태그 필터</b>}
+        </div>
         <KInput placeholder="닉네임·아이디·태그 검색" value={mq}
           onChange={e => { setMq(e.target.value); setMPage(1); }}
-          style={{ width: 200, fontSize: 12, marginLeft: 'auto' }} />
+          style={{ width: 200, fontSize: 12 }} />
       </div>
       {pageMembers.map(m => {
         const isBase = m.id === 'admin' || m.id === 'guest';
@@ -1062,9 +1063,40 @@ function MemberPane() {
           { label: 'CANCEL', kind: 'ghost' as const, onClick: () => setDelMember(null) },
         ]} />
       {del.element}
+      {/* 포크는 GitHub이 자동으로 동기화해 주지 않는다 — 원본 저장소에 업데이트가 올라와도
+          내 포크·배포에는 반영 안 된 채로 남는다(오늘 만든 기능이 안 보이는 흔한 원인, v2.0 사용자 요청).
+          자격 증명은 전혀 다루지 않고, 저장해 둔 내 포크 주소로 이동만 시켜 준다 — 거기서
+          [Sync fork] 버튼 한 번이면 끝 */}
+      {serverOn2 && <ForkUpdateRow />}
       {/* 설치를 이미 마친 뒤에도 보안 규칙이 바뀔 때(버전 업데이트 등) 다시 붙여넣을 수 있게 —
           예전엔 최초 설치 화면에만 있어서 재설치 없이는 갱신된 규칙을 볼 방법이 없었다 (v2.0) */}
       {serverOn2 && <SecurityRulesRow />}
+    </div>
+  );
+}
+
+/** 포크 업데이트 바로가기 (v2.0 사용자 요청) — 토큰이나 GitHub 로그인 연동 없이, 저장해 둔 내 포크
+ *  주소로 한 번에 이동시켜 준다. 자격 증명을 전혀 다루지 않아 가장 안전하고 구현도 간단하다 —
+ *  실제 업데이트(Sync fork)는 그 페이지에서 사용자가 직접 누른다 */
+function ForkUpdateRow() {
+  const toast = useToast();
+  const [url, setUrl] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { setUrl(getSetting<string>('ohome.repo.v1', '')); setLoaded(true); }, []);
+  const trimmed = url.trim();
+  const valid = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/?$/i.test(trimmed);
+  return (
+    <div className="set-row" style={{ flexWrap: 'wrap' }}>
+      <div className="l"><b>포크 업데이트</b>
+        <small>내 포크 주소를 저장해 두면, 원본에 업데이트가 올라왔을 때 GitHub의 [Sync fork] 화면으로 바로 이동할 수 있습니다</small>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <KInput placeholder="https://github.com/내아이디/O.home" value={url} onChange={e => setUrl(e.target.value)} style={{ width: 250 }} />
+        <button className="btn btn-ghost" disabled={!loaded}
+          onClick={() => { setSetting('ohome.repo.v1', trimmed); toast('저장되었습니다'); }}>SAVE</button>
+        <button className="btn btn-dark" disabled={!valid}
+          onClick={() => window.open(trimmed, '_blank', 'noopener')}>내 포크로 이동 ↗</button>
+      </div>
     </div>
   );
 }
