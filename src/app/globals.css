@@ -928,7 +928,7 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .page-char-detail{padding-bottom:82px}
 .profile-info{padding:24px;overflow:auto}
 .profile-info h3{font-family:var(--serif);font-size:calc(19px*var(--fs,1));letter-spacing:.14em;margin-bottom:4px}
-.profile-info .sub{font-size:calc(11px*var(--fs,1));color:var(--faint);letter-spacing:.1em;margin-bottom:16px}
+.profile-info .sub{font-size:calc(11px*var(--fs,1));color:var(--faint);letter-spacing:.1em;margin-top:7px;margin-bottom:16px}
 .spec{display:grid;grid-template-columns:76px 1fr;gap:7px 10px;font-size:calc(12.5px*var(--fs,1));margin-bottom:18px}
 .spec dt{color:var(--faint);letter-spacing:.06em}
 .spec dd{color:var(--ink)}
@@ -977,7 +977,7 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
    「한 줄에 맞춰 줄이기」가 넘침을 감지하지 못한다 */
 .mini-prof .hd > div{min-width:0}
 .mini-prof .hd b{font-family:var(--serif);font-size:calc(17px*var(--fs,1));letter-spacing:.16em;display:block}
-.mini-prof .hd small{font-size:calc(9.5px*var(--fs,1));color:var(--faint);letter-spacing:.1em}
+.mini-prof .hd small{display:block;margin-top:5px;font-size:calc(9.5px*var(--fs,1));color:var(--faint);letter-spacing:.1em}
 .mini-prof .specs{padding:11px 16px;font-size:calc(11.5px*var(--fs,1));color:var(--sub)}
 .mini-prof .specs div{display:flex;gap:8px;padding:2.5px 0}
 .mini-prof .specs b{color:var(--faint);font-weight:600;min-width:34px}

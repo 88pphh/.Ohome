@@ -142,7 +142,9 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side,
           지우거나 더 넣어도 자관 페이지는 추가 당시 상태에 멈춰 있었다("지웠는데 안 사라져",
           "더 등록해도 추가로 안 떠"의 원인). 옛 저장분은 캐릭터에 색이 하나도 없을 때만 fallback */}
       <div className="palette-row" data-tip="캐릭터 테마색 팔레트">
-        {(char.colors?.length ? char.colors : member.palette).map(p => (
+        {/* `?? `(nullish)로 판단 — 빈 배열은 "색을 다 지웠다"는 뜻이라 그대로 비워야 한다.
+            length로 보면 전부 지웠을 때 옛 스냅샷이 되살아난다 (v2.0 사용자 재신고) */}
+        {(char.colors ?? member.palette).map(p => (
           <Tip key={p.hex + p.label} tip={p.label}>
             <span className="gem" style={{ background: p.hex }} />
           </Tip>
