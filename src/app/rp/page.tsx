@@ -5,7 +5,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useLocalList, newId } from '@/lib/postStore';
-import { RpRoom, RpMessage, RP_SEED, hexRgb, rpLastDate, rpHasNew } from '@/lib/rpStore';
+import {
+  RpRoom, RpMessage, RP_SEED, hexRgb, rpLastDate, rpHasNew,
+  RpMessageRow, RP_MSG_KEY, RP_MSG_SEED, messagesFor, rpMarkRead,
+} from '@/lib/rpStore';
 import { Character, CHAR_SEED, Relation, REL_SEED, charGrant } from '@/lib/charStore';
 import { Modal, ConfirmModal, useConfirmDelete } from '@/components/ui/Modal';
 import { KInput, KTextarea, KSelect, KCheck } from '@/components/ui/Kit';
@@ -35,6 +38,11 @@ export default function RpPage() {
   const toast = useToast();
   const del = useConfirmDelete();
   const [rooms, setRooms, loaded] = useLocalList<RpRoom>('ohome.rp.v1', RP_SEED);
+  // 발화는 방과 따로 저장한다 (v2.0) — 방 안에 두면 말할 때마다 방을 UPDATE 해야 해서
+  // 남이 만든 방에서는 참여자가 발화할 수 없었다 (댓글·문답과 같은 뿌리)
+  const [msgRows, setMsgRows] = useLocalList<RpMessageRow>(RP_MSG_KEY, RP_MSG_SEED);
+  // 방 하나의 발화 — 옛 방 안의 것 + 분리 저장분
+  const msgsOf = (r: RpRoom) => messagesFor(msgRows, r.id, r.messages);
   const [chars] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
   const [selId, setSelId] = useState<string | null>(null);
@@ -46,8 +54,9 @@ export default function RpPage() {
   // 참여자에게만 존재 노출 (확정 — 관리자도 비참여 방은 보지 않음)
   const allMine = useMemo(() => (user
     ? rooms.filter(r => r.memberIds.includes(user.id))
-      .sort((a, b) => rpLastDate(b).localeCompare(rpLastDate(a)))
-    : []), [rooms, user]);
+      .sort((a, b) => rpLastDate(b, messagesFor(msgRows, b.id, b.messages))
+        .localeCompare(rpLastDate(a, messagesFor(msgRows, a.id, a.messages))))
+    : []), [rooms, user, msgRows]);
   const myRooms = useMemo(() => allMine.filter(r => fStatus === 'all' || r.status === fStatus), [allMine, fStatus]);
   const sel = myRooms.find(r => r.id === selId) ?? myRooms[0];
   const cntS = (s: 'all' | 'ongoing' | 'done') =>
@@ -68,22 +77,21 @@ export default function RpPage() {
   const [pickOpen, setPickOpen] = useState(false);
   useEffect(() => { setSpeaker(speakChars[0]?.id ?? 'player'); setPickOpen(false); }, [sel?.id, speakChars]);
 
-  // 입장 시 읽음 처리 (N 뱃지 해제)
+  // 입장 시 읽음 처리 (N 뱃지 해제) — 브라우저에만 기록한다 (v2.0).
+  // 예전엔 방 문서의 lastRead에 써서, 방을 열어 보기만 해도 남의 방을 UPDATE 하게 되어
+  // 참여자에게는 규칙이 막았다(뱃지가 안 없어짐). 읽음 시각은 원래 사람마다 다른 값이다.
   useEffect(() => {
     if (!sel || !user) return;
-    if (rpHasNew(sel, user.id) || !sel.lastRead[user.id]) {
-      setRooms(rooms.map(r => r.id === sel.id
-        ? { ...r, lastRead: { ...r.lastRead, [user.id]: new Date().toISOString() } } : r));
-    }
+    rpMarkRead(sel.id, user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel?.id, user?.id]);
+  }, [sel?.id, user?.id, msgRows.length]);
 
   // 새 메시지 → 맨 아래로
   const msgsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = msgsRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [sel?.id, sel?.messages.length]);
+  }, [sel?.id, msgRows.length]);
 
   const [text, setText] = useState('');
   const send = () => {
@@ -99,8 +107,9 @@ export default function RpPage() {
       charOwn: kind === 'char' ? chars.find(c => c.id === speaker)?.own : undefined,
       authorId: user.id, text: t, date: new Date().toISOString(),
     };
-    setRooms(rooms.map(r => r.id === sel.id
-      ? { ...r, messages: [...r.messages, m], lastRead: { ...r.lastRead, [user.id]: m.date } } : r));
+    // 방은 건드리지 않는다 — 발화만 자기 행으로 (v2.0)
+    setMsgRows([...msgRows, { ...m, roomId: sel.id }]);
+    rpMarkRead(sel.id, user.id, m.date);
     setText('');
     // 알림 (4.13) — 나를 제외한 참여자에게, 방 단위로 묶어서 (디스코드 DM은 봇 연동 시)
     sel.memberIds.filter(id => id !== user.id).forEach(id =>
@@ -117,15 +126,22 @@ export default function RpPage() {
   const saveMsg = () => {
     if (!sel || !editMsg) return;
     if (!editText.trim()) { toast('내용을 입력해 주세요'); return; }
-    setRooms(rooms.map(r => r.id === sel.id
-      ? { ...r, messages: r.messages.map(m => m.id === editMsg.id ? { ...m, text: editText.trim() } : m) } : r));
+    const t = editText.trim();
+    if (msgRows.some(x => x.id === editMsg.id)) {
+      setMsgRows(msgRows.map(x => (x.id === editMsg.id ? { ...x, text: t } : x)));
+    } else {
+      setRooms(rooms.map(r => r.id === sel.id
+        ? { ...r, messages: r.messages.map(m => m.id === editMsg.id ? { ...m, text: t } : m) } : r));
+    }
     setEditMsg(null);
   };
   const removeMsg = (m: RpMessage) => {
     if (!sel) return;
-    del.ask('이 메시지를 삭제하시겠습니까?', () =>
-      setRooms(rooms.map(r => r.id === sel.id
-        ? { ...r, messages: r.messages.filter(x => x.id !== m.id) } : r)));
+    del.ask('이 메시지를 삭제하시겠습니까?', () => {
+      if (msgRows.some(x => x.id === m.id)) setMsgRows(msgRows.filter(x => x.id !== m.id));
+      else setRooms(rooms.map(r => r.id === sel.id
+        ? { ...r, messages: r.messages.filter(x => x.id !== m.id) } : r));
+    });
   };
 
   // 방 개설 모달
@@ -158,7 +174,7 @@ export default function RpPage() {
   const brokenChars = useMemo(() => {
     if (!sel) return [] as { charId: string; own: boolean }[];
     const map = new Map<string, boolean>();
-    for (const m of sel.messages) {
+    for (const m of msgsOf(sel)) {
       if (m.kind === 'char' && m.charId && !chars.some(c => c.id === m.charId) && !map.has(m.charId)) {
         map.set(m.charId, !!m.charOwn);
       }
@@ -179,19 +195,18 @@ export default function RpPage() {
   };
   // 이미 이 방에서 발화 중인 캐릭터 — 고르면 대사가 합쳐지므로 표시해 준다 (v1.9)
   const speakingIds = useMemo(() => new Set(
-    (sel?.messages ?? []).filter(m => m.kind === 'char' && m.charId).map(m => m.charId as string)), [sel]);
+    (sel ? msgsOf(sel) : []).filter(m => m.kind === 'char' && m.charId).map(m => m.charId as string)), [sel, msgRows]);
   const applyRelink = () => {
     if (!sel) return;
     const picked = Object.entries(relinkSel).filter(([, v]) => v);
     if (picked.length === 0) { setRelinkOpen(false); return; }
-    setRooms(rooms.map(r => r.id === sel.id ? {
-      ...r,
-      messages: r.messages.map(m => {
-        const nid = m.charId ? relinkSel[m.charId] : undefined;
-        if (!nid) return m;
-        return { ...m, charId: nid, charOwn: chars.find(c => c.id === nid)?.own };
-      }),
-    } : r));
+    const relink = <M extends RpMessage>(m: M): M => {
+      const nid = m.charId ? relinkSel[m.charId] : undefined;
+      if (!nid) return m;
+      return { ...m, charId: nid, charOwn: chars.find(c => c.id === nid)?.own };
+    };
+    setMsgRows(msgRows.map(x => (x.roomId === sel.id ? relink(x) : x)));
+    setRooms(rooms.map(r => (r.id === sel.id ? { ...r, messages: r.messages.map(relink) } : r)));
     setRelinkOpen(false);
     setRelinkSel({});
     toast('캐릭터를 다시 연결했습니다');
@@ -202,17 +217,19 @@ export default function RpPage() {
   };
   const removeRoom = () => {
     if (!sel) return;
+    const count = msgsOf(sel).length;
     del.ask(`「${sel.title}」 방을 삭제하시겠습니까?`, () => {
       setRooms(rooms.filter(r => r.id !== sel.id));
+      setMsgRows(msgRows.filter(x => x.roomId !== sel.id));   // 딸린 발화도 함께 (v2.0)
       setSelId(null);
-    }, `대화 ${sel.messages.length}개도 함께 삭제됩니다.`);
+    }, `대화 ${count}개도 함께 삭제됩니다.`);
   };
 
   // 완결 로그 HTML 내보내기 (4.9 — TRPG 백업에 붙일 수 있는 형태)
   const exportHtml = () => {
     if (!sel) return;
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
-    const rows = sel.messages.map(m => {
+    const rows = msgsOf(sel).map(m => {
       if (m.kind === 'desc') {
         return `<p style="text-align:center;color:#4a505a;line-height:1.8;margin:14px 0">${esc(m.text)}</p>`;
       }
@@ -291,7 +308,7 @@ ${rows}
             {myRooms.map(r => (
               <div key={r.id} className={`rp-room ${sel?.id === r.id ? 'on' : ''}`}
                 onClick={() => { setSelId(r.id); setMListOpen(false); }}>
-                <b>{r.title} {rpHasNew(r, user.id) && sel?.id !== r.id && <span className="new">N</span>}</b>
+                <b>{r.title} {rpHasNew(r, user.id, msgsOf(r)) && sel?.id !== r.id && <span className="new">N</span>}</b>
                 <small>{roomSub(r)}</small>
               </div>
             ))}
@@ -350,7 +367,7 @@ ${rows}
               </div>
 
               <div className="rp-msgs" ref={msgsRef}>
-                {sel.messages.map(m => {
+                {msgsOf(sel).map(m => {
                   const mine = m.authorId === user.id;
                   if (m.kind === 'desc') {
                     return (
@@ -390,7 +407,7 @@ ${rows}
                     </div>
                   );
                 })}
-                {sel.messages.length === 0 && (
+                {msgsOf(sel).length === 0 && (
                   <p className="hint" style={{ textAlign: 'center', marginTop: 30 }}>첫 메시지를 남겨보세요</p>
                 )}
               </div>

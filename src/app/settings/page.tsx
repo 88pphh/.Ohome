@@ -1119,16 +1119,20 @@ function ForkUpdateRow() {
   const trimmed = url.trim();
   const valid = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/?$/i.test(trimmed);
   return (
-    <div className="set-row" style={{ flexWrap: 'wrap' }}>
-      <div className="l"><b>포크 업데이트</b>
-        <small>내 포크 주소를 저장해 두면, 원본에 업데이트가 올라왔을 때 GitHub의 [Sync fork] 화면으로 바로 이동할 수 있습니다</small>
+    <div className="set-sec" style={{ marginTop: 26 }}>
+      <h3>포크 업데이트</h3>
+      <div className="d">
+        내 포크 주소를 저장해 두면, 원본에 업데이트가 올라왔을 때 GitHub의 [Sync fork] 화면으로 바로 이동할 수 있습니다
       </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <KInput placeholder="https://github.com/내아이디/O.home" value={url} onChange={e => setUrl(e.target.value)} style={{ width: 250 }} />
-        <button className="btn btn-ghost" disabled={!loaded}
-          onClick={() => { setSetting('ohome.repo.v1', trimmed); toast('저장되었습니다'); }}>SAVE</button>
-        <button className="btn btn-dark" disabled={!valid}
-          onClick={() => window.open(trimmed, '_blank', 'noopener')}>내 포크로 이동 ↗</button>
+      <div className="set-row" style={{ flexWrap: 'wrap' }}>
+        <div className="l"><b>내 포크 주소</b><small>GitHub에서 포크한 저장소의 주소</small></div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <KInput placeholder="https://github.com/내아이디/O.home" value={url} onChange={e => setUrl(e.target.value)} style={{ width: 250 }} />
+          <button className="btn btn-ghost" disabled={!loaded}
+            onClick={() => { setSetting('ohome.repo.v1', trimmed); toast('저장되었습니다'); }}>SAVE</button>
+          <button className="btn btn-dark" disabled={!valid}
+            onClick={() => window.open(trimmed, '_blank', 'noopener')}>내 포크로 이동 ↗</button>
+        </div>
       </div>
     </div>
   );

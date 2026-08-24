@@ -31,14 +31,60 @@ export function hexRgb(hex?: string): string {
   return `${parseInt(f.slice(0, 2), 16) || 93},${parseInt(f.slice(2, 4), 16) || 99},${parseInt(f.slice(4, 6), 16) || 109}`;
 }
 
+/**
+ * 발화 한 줄 = 자기 문서 하나 (v2.0).
+ *
+ * 예전에는 발화가 방(RpRoom) 문서 안 배열에 있었다. 그래서 **말을 하려면 방을 UPDATE 해야 했고**,
+ * 「수정은 작성자 또는 관리자만」 규칙에 걸려 남이 만든 방에서는 참여자가 발화할 수 없었다 —
+ * 댓글·문답이 막히던 것과 똑같은 뿌리다 (v2.0 사용자 요청으로 함께 정리).
+ */
+export const RP_MSG_KEY = 'ohome.rpmsgs.v1';
+
+export interface RpMessageRow extends RpMessage { roomId: string }
+
+export const RP_MSG_SEED: RpMessageRow[] = [];
+
+/** 방 하나의 발화 — 옛 방 안의 것 + 따로 저장된 것을 시간순으로 */
+export function messagesFor(rows: RpMessageRow[], roomId: string, legacy: RpMessage[] = []): RpMessage[] {
+  const mine = rows.filter(r => r.roomId === roomId);
+  const seen = new Set(mine.map(r => r.id));
+  return [...legacy.filter(m => !seen.has(m.id)), ...mine]
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* ---------- 읽음 표시 (v2.0) ----------
+   예전에는 방 문서의 lastRead에 적었는데, 방을 열어 보기만 해도 남의 방을 UPDATE 하게 되어
+   참여자에게는 규칙이 막았다(N 뱃지가 영영 안 없어짐). 읽음 시각은 원래 사람마다 다른 값이라
+   서버에 공유할 이유가 없어 브라우저에만 둔다. */
+const READ_KEY = 'ohome.rpread.v1';
+
+function readMap(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(READ_KEY) ?? '{}') as Record<string, string>; } catch { return {}; }
+}
+
+/** 내가 이 방을 마지막으로 본 시각 — 로컬 기록과 옛 방 기록 중 나중 것 */
+export function rpSeenAt(r: RpRoom, userId: string): string {
+  const local = readMap()[`${userId}:${r.id}`] ?? '';
+  const legacy = r.lastRead?.[userId] ?? '';
+  return local > legacy ? local : legacy;
+}
+
+export function rpMarkRead(roomId: string, userId: string, at = new Date().toISOString()): void {
+  try {
+    const m = readMap();
+    m[`${userId}:${roomId}`] = at;
+    localStorage.setItem(READ_KEY, JSON.stringify(m));
+  } catch { /* 무시 */ }
+}
+
 /** 방의 마지막 메시지 시각 (없으면 개설 시각) */
-export const rpLastDate = (r: RpRoom) =>
-  r.messages.length ? r.messages[r.messages.length - 1].date : r.created;
+export const rpLastDate = (r: RpRoom, msgs: RpMessage[]) =>
+  msgs.length ? msgs[msgs.length - 1].date : r.created;
 
 /** 안 읽은 새 메시지 여부 (내가 마지막으로 본 뒤에 남이 쓴 메시지) */
-export function rpHasNew(r: RpRoom, userId: string): boolean {
-  const seen = r.lastRead[userId] ?? '';
-  return r.messages.some(m => m.authorId !== userId && m.date > seen);
+export function rpHasNew(r: RpRoom, userId: string, msgs: RpMessage[]): boolean {
+  const seen = rpSeenAt(r, userId);
+  return msgs.some(m => m.authorId !== userId && m.date > seen);
 }
 
 /* ---------- 시드 (프로토타입 데모 계승 — admin·guest 참여) ---------- */

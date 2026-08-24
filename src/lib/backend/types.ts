@@ -111,6 +111,9 @@ export const COLLECTION_OF: Record<string, string> = {
   // 자관 문답 답변 — 자관 안이 아니라 자기 문서로 (v2.0). 댓글과 같은 이유:
   // 자관 안에 두면 답을 달 때마다 자관을 UPDATE 해야 해서 일반 회원이 답할 수 없었다
   'ohome.qaanswers.v1': 'qa_answers',
+  // 역극 발화 — 방 안이 아니라 자기 문서로 (v2.0). 같은 이유로, 방 안에 두면 말할 때마다
+  // 방을 UPDATE 해야 해서 남이 만든 방에서 참여자가 발화할 수 없었다
+  'ohome.rpmsgs.v1': 'rp_messages',
 };
 
 export const CONTENT_COLLECTIONS = Object.values(COLLECTION_OF);

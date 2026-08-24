@@ -293,7 +293,7 @@ export default function RelDetailPage() {
 
   // 자관별 페이지 테마 (4.18 방식) — 별도 테마컬러면 홈 전체 팔레트를 임시 전환, 벗어나면 원복.
   // AU별 (v1.9): AU에 테마를 지정했으면 그것, 미지정이면 base(원본) 테마 따라가기
-  const { setPageTheme } = useTheme();
+  const { setPageTheme, setPageBg } = useTheme();
   const themeAu = rel?.aus.find(a => a.id === auId);
   const auTheme = themeAu && themeAu.id !== 'base' ? themeAu.theme : undefined;
   const effThemeMode = auTheme?.mode ?? rel?.themeMode;
@@ -304,6 +304,16 @@ export default function RelDetailPage() {
     setPageTheme(pageColor, pageTone);
     return () => setPageTheme(null);
   }, [pageColor, pageTone, setPageTheme]);
+
+  // 자관별 페이지 배경 (v2.0 사용자 요청) — 이 페이지에 있는 동안만, 벗어나면 원래 배경으로
+  const bgG1 = rel?.pageBgG1;
+  const bgG2 = rel?.pageBgG2;
+  const bgAngle = rel?.pageBgAngle;
+  useEffect(() => {
+    if (!bgG1 && !bgG2) return;
+    setPageBg({ g1: bgG1 ?? '#2b3038', g2: bgG2 ?? '#121418', angle: bgAngle ?? 180 });
+    return () => setPageBg(null);
+  }, [bgG1, bgG2, bgAngle, setPageBg]);
 
   // 삭제된 캐릭터를 가리키는 멤버 자동 정리 — 카드도 안 뜨고 [＋ 멤버 추가]도
   // 안 나오는 유령 슬롯이 남지 않게 (캐릭터 삭제 기능 도입에 따른 정합성 보정)

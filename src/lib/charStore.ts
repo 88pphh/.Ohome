@@ -222,6 +222,11 @@ export interface Relation {
   headerBgG1?: string;
   headerBgG2?: string;
   headerBgAngle?: number;
+  // 이 자관 페이지 전체의 배경 그라데이션 (v2.0 사용자 요청) — 색 2개 + 각도.
+  // 위 headerBg*는 상단 헤더 자리에만 깔리는 것이고, 이건 페이지 바탕 전체다.
+  pageBgG1?: string;
+  pageBgG2?: string;
+  pageBgAngle?: number;
   thumbId?: string;              // 리스트 썸네일 (IndexedDB, 4:3 크롭)
   thumbCrop?: import("@/components/ui/CropEditor").CropValue;
   members: RelMember[];          // 2인 = 좌/우, 3인+ = 다인 리스트

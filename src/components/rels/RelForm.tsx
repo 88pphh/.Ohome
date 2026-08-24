@@ -43,6 +43,9 @@ export interface RelFormValue {
   headerBgG1?: string;       // 헤더 이미지 없을 때 배경 그라데이션 (v2.0 사용자 요청)
   headerBgG2?: string;
   headerBgAngle?: number;
+  pageBgG1?: string;         // 페이지 전체 배경 그라데이션 (v2.0 사용자 요청)
+  pageBgG2?: string;
+  pageBgAngle?: number;
   themeMode: 'site' | 'custom'; // 페이지 테마 — 홈페이지 그대로 / 별도 테마컬러 (4.18 방식)
   themeColor?: string;          // 별도 테마컬러 (custom일 때)
   themeTone?: 'dark' | 'light'; // 테마컬러의 다크/라이트 느낌
@@ -215,6 +218,11 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
   const [headerBgG1, setHeaderBgG1] = useState(initial?.headerBgG1 ?? '#3a4150');
   const [headerBgG2, setHeaderBgG2] = useState(initial?.headerBgG2 ?? '#1a1d22');
   const [headerBgAngle, setHeaderBgAngle] = useState(initial?.headerBgAngle ?? 180);
+  // 페이지 전체 배경 (v2.0 사용자 요청) — 디자인 탭의 사이트 배경과 같은 방식(색 2개 + 각도)
+  const [pageBgCustom, setPageBgCustom] = useState(!!(initial?.pageBgG1 || initial?.pageBgG2));
+  const [pageBgG1, setPageBgG1] = useState(initial?.pageBgG1 ?? '#2b3038');
+  const [pageBgG2, setPageBgG2] = useState(initial?.pageBgG2 ?? '#121418');
+  const [pageBgAngle, setPageBgAngle] = useState(initial?.pageBgAngle ?? 180);
   const [charQuery, setCharQuery] = useState('');
   // 전신 이미지 (v1.9 — 페어 · 수정 모드) — AU 편집이면 그 AU의 전신
   const pairMembers = !isNew && (initial!.kind ? initial!.kind === 'pair' : initial!.members.length === 2)
@@ -301,6 +309,9 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
       headerBgG1: headerBgCustom ? headerBgG1 : undefined,
       headerBgG2: headerBgCustom ? headerBgG2 : undefined,
       headerBgAngle: headerBgCustom ? headerBgAngle : undefined,
+      pageBgG1: pageBgCustom ? pageBgG1 : undefined,
+      pageBgG2: pageBgCustom ? pageBgG2 : undefined,
+      pageBgAngle: pageBgCustom ? pageBgAngle : undefined,
       cpTagBg: tagCustom ? cpTagBg : undefined,
       cpTagFg: tagCustom ? cpTagFg : undefined,
       themeMode,
@@ -702,6 +713,21 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                   : '이 페이지도 홈페이지 테마를 그대로 사용합니다'}
               </p>
             </div>
+            {/* 페이지 배경 (v2.0 사용자 요청) — 이 자관 페이지에 들어가 있는 동안의 바탕 그라데이션 */}
+            {!auObj && (
+              <div>
+                <KCheck label="페이지 배경 직접 지정" checked={pageBgCustom} onChange={setPageBgCustom} />
+                {pageBgCustom && (
+                  <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
+                    <ColorField value={pageBgG1} onChange={setPageBgG1} />
+                    <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
+                    <ColorField value={pageBgG2} onChange={setPageBgG2} />
+                    <span className="cp-lb">각도</span>
+                    <KStep value={pageBgAngle} min={0} max={360} step={15} suffix="°" onChange={setPageBgAngle} />
+                  </div>
+                )}
+              </div>
+            )}
             {/* 전신/일러 스위치 색 (v1.9 사용자 요청) — 페어 중앙 이미지의 전환 스위치, 기본은 테마·포인트색 */}
             {!auObj && (
               <div>
