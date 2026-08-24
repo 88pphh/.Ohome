@@ -353,7 +353,7 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
             <KInput placeholder="열람 비밀번호 (선택)" value={e.password} onChange={ev => setE(s => ({ ...s, password: ev.target.value }))} style={{ flex: 1 }} />
           </div>
           {/* 목록 표시 — 접근권한과 별개 (v2.0 사용자 요청) */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
             <span className="cp-lb">목록</span>
             <KSelect minWidth={140} value={e.listHidden ? 'hidden' : 'show'}
               onChange={v => setE(s => ({ ...s, listHidden: v === 'hidden' }))}

@@ -265,7 +265,11 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
 
     async fetchList<T extends ListItem>(coll: string): Promise<T[]> {
       const sets = await readSets();
-      const snaps = await Promise.all(sets.map(cs => getDocs(listQuery(coll, cs))));
+      // 반드시 getDocsFromServer — 일반 getDocs는 로컬(오프라인) 캐시가 있으면 그걸로 조용히 성공해
+      // 버린다. 실시간 구독이 한 번의 쓰기에 두 번(로컬 반영·서버 확정) 반응해 재조회가 겹칠 때
+      // 낡은 캐시 결과가 방금 반영된 변경을 도로 덮어써 "새로고침해야 보임"이 되던 원인 중 하나
+      // (v2.0 사용자 발견 — 목록 숨김을 바꿔도 반영이 안 되는 것처럼 보임)
+      const snaps = await Promise.all(sets.map(cs => getDocsFromServer(listQuery(coll, cs))));
       // 두 질의(공개분 · 내 글)를 합치므로 문서 id로 중복을 없앤 뒤 sort로 정렬한다
       const seen = new Map<string, { sort: number; item: T }>();
       snaps.forEach(s => s.docs.forEach(d => {
