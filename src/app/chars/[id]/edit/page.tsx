@@ -73,17 +73,20 @@ function CharEditInner() {
               auProfiles: {
                 ...x.auProfiles,
                 [auKey]: {
+                  // 폼 밖에서 정한 값(상세 아트 위치 등)은 그대로 두고 폼 값만 덮어쓴다 (v2.0)
+                  ...x.auProfiles?.[auKey],
                   name: c.name, sub: c.sub, color: c.color, themeMode: c.themeMode,
                   colors: c.colors, colorTipMode: c.colorTipMode,
                   specs: c.specs, tabs: c.tabs, basicHtml: c.basicHtml,
                   arts: c.arts, thumbId: c.thumbId, thumbCrop: c.thumbCrop,
-                  fontId: c.fontId, bodyFontId: c.bodyFontId,
+                  fontId: c.fontId, nameSize: c.nameSize, bodyFontId: c.bodyFontId,
                 },
               },
             } : x)));
             toast('AU 프로필이 저장되었습니다');
           } else {
-            setChars(chars.map(x => (x.id === c.id ? c : x)));
+            // 폼이 다루지 않는 값(상세 아트 위치 등)이 저장할 때마다 사라지지 않게 덮어쓰지 않고 합친다 (v2.0)
+            setChars(chars.map(x => (x.id === c.id ? { ...x, ...c } : x)));
             toast('저장되었습니다');
           }
           router.push(back);
