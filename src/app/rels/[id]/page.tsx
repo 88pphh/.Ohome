@@ -73,6 +73,11 @@ function rgbTriple(hex: string): string {
   return `${parseInt(f.slice(0, 2), 16)},${parseInt(f.slice(2, 4), 16)},${parseInt(f.slice(4, 6), 16)}`;
 }
 
+/** 프로필에 덧붙일 메모 — 「회원 ○○ 연결됨」처럼 알려 줄 게 있을 때만.
+ *  예전엔 상대 캐릭터를 등록하면 「상대 캐릭터」라고 적어 뒀는데, 상대 캐릭터 자리에 있는 게
+ *  상대 캐릭터인 건 굳이 적을 일이 아니라 뺐다 (v2.0 사용자 요청 — 이미 저장된 것도 안 보이게) */
+const noteOf = (m: RelMember) => (m.linkedNote === '상대 캐릭터' ? '' : m.linkedNote ?? '');
+
 function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side, onMoveSide, onFaceCrop }: {
   member: RelMember; char?: Character; isAdmin: boolean; onGo: () => void; onRemove: () => void;
   auUnregistered?: boolean;   // AU 선택 중인데 이 캐릭터의 AU 프로필이 미등록 (v1.9)
@@ -132,7 +137,7 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side,
           <b style={{ fontFamily: familyOf(char.fontId), fontSize: member.nameSize ?? undefined }}>
             {char.name}
           </b>
-          <small>{char.sub}{member.linkedNote ? ` · ${member.linkedNote}` : ''}</small>
+          <small>{[char.sub, noteOf(member)].filter(Boolean).join(' · ')}</small>
         </div>
       </div>
       <div className="specs">
@@ -418,7 +423,7 @@ export default function RelDetailPage() {
         // 자관 페이지가 따라오지 않는다. 입력한 색을 「테마색」이라는 이름으로 팔레트에 자동
         // 등록하던 것도 없앴다 (v2.0 사용자 요청 — 포인트 컬러로 넣은 값이 테마색으로 들어가 버림)
         palette: [],
-        linkedNote: mMode === 'new' ? '상대 캐릭터' : undefined,
+        // linkedNote는 「회원 ○○ 연결됨」처럼 알려 줄 게 있을 때만 — 상대 캐릭터라고 적어 두던 건 없앴다 (v2.0)
       }],
     });
     setMemberOpen(false);
@@ -821,8 +826,8 @@ export default function RelDetailPage() {
                       <>
                         <b style={{ fontFamily: familyOf(c.fontId) }}>{c.name}</b><i>{c.sub}</i>
                         <small>{c.specs.slice(0, 3).map(s => s.value).join(' · ')}</small>
-                        {(m.quote || m.linkedNote || m.keywords[0]) && (
-                          <span className="ext">{m.quote || m.linkedNote || m.keywords[0]}</span>
+                        {(m.quote || noteOf(m) || m.keywords[0]) && (
+                          <span className="ext">{m.quote || noteOf(m) || m.keywords[0]}</span>
                         )}
                       </>
                     )}

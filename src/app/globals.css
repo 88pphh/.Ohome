@@ -1594,6 +1594,10 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .cf-row .cp-lb{flex-shrink:0}
 .cf-row .color-field{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
 .cf-row .color-field .k-input{width:100%;min-width:52px;flex:1}
+/* 스테퍼·뱃지 미리보기는 줄어들 수 없는 것들 — 좁은 패널에서 눌리면 안쪽 +버튼·글씨가 잘려 나간다.
+   눌리지 않게 막고, 대신 한 줄에 안 들어가는 조합은 .cf-stack으로 아랫줄에 내린다 (v2.0 사용자 요청) */
+.cf-row .k-step,.cf-row .pill{flex-shrink:0}
+.cf-stack{display:grid;gap:8px}
 
 /* 중간 폭 (621~960px): 구조 유지, 폭만 축소 (v1.8) */
 @media (max-width:960px){

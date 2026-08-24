@@ -862,10 +862,13 @@ function RelQPane() {
               </div>
               );
             }} />
+          {/* 개수는 완전히 오른쪽 끝으로, 페이저는 가운데 그대로 (v2.0 사용자 요청) —
+              한 줄에 나란히 두면 개수만큼 페이저가 왼쪽으로 밀려 가운데가 어긋난다 */}
           {qTotal > PER_Q && (
-            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
+              <span />
               <Pager page={qCur} total={qPages} onChange={setQPage} />
-              <small style={{ color: 'var(--faint)', fontSize: 10.5 }}>총 {qTotal}개</small>
+              <small style={{ color: 'var(--faint)', fontSize: 10.5, justifySelf: 'end' }}>총 {qTotal}개</small>
             </div>
           )}
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

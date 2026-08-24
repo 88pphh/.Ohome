@@ -108,6 +108,24 @@ async function putBlobRaw(blob: Blob): Promise<string> {
   return id;
 }
 
+/**
+ * 브라우저에만 있는 파일을 서버 저장소로 올려 준다 (v2.0 사용자 발견).
+ *
+ * 백엔드를 붙이기 전에 저장한 이미지는 참조가 IndexedDB 파일 id라, 올린 그 브라우저에서만
+ * 보이고 다른 데서 로그인하면 안 보인다. 원본이 이 브라우저에 아직 있으면 저장소로 올리고
+ * 새 주소를 돌려준다 — 이미 주소이거나 원본이 없으면 null(바꿀 게 없다).
+ *
+ * putBlob이 내용 해시로 걸러 주므로 여러 번 불려도 같은 파일이 두 번 올라가지 않는다.
+ */
+export async function promoteToStorage(ref?: string): Promise<string | null> {
+  if (!ref || /^(https?:|data:|blob:)/.test(ref)) return null;
+  if (!isServerMode()) return null;
+  const blob = await getBlob(ref);
+  if (!blob) return null;
+  const url = await putBlob(blob);
+  return url === ref ? null : url;
+}
+
 /** 전체 파일 목록 (id → Blob) — 데이터 백업 내보내기용 (5.2) */
 export async function allBlobs(): Promise<Map<string, Blob>> {
   const db = await openDb();

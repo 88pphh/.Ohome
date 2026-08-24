@@ -587,12 +587,16 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
           <div style={{ marginTop: 10 }}>
             <KCheck label="헤더 이미지 없을 때 배경 직접 지정" checked={headerBgCustom} onChange={setHeaderBgCustom} />
             {headerBgCustom && (
-              <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
-                <ColorField value={headerBgG1} onChange={setHeaderBgG1} />
-                <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
-                <ColorField value={headerBgG2} onChange={setHeaderBgG2} />
-                <span className="cp-lb">각도</span>
-                <KStep value={headerBgAngle} min={0} max={360} step={15} suffix="°" onChange={setHeaderBgAngle} />
+              <div className="cf-stack" style={{ marginTop: 8 }}>
+                <div className="cf-row">
+                  <ColorField value={headerBgG1} onChange={setHeaderBgG1} />
+                  <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
+                  <ColorField value={headerBgG2} onChange={setHeaderBgG2} />
+                </div>
+                <div className="cf-row">
+                  <span className="cp-lb">각도</span>
+                  <KStep value={headerBgAngle} min={0} max={360} step={15} suffix="°" onChange={setHeaderBgAngle} />
+                </div>
               </div>
             )}
           </div>
@@ -639,11 +643,15 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
               <div>
                 <KCheck label="자관명 그림자 직접 지정" checked={shadowCustom} onChange={setShadowCustom} />
                 {shadowCustom && (
-                  <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
-                    <span className="cp-lb">색</span>
-                    <ColorField value={nameShadowColor} onChange={setNameShadowColor} />
-                    <span className="cp-lb">강도</span>
-                    <KStep value={nameShadow} min={0} max={200} step={10} suffix="%" onChange={setNameShadow} />
+                  <div className="cf-stack" style={{ marginTop: 8 }}>
+                    <div className="cf-row">
+                      <span className="cp-lb">색</span>
+                      <ColorField value={nameShadowColor} onChange={setNameShadowColor} />
+                    </div>
+                    <div className="cf-row">
+                      <span className="cp-lb">강도</span>
+                      <KStep value={nameShadow} min={0} max={200} step={10} suffix="%" onChange={setNameShadow} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -662,14 +670,19 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
               <div>
                 <KCheck label="CP 뱃지 색 직접 지정" checked={tagCustom} onChange={setTagCustom} />
                 {tagCustom && (
-                  <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
-                    <span className="cp-lb">배경</span>
-                    <ColorField value={cpTagBg} onChange={setCpTagBg} />
-                    <span className="cp-lb">글씨</span>
-                    <ColorField value={cpTagFg} onChange={setCpTagFg} />
-                    <span className="pill" style={{ background: cpTagBg, color: cpTagFg, borderColor: cpTagBg, marginLeft: 4 }}>
-                      {CP_LABEL[cp]}
-                    </span>
+                  <div className="cf-stack" style={{ marginTop: 8 }}>
+                    <div className="cf-row">
+                      <span className="cp-lb">배경</span>
+                      <ColorField value={cpTagBg} onChange={setCpTagBg} />
+                      <span className="cp-lb">글씨</span>
+                      <ColorField value={cpTagFg} onChange={setCpTagFg} />
+                    </div>
+                    <div className="cf-row">
+                      <span className="cp-lb">미리보기</span>
+                      <span className="pill" style={{ background: cpTagBg, color: cpTagFg, borderColor: cpTagBg }}>
+                        {CP_LABEL[cp]}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -718,12 +731,16 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
               <div>
                 <KCheck label="페이지 배경 직접 지정" checked={pageBgCustom} onChange={setPageBgCustom} />
                 {pageBgCustom && (
-                  <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
-                    <ColorField value={pageBgG1} onChange={setPageBgG1} />
-                    <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
-                    <ColorField value={pageBgG2} onChange={setPageBgG2} />
-                    <span className="cp-lb">각도</span>
-                    <KStep value={pageBgAngle} min={0} max={360} step={15} suffix="°" onChange={setPageBgAngle} />
+                  <div className="cf-stack" style={{ marginTop: 8 }}>
+                    <div className="cf-row">
+                      <ColorField value={pageBgG1} onChange={setPageBgG1} />
+                      <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
+                      <ColorField value={pageBgG2} onChange={setPageBgG2} />
+                    </div>
+                    <div className="cf-row">
+                      <span className="cp-lb">각도</span>
+                      <KStep value={pageBgAngle} min={0} max={360} step={15} suffix="°" onChange={setPageBgAngle} />
+                    </div>
                   </div>
                 )}
               </div>
