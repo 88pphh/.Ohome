@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList, newId } from '@/lib/postStore';
-import { TrpgLog, TRPG_SEED, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
+import { TrpgLog, TRPG_SEED, TrpgLogBody, TRPG_BODY_SEED, bodyVisibility, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
 import { Relation, REL_SEED } from '@/lib/charStore';
 import { SearchBar, KInput, KTextarea, KRadio, KSelect, KDate } from '@/components/ui/Kit';
 import { Modal } from '@/components/ui/Modal';
@@ -25,6 +25,9 @@ export default function TrpgPage() {
   const toast = useToast();
   const [site] = useSiteSettings(); // 티켓 하단 문구 = 로고 서브타이틀 (5.2 연동)
   const [logs, setLogs] = useLocalList<TrpgLog>('ohome.trpg.v1', TRPG_SEED);
+  // 본문은 목록과 분리 저장 (v2.0) — 나만보기 로그도 목록엔 뜨게 하려고 목록 문서의 질의 조건이
+  // listHidden으로 느슨해졌는데, 본문까지 같이 있으면 그 질의로 본문도 함께 새어 나간다
+  const [bodies, setBodies] = useLocalList<TrpgLogBody>('ohome.trpgbody.v1', TRPG_BODY_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
   const { editOn } = useMainStore();          // 편집모드 — 상단바 토글 (다른 목록과 공통)
   const [filter, setFilter] = useState<string>('all');
@@ -100,31 +103,38 @@ export default function TrpgPage() {
 
   const add = async () => {
     if (!nTitle.trim()) { toast('시나리오 타이틀을 입력해 주세요'); return; }
+    const id = newId();
     // 파일이 있으면 등록 시점에 직접 읽음 — 읽기 완료 전에 ADD를 눌러도 본문이 비지 않음
     const bodyText = nFile ? await decodeText(nFile) : nBody;
     const log: TrpgLog = {
-      id: newId(),
+      id,
       no: Math.max(0, ...logs.map(l => l.no)) + 1, // 내부 순번 (정렬용)
       noText: nNo.trim() || undefined,             // № 자리 표시 텍스트 — 비우면 자동 № 0XX
       title: nTitle.trim(), catchphrase: nCatch.trim() || undefined,
       writer: nWriter.trim(), withText: nWith.trim(),
       relId: nRel === 'none' ? undefined : nRel,
       date: nDate || undefined, ph: 'cool',
-      // 본문 저장 위치는 saveLogBody가 정한다 (서버면 문서에 직접 · 로컬이거나 아주 크면 파일로)
-      ...(await saveLogBody(bodyText)),
-      visibility: 'public',
-      // 업로드 원본 파일은 그대로 보관 (4.3 — 백업 목적, IndexedDB → R2 이전 예정)
-      originalFileId: nFile ? await putBlob(nFile) : undefined,
-      originalName: nFile?.name,
+      visibility: nVis,
+      password: nPw.trim() || undefined,
+      listHidden: nListHidden,
       // 썸네일: 이미지(선택) 또는 단색/그라데이션
       thumbId: nThumb ? await putBlob(nThumb) : undefined,
       thumbCrop: nThumb ? nThumbCrop : undefined,
       thumbColor: nThumb ? undefined : { c1: nC1, c2: nColorMode === 'grad' ? nC2 : undefined },
     };
-    log.visibility = nVis;
-    log.password = nPw.trim() || undefined;
-    log.listHidden = nListHidden;
+    // 본문·원본 파일은 별도 문서로 (v2.0) — 목록 문서(log)와 같은 곳에 있으면 나만보기여도
+    // 목록에 뜨는 순간 함께 새어 나간다. 이 문서의 열람 권한은 로그의 실제 visibility를 그대로 따른다
+    const body: TrpgLogBody = {
+      id,
+      // 본문 저장 위치는 saveLogBody가 정한다 (서버면 문서에 직접 · 로컬이거나 아주 크면 파일로)
+      ...(await saveLogBody(bodyText)),
+      // 업로드 원본 파일은 그대로 보관 (4.3 — 백업 목적, IndexedDB → R2 이전 예정)
+      originalFileId: nFile ? await putBlob(nFile) : undefined,
+      originalName: nFile?.name,
+      visibility: bodyVisibility(log),
+    };
     setLogs([log, ...logs]);
+    setBodies([body, ...bodies]);
     setAddOpen(false);
     setNNo(''); setNVis('public'); setNPw(''); setNListHidden(false); setNTitle(''); setNCatch(''); setNWriter(''); setNWith(''); setNBody(''); setNFileName(''); setNDate(''); setNFile(null);
     setNThumb(null); setNThumbUrl(''); setNThumbCrop(undefined);

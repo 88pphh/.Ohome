@@ -91,6 +91,10 @@ export const COLLECTION_OF: Record<string, string> = {
   'ohome.backup.v1': 'gallery',
   'ohome.road.v1': 'roadview',
   'ohome.trpg.v1': 'trpg_logs',
+  // TRPG 로그 본문 — 목록 문서와 분리 저장 (v2.0). 목록 노출(listHidden)과 열람 권한(visibility)이
+  // Firestore에서는 같은 read 규칙을 타므로(질의로 노출된 문서는 단일 조회도 전부 읽힌다),
+  // "나만보기여도 목록엔 표시" 조건을 안전하게 만족하려면 본문을 아예 다른 문서에 둬야 한다
+  'ohome.trpgbody.v1': 'trpg_log_bodies',
   'ohome.tchars.v1': 'trpg_chars',
   'ohome.dotori.v1': 'dotori',
   'ohome.playlog.v1': 'playlog',
@@ -120,10 +124,19 @@ export function diffList<T extends ListItem>(prev: T[], next: T[]) {
   return { inserts, updates, deletes };
 }
 
-/** 항목에서 권한 판단에 쓰는 값 뽑기 */
+/** 항목에서 권한 판단에 쓰는 값 뽑기.
+ *
+ *  listHidden 필드가 있는 항목(TRPG 로그 목록 문서 등)은 "목록에 뜨는지"가 곧 질의(list) 단계의
+ *  공개 여부다 — 실제 열람 권한(item.visibility)과는 별개로 다룬다 (v2.0 사용자 확정: "나만보기여도
+ *  목록에는 표시돼야해"). Firestore·Supabase RLS 둘 다 list/get을 같은 규칙으로 묶어 판단하므로,
+ *  이 필드가 있는 문서에는 민감한 내용(본문 등)을 절대 함께 두면 안 된다 — 질의로 노출되면
+ *  단일 조회 권한도 함께 열리기 때문. (그래서 TRPG 로그는 본문을 별도 문서로 분리해 저장한다.) */
 export function metaOf(item: ListItem, uid: string | null) {
   const rawAuthor = typeof item.authorId === 'string' ? item.authorId : '';
   const authorId = rawAuthor || uid || null;
-  const visibility = typeof item.visibility === 'string' ? item.visibility : 'public';
+  const hasListHidden = typeof item.listHidden === 'boolean';
+  const visibility = hasListHidden
+    ? (item.listHidden ? 'private' : 'public')
+    : (typeof item.visibility === 'string' ? item.visibility : 'public');
   return { authorId, visibility };
 }

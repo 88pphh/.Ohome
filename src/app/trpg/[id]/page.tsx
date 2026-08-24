@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
-import { TrpgLog, TRPG_SEED, showAsHtml, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
+import { TrpgLog, TRPG_SEED, TrpgLogBody, TRPG_BODY_SEED, bodyVisibility, showAsHtml, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
 import { Relation, REL_SEED, Character, CHAR_SEED, charGrant } from '@/lib/charStore';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { getBlob, putBlob, useBlobUrl } from '@/lib/blobStore';
@@ -40,6 +40,10 @@ export default function TrpgDetailPage() {
   const { user, isAdmin } = useAuth();
   const toast = useToast();
   const [logs, setLogs, loaded] = useLocalList<TrpgLog>('ohome.trpg.v1', TRPG_SEED);
+  // 본문은 목록과 분리 저장 (v2.0 — 나만보기 로그도 목록엔 뜨게 하려고 목록 문서의 질의 조건이
+  // listHidden으로 느슨해졌는데, 본문까지 같이 있으면 그 질의로 본문도 함께 새어 나간다).
+  // 이 목록에 없는 id는 "권한이 없어 애초에 안 받아졌다"는 뜻 — 서버가 알아서 걸러 준다
+  const [bodies, setBodies] = useLocalList<TrpgLogBody>('ohome.trpgbody.v1', TRPG_BODY_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
   const [allChars] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const [delAsk, setDelAsk] = useState(false);
@@ -48,6 +52,7 @@ export default function TrpgDetailPage() {
   const gotHeightRef = useRef(false);   // 안쪽에서 높이 보고가 왔는지 (안 오면 기본 높이로 되돌린다)
 
   const l = logs.find(x => x.id === id);
+  const bd = bodies.find(x => x.id === id);   // 분리 저장된 본문 — 권한이 없으면 애초에 안 온다 (undefined)
 
   // 비밀번호 열람 (4.3) — 세션 동안 유지
   const [unlocked, setUnlocked] = useState(false);
@@ -92,8 +97,8 @@ export default function TrpgDetailPage() {
 
   const saveEdit = async () => {
     if (!e.title.trim()) { toast('시나리오 타이틀을 입력해 주세요'); return; }
-    // 본문 교체 준비
-    let bodyPatch: Partial<TrpgLog> = {};
+    // 본문 교체 준비 — 본문은 목록과 분리 저장이라(v2.0) 이제 TrpgLogBody 조각으로 만든다
+    let bodyPatch: Partial<TrpgLogBody> = {};
     if (bodyMode === 'file' && eFile) {
       const text = await decodeLogText(eFile);
       bodyPatch = {
@@ -113,8 +118,8 @@ export default function TrpgDetailPage() {
     } else if (thumbMode === 'color') {
       thumbPatch = { thumbId: undefined, thumbCrop: undefined, thumbColor: { c1: eC1, c2: eColorMode === 'grad' ? eC2 : undefined } };
     }
-    setLogs(logs.map(x => x.id === id ? {
-      ...x,
+    const nextLog: TrpgLog = {
+      ...(l as TrpgLog),
       noText: e.noText.trim() || undefined,
       title: e.title.trim(), catchphrase: e.catchphrase.trim() || undefined,
       writer: e.writer.trim(), withText: e.withText.trim(),
@@ -122,9 +127,26 @@ export default function TrpgDetailPage() {
       date: e.date || undefined,
       visibility: e.visibility, password: e.password.trim() || undefined,
       listHidden: e.listHidden,
+      ...thumbPatch,
+      // 예전엔 본문이 이 문서에 있었다 — 저장할 때마다 확실히 비워서(구버전 잔재 정리),
+      // 나만보기 로그가 목록엔 뜨면서 본문까지 같이 새어 나가는 일이 없게 한다 (v2.0)
+      body: undefined, bodyId: undefined, bodyHtml: undefined,
+      originalFileId: undefined, originalName: undefined,
+    };
+    setLogs(logs.map(x => x.id === id ? nextLog : x));
+    // 본문은 별도 문서에 upsert — 「현재 유지」면 기존 값(분리된 게 있으면 그것, 없으면 구버전 로그의
+    // 내장 값)을 그대로 옮겨 담아, 한 번이라도 수정하면 자동으로 분리 저장 쪽으로 옮겨지게 한다
+    const nextBody: TrpgLogBody = {
+      id,
+      body: bd?.body ?? l?.body ?? '',
+      bodyId: bd?.bodyId ?? l?.bodyId,
+      originalFileId: bd?.originalFileId ?? l?.originalFileId,
+      originalName: bd?.originalName ?? l?.originalName,
       bodyHtml: bodyDisp === 'auto' ? undefined : bodyDisp === 'html',
-      ...bodyPatch, ...thumbPatch,
-    } : x));
+      ...bodyPatch,
+      visibility: bodyVisibility(nextLog),
+    };
+    setBodies(bd ? bodies.map(x => x.id === id ? nextBody : x) : [nextBody, ...bodies]);
     if (bodyMode !== 'keep') setBodyText(null); // 본문 다시 로드
     setEOpen(false);
     setBodyMode('keep'); setEFile(null); setEText('');
@@ -132,14 +154,15 @@ export default function TrpgDetailPage() {
     toast('저장되었습니다');
   };
 
-  // 본문 로드 — 인라인(시드) 또는 IndexedDB(bodyId, 대용량 로그)
+  // 본문 로드 — 분리 저장된 본문(bd) 우선, 없으면 구버전 로그의 내장 본문(l.body/bodyId)로 fallback (v2.0)
   useEffect(() => {
     if (!l) return;
-    if (l.body) { setBodyText(l.body); return; }
-    if (l.bodyId) {
-      getBlob(l.bodyId).then(async b => setBodyText(b ? await b.text() : ''));
+    const src = bd ?? l;   // bd가 없으면(아직 분리 전인 구버전 로그) l 자신에서 읽는다
+    if (src.body) { setBodyText(src.body); return; }
+    if (src.bodyId) {
+      getBlob(src.bodyId).then(async b => setBodyText(b ? await b.text() : ''));
     } else setBodyText('');
-  }, [l]);
+  }, [l, bd]);
 
   // 샌드박스 안 높이 리포터 수신 → iframe 높이 자동 맞춤 (널 오리진이라 직접 측정 불가)
   useEffect(() => {
@@ -216,7 +239,10 @@ export default function TrpgDetailPage() {
   const rel = rels.find(r => r.id === l.relId);
   const body = bodyText ?? '';
   // 지정값이 있으면 그대로 — 직접 쓴 글이 태그처럼 보이는 문자 때문에 HTML로 오판되던 것 방지
-  const html = showAsHtml(l, body);
+  const html = showAsHtml({ bodyHtml: bd?.bodyHtml ?? l.bodyHtml }, body);
+  // 원본 파일도 분리 저장된 쪽 우선, 없으면 구버전 로그의 내장 값 (v2.0)
+  const origFileId = bd?.originalFileId ?? l.originalFileId;
+  const origName = bd?.originalName ?? l.originalName;
   // iframe 기본 body 마진 제거(흰 테두리 방지) + 높이 리포터 주입
   // 크리스탈리아/크릿 계열 로그는 본문을 JS로 그리므로 스크립트 실행이 필요 —
   // 널 오리진 샌드박스(allow-scripts만)라 사이트 쿠키·DOM 접근은 불가 (6.3의 격리 목적 유지)
@@ -260,7 +286,8 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
             });
             // 본문·썸네일 교체 상태 초기화 (기본: 현재 것 유지)
             setBodyMode('keep'); setEFile(null); setEText(bodyText ?? '');
-            setBodyDisp(l.bodyHtml === undefined ? 'auto' : l.bodyHtml ? 'html' : 'text');
+            const bh = bd?.bodyHtml ?? l.bodyHtml;
+            setBodyDisp(bh === undefined ? 'auto' : bh ? 'html' : 'text');
             // 「현재 유지」에서도 위치·확대를 조정할 수 있게 지금 크롭값에서 시작한다
             setThumbMode('keep'); setEThumb(null); setEThumbUrl(''); setEThumbCrop(l.thumbCrop);
             setEColorMode(l.thumbColor ? (l.thumbColor.c2 ? 'grad' : 'solid') : 'grad');
@@ -292,27 +319,27 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
         )}
         {/* 설명문 없이 원본 파일 다운로드 링크만 (4.3 백업) */}
         <p className="hint" style={{ marginTop: 10 }}>
-          {l.originalFileId && (
-            /^https?:/.test(l.originalFileId)
+          {origFileId && (
+            /^https?:/.test(origFileId)
               // 서버에 올라간 파일은 링크로 연다 — fetch로 받으면 버킷 CORS 설정이 필요해진다
               ? (
-                <a href={l.originalFileId} target="_blank" rel="noreferrer" download={l.originalName}
+                <a href={origFileId} target="_blank" rel="noreferrer" download={origName}
                   style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
-                  ⤓ 원본 파일 ({l.originalName})
+                  ⤓ 원본 파일 ({origName})
                 </a>
               ) : (
                 <span style={{ color: 'var(--accent)', cursor: 'var(--cur-pointer,pointer)', fontWeight: 600 }}
                   onClick={async () => {
                     // 이 브라우저에 보관된 원본 파일 (4.3 — 백업 목적)
-                    const b = await getBlob(l.originalFileId!);
+                    const b = await getBlob(origFileId);
                     if (!b) return;
                     const u = URL.createObjectURL(b);
                     const a = document.createElement('a');
-                    a.href = u; a.download = l.originalName ?? 'log.txt';
+                    a.href = u; a.download = origName ?? 'log.txt';
                     a.click();
                     URL.revokeObjectURL(u);
                   }}>
-                  ⤓ 원본 파일 ({l.originalName})
+                  ⤓ 원본 파일 ({origName})
                 </span>
               )
           )}
@@ -476,7 +503,11 @@ html,body{margin:0!important;padding:0!important;height:auto!important;min-heigh
       <ConfirmModal open={delAsk} title="로그를 삭제하시겠습니까?" body="삭제한 로그는 복구할 수 없습니다."
         onClose={() => setDelAsk(false)}
         buttons={[
-          { label: 'DELETE', kind: 'accent', onClick: () => { setLogs(logs.filter(x => x.id !== l.id)); router.push('/trpg'); } },
+          { label: 'DELETE', kind: 'accent', onClick: () => {
+            setLogs(logs.filter(x => x.id !== l.id));
+            setBodies(bodies.filter(x => x.id !== l.id));   // 분리 저장된 본문도 함께 삭제 (v2.0)
+            router.push('/trpg');
+          } },
           { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
         ]} />
     </section>

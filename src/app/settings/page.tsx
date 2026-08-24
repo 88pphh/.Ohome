@@ -51,6 +51,7 @@ import { isServerMode, createBackend, backend } from '@/lib/backend';
 import type { BackendConfig, BackendKind } from '@/lib/backend/types';
 import { validateConfig, configFileText, saveLocalConfig, parseFirebaseSnippet, serverConfig } from '@/lib/serverConfig';
 import { migrateTo, findOrphanFiles } from '@/lib/transfer';
+import { FIRESTORE_RULES, STORAGE_RULES } from '@/lib/firebaseRules';
 
 const CATEGORIES = [
   '디자인', '메인 페이지', '위젯', '메뉴 관리', '게시판 관리', '자관 질문', '커미션', 'TRPG', '감상타래', '메모장',
@@ -78,7 +79,7 @@ function FontRoleRow({ role }: { role: FontRole }) {
   );
   return (
     <div className="set-row" style={{ flexWrap: 'wrap' }}>
-      <div className="l"><b>{ROLE_LABEL[role].label}</b><small>{ROLE_LABEL[role].desc}</small></div>
+      <div className="l"><b>{ROLE_LABEL[role].label}</b>{ROLE_LABEL[role].desc && <small>{ROLE_LABEL[role].desc}</small>}</div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {/* 폰트 이름이 길어도 줄이 넘어가지 않게 상한을 둔다 — 넘치면 … (v2.0 사용자 요청) */}
         <KSelect minWidth={170} value={cfg.id} onChange={v => setRole(role, { id: v })}
@@ -1061,6 +1062,55 @@ function MemberPane() {
           { label: 'CANCEL', kind: 'ghost' as const, onClick: () => setDelMember(null) },
         ]} />
       {del.element}
+      {/* 설치를 이미 마친 뒤에도 보안 규칙이 바뀔 때(버전 업데이트 등) 다시 붙여넣을 수 있게 —
+          예전엔 최초 설치 화면에만 있어서 재설치 없이는 갱신된 규칙을 볼 방법이 없었다 (v2.0) */}
+      {serverOn2 && <SecurityRulesRow />}
+    </div>
+  );
+}
+
+/** 보안 규칙 다시 보기 (v2.0) — 최초 설치 이후에도, 앱 업데이트로 규칙이 바뀌면 다시 붙여넣어야 한다.
+ *  설치 화면과 같은 내용을 여기서도 복사할 수 있게 */
+function SecurityRulesRow() {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState('');
+  const cfg = serverConfig();
+  const copy = async (text: string, tag: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(tag);
+      setTimeout(() => setCopied(''), 2000);
+    } catch {
+      setOpen(true);
+    }
+  };
+  return (
+    <div className="set-sec" style={{ marginTop: 26 }}>
+      <h3>보안 규칙</h3>
+      <div className="d">
+        앱이 업데이트되며 규칙이 바뀔 때가 있습니다 — 새 기능이 갑자기 안 보이거나 목록이 비어 보이면
+        아래를 다시 붙여넣어 보세요. {cfg?.kind === 'firebase' ? 'Firestore' : 'Supabase'} 콘솔의 규칙 화면에
+        그대로 덮어써도 안전합니다(기존 컬렉션 권한은 그대로 유지).
+      </div>
+      {cfg?.kind === 'firebase' ? (
+        <div className="setup-row">
+          <button className="btn btn-dark" onClick={() => copy(FIRESTORE_RULES, 'fs')}>
+            {copied === 'fs' ? '복사됨 ✓' : 'Firestore 규칙 복사'}
+          </button>
+          <button className="btn btn-dark" onClick={() => copy(STORAGE_RULES, 'st')}>
+            {copied === 'st' ? '복사됨 ✓' : 'Storage 규칙 복사'}
+          </button>
+          <button className="btn btn-ghost" onClick={() => setOpen(o => !o)}>{open ? '내용 접기' : '내용 보기'}</button>
+        </div>
+      ) : (
+        <p className="hint" style={{ margin: 0 }}>Supabase는 schema.sql을 SQL Editor에서 다시 실행해 반영합니다.</p>
+      )}
+      {open && cfg?.kind === 'firebase' && (
+        <>
+          <pre className="setup-sql">{FIRESTORE_RULES}</pre>
+          <pre className="setup-sql">{STORAGE_RULES}</pre>
+        </>
+      )}
     </div>
   );
 }

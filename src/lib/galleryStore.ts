@@ -63,18 +63,44 @@ export interface TrpgLog {
   thumbCrop?: CropValue;     // 썸네일 크롭 좌표 (6.1)
   thumbColor?: { c1: string; c2?: string }; // 이미지 없을 때 단색/그라데이션
   serifTitle?: boolean;      // 타이틀 폰트 개별 지정 예시 (폰트 라이브러리는 후속)
-  body: string;              // 로그 본문 (소형/시드용 — 대형 로그는 bodyId 사용)
-  bodyId?: string;           // IndexedDB 본문 파일 id (대용량 로그 — localStorage 용량 보호)
-  bodyHtml?: boolean;        // 본문 표시 방식 지정 (v2.0) — 없으면 내용으로 자동 판별
-  originalFileId?: string;   // 업로드 원본 파일 보관 (4.3 — 백업 목적)
-  originalName?: string;
   visibility: Visibility;
   password?: string;         // 열람 비밀번호 (선택) — 권한이 없어도 비밀번호로 열람 가능
   // 목록 표시 여부 (v2.0 사용자 요청) — 접근권한(누가 열 수 있는지)과는 별개로, 목록에 줄이 뜰지만 정하는
   // 스위치. 나만보기(private)여도 이걸 켜지 않으면 관리자 목록에서 사라지지 않는다 — 반대로 이걸 켜면
   // 전체공개여도 목록에서만 빠지고 직접 링크로는 그대로 열린다. 관리자는 편집모드에서 숨김 표시로 계속 본다
   listHidden?: boolean;
+  // (구버전 호환, v2.0) — 예전엔 본문이 이 문서에 그대로 있었다. 서버 모드에서 목록 문서는
+  // listHidden으로 질의 단계부터 공개될 수 있어(metaOf), 본문처럼 민감한 내용을 같이 두면 새어 나간다
+  // (list 권한이 있으면 같은 문서의 get도 함께 열리는 Firestore/RLS 특성 — 나만보기+목록표시가 이래서
+  // 처음엔 안전하게 동작하지 않았다). 그래서 새 로그부터는 본문을 TrpgLogBody로 분리 저장하고,
+  // 이 필드들은 아직 옮겨지지 않은 옛 로그를 읽을 때만 fallback으로 남겨 둔다 — 그런 로그를 한 번이라도
+  // 수정해 저장하면 자동으로 분리되고 이 필드들은 비워진다.
+  body?: string;
+  bodyId?: string;
+  bodyHtml?: boolean;
+  originalFileId?: string;
+  originalName?: string;
 }
+
+/** TRPG 로그 본문 — 목록 문서(TrpgLog)와 분리 저장 (v2.0, 위 주석 참조).
+ *  id는 로그와 같은 값을 쓴다. visibility는 로그의 실제 열람 권한을 그대로 복사해 이 문서 자체의
+ *  질의 조건으로 삼는다 — 목록 노출(listHidden)과 완전히 무관하게, 이 문서만 따로 보호된다. */
+export interface TrpgLogBody {
+  id: string;
+  body: string;
+  bodyId?: string;
+  bodyHtml?: boolean;
+  originalFileId?: string;
+  originalName?: string;
+  visibility: Visibility;
+}
+
+/** 본문 문서에 적을 열람 권한 — 비밀번호가 걸려 있으면 목록 필터가 예전부터 그래 왔듯 공개로 둔다
+ *  (비밀번호는애초에 Firestore 규칙 단계에서 검증할 수 없어 클라이언트 확인용일 뿐이었다) */
+export const bodyVisibility = (l: { visibility: Visibility; password?: string }): Visibility =>
+  l.password ? 'public' : l.visibility;
+
+export const TRPG_BODY_SEED: TrpgLogBody[] = [];
 
 /** № 자리 표시 — 직접 입력한 텍스트가 있으면 그대로, 없으면 자동 № 0XX */
 export const logNo = (l: TrpgLog) => l.noText || `№ ${String(l.no).padStart(3, '0')}`;

@@ -57,9 +57,10 @@ export interface RoleSetting {
   weight?: number;   // 굵기 (300/400/700) — 없으면 역할별 기본
   scale?: number;    // 크기 % (기본 100)
 }
-export const ROLE_LABEL: Record<FontRole, { label: string; desc: string }> = {
+// desc는 선택 — 굳이 설명이 필요 없는 역할은 비워 둔다 (v2.0 사용자 요청: 메뉴 타이틀 폰트 설명 제거)
+export const ROLE_LABEL: Record<FontRole, { label: string; desc?: string }> = {
   title: { label: '타이틀 폰트', desc: '배너 캡션 등 세리프 자리 전체' },
-  pagetitle: { label: '메뉴 타이틀 폰트', desc: '메뉴 눌렀을 때 상단에 크게 뜨는 페이지 제목 — 기본은 타이틀 폰트를 따라감' },
+  pagetitle: { label: '메뉴 타이틀 폰트' },
   subtitle: { label: '서브타이틀 폰트', desc: '타이틀 아래 설명 문구' },
   logosub: { label: '로고 서브타이틀 폰트', desc: '상단바 로고 아랫줄 문구 — TRPG 티켓 하단 문구도 따라감' },
   menu: { label: '메뉴 폰트', desc: '상단 메뉴' },
