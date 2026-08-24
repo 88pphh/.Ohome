@@ -21,6 +21,7 @@ import { useFonts } from '@/lib/fontStore';
 import { Tip, KInput, KTextarea, KSelect, KRadio } from '@/components/ui/Kit';
 import { Modal, ConfirmModal, useConfirmDelete } from '@/components/ui/Modal';
 import { ColorField } from '@/components/ui/ColorField';
+import { withAlpha } from '@/lib/color';
 import { DragList } from '@/components/ui/DragList';
 import { BlobImg, useBlobUrl } from '@/lib/blobStore';
 import { CroppedBlobImg, CropEditor, type CropValue } from '@/components/ui/CropEditor';
@@ -599,18 +600,28 @@ export default function RelDetailPage() {
 
   return (
     <section className="page page-rel-detail">
-      {/* 헤더 이미지 (v1.5) — 풀폭 블러 + 아래로 페이드아웃 (이미지 없으면 데모 그라데이션)
-          AU별 완전 분리 (v1.9 사용자 확정): AU는 자기 헤더만 — base 것을 물려받지 않음 */}
+      {/* 헤더 이미지 (v1.5) — 풀폭 블러 + 아래로 페이드아웃.
+          AU별 완전 분리 (v1.9 사용자 확정): AU는 자기 헤더만 — base 것을 물려받지 않음.
+          이미지가 없으면 아무것도 안 그리는 게 기본(v2.0) — 다만 자관 수정에서 배경 그라데이션을
+          직접 지정해 뒀으면(base 소관, AU 무관) 그걸로 대신한다 */}
       {(() => {
         const hdrId = isBaseAu ? rel.headerImgId : (au?.headerImgId ?? undefined);
         const hdrCrop = isBaseAu ? rel.headerCrop : au?.headerCrop;
-        // 헤더 이미지가 없으면 배경을 아예 안 그린다 (v2.0 사용자 요청) — 예전엔 데모 그라데이션이 깔렸었다
-        if (!hdrId) return null;
+        if (hdrId) {
+          return (
+            <div className="rel-backdrop">
+              <div className="img custom">
+                <CroppedBlobImg fileRef={hdrId} crop={hdrCrop} ph="" />
+              </div>
+            </div>
+          );
+        }
+        if (!rel.headerBgG1 && !rel.headerBgG2) return null;
         return (
           <div className="rel-backdrop">
-            <div className="img custom">
-              <CroppedBlobImg fileRef={hdrId} crop={hdrCrop} ph="" />
-            </div>
+            <div className="img custom" style={{
+              background: `linear-gradient(${rel.headerBgAngle ?? 180}deg, ${rel.headerBgG1 ?? '#3a4150'}, ${rel.headerBgG2 ?? '#1a1d22'})`,
+            }} />
           </div>
         );
       })()}
@@ -664,7 +675,11 @@ export default function RelDetailPage() {
           </div>
         )}
         {/* 자관명·캐치프레이즈 글씨색 — 직접 지정 시 (v1.9 사용자 요청, 미지정: 테마) */}
-        <h1 style={{ fontFamily: familyOf(rel.fontId), color: rel.nameColor }}>{rel.name}</h1>
+        {/* 이름 그림자 — 색·강도 직접 지정 (v2.0 사용자 요청, 미지정: 검정 60% · 기존과 동일) */}
+        <h1 style={{
+          fontFamily: familyOf(rel.fontId), color: rel.nameColor,
+          textShadow: `0 4px 30px ${withAlpha(rel.nameShadowColor ?? '#000000', 0.6 * ((rel.nameShadow ?? 100) / 100))}`,
+        }}>{rel.name}</h1>
         <div className="catch" style={{ color: rel.cpColor }}>
           {au?.catchphrase || rel.catchphrase}
         </div>

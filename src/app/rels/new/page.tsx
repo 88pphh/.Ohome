@@ -50,6 +50,8 @@ export default function RelNewPage() {
             themeMode: v.themeMode, themeColor: v.themeColor, themeTone: v.themeTone,
             illuBg: v.illuBg, illuOn: v.illuOn,
             nameColor: v.nameColor, cpColor: v.cpColor, cpTagBg: v.cpTagBg, cpTagFg: v.cpTagFg,
+            nameShadowColor: v.nameShadowColor, nameShadow: v.nameShadow,
+            headerBgG1: v.headerBgG1, headerBgG2: v.headerBgG2, headerBgAngle: v.headerBgAngle,
             members, thumbClass: '',
             illustMode: v.kind === 'pair' ? 'duo' : 'one',
             aus: [{ id: 'base', label: '원본', catchphrase: v.catchphrase }],

@@ -38,6 +38,11 @@ export interface RelFormValue {
   cpColor?: string;          // 캐치프레이즈 글씨색 (미지정: 테마)
   cpTagBg?: string;          // CP/NCP 뱃지 배경색 (v2.0 사용자 요청)
   cpTagFg?: string;          // CP/NCP 뱃지 글씨색
+  nameShadowColor?: string;  // 자관명 그림자 색 (v2.0 사용자 요청)
+  nameShadow?: number;       // 자관명 그림자 강도 %
+  headerBgG1?: string;       // 헤더 이미지 없을 때 배경 그라데이션 (v2.0 사용자 요청)
+  headerBgG2?: string;
+  headerBgAngle?: number;
   themeMode: 'site' | 'custom'; // 페이지 테마 — 홈페이지 그대로 / 별도 테마컬러 (4.18 방식)
   themeColor?: string;          // 별도 테마컬러 (custom일 때)
   themeTone?: 'dark' | 'light'; // 테마컬러의 다크/라이트 느낌
@@ -201,6 +206,15 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
   const [tagCustom, setTagCustom] = useState(!!(initial?.cpTagBg || initial?.cpTagFg));
   const [cpTagBg, setCpTagBg] = useState(initial?.cpTagBg ?? '#eef0f2');
   const [cpTagFg, setCpTagFg] = useState(initial?.cpTagFg ?? '#5d636d');
+  // 자관명 그림자 (v2.0 사용자 요청) — 색·강도. 미지정이면 기존 그대로(검정 60%)
+  const [shadowCustom, setShadowCustom] = useState(!!(initial?.nameShadowColor || initial?.nameShadow));
+  const [nameShadowColor, setNameShadowColor] = useState(initial?.nameShadowColor ?? '#000000');
+  const [nameShadow, setNameShadow] = useState(initial?.nameShadow ?? 100);
+  // 헤더 이미지가 없을 때 대신 깔 배경 그라데이션 (v2.0 사용자 요청) — 디자인 탭 배경 설정과 같은 방식(색 2개+각도)
+  const [headerBgCustom, setHeaderBgCustom] = useState(!!(initial?.headerBgG1 || initial?.headerBgG2));
+  const [headerBgG1, setHeaderBgG1] = useState(initial?.headerBgG1 ?? '#3a4150');
+  const [headerBgG2, setHeaderBgG2] = useState(initial?.headerBgG2 ?? '#1a1d22');
+  const [headerBgAngle, setHeaderBgAngle] = useState(initial?.headerBgAngle ?? 180);
   const [charQuery, setCharQuery] = useState('');
   // 전신 이미지 (v1.9 — 페어 · 수정 모드) — AU 편집이면 그 AU의 전신
   const pairMembers = !isNew && (initial!.kind ? initial!.kind === 'pair' : initial!.members.length === 2)
@@ -282,6 +296,11 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
       illuOn: illuCustom ? illuOn : undefined,
       nameColor: txtCustom ? nameColor : undefined,
       cpColor: txtCustom ? cpColor : undefined,
+      nameShadowColor: shadowCustom ? nameShadowColor : undefined,
+      nameShadow: shadowCustom ? nameShadow : undefined,
+      headerBgG1: headerBgCustom ? headerBgG1 : undefined,
+      headerBgG2: headerBgCustom ? headerBgG2 : undefined,
+      headerBgAngle: headerBgCustom ? headerBgAngle : undefined,
       cpTagBg: tagCustom ? cpTagBg : undefined,
       cpTagFg: tagCustom ? cpTagFg : undefined,
       themeMode,
@@ -550,6 +569,23 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
             onClose={() => setHeaderCropOpen(false)}
             onApply={c => { setHeaderCrop(c); setHeaderCropOpen(false); }} />
         )}
+
+        {/* 헤더 이미지가 없을 때 대신 깔 배경 (v2.0 사용자 요청) — 디자인 탭 배경 설정과 같은 방식.
+            지정하지 않으면 예전처럼 그 자리엔 아무것도 안 그린다 */}
+        {!auObj && (
+          <div style={{ marginTop: 10 }}>
+            <KCheck label="헤더 이미지 없을 때 배경 직접 지정" checked={headerBgCustom} onChange={setHeaderBgCustom} />
+            {headerBgCustom && (
+              <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
+                <ColorField value={headerBgG1} onChange={setHeaderBgG1} />
+                <span style={{ color: 'var(--faint)', fontSize: 11 }}>→</span>
+                <ColorField value={headerBgG2} onChange={setHeaderBgG2} />
+                <span className="cp-lb">각도</span>
+                <KStep value={headerBgAngle} min={0} max={360} step={15} suffix="°" onChange={setHeaderBgAngle} />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 우: 기본 정보 + 저장 */}
@@ -583,6 +619,20 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                     <ColorField value={nameColor} onChange={setNameColor} />
                     <span className="cp-lb">캐치</span>
                     <ColorField value={cpColor} onChange={setCpColor} />
+                  </div>
+                )}
+              </div>
+            )}
+            {/* 자관명 그림자 (v2.0 사용자 요청) — 어떤 색으로 얼마나 진하게 깔릴지 */}
+            {!auObj && (
+              <div>
+                <KCheck label="자관명 그림자 직접 지정" checked={shadowCustom} onChange={setShadowCustom} />
+                {shadowCustom && (
+                  <div className="cf-row" style={{ marginTop: 8, alignItems: 'center' }}>
+                    <span className="cp-lb">색</span>
+                    <ColorField value={nameShadowColor} onChange={setNameShadowColor} />
+                    <span className="cp-lb">강도</span>
+                    <KStep value={nameShadow} min={0} max={200} step={10} suffix="%" onChange={setNameShadow} />
                   </div>
                 )}
               </div>
