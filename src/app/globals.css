@@ -266,10 +266,10 @@ a{color:inherit;text-decoration:none}
 .k-input:focus,.k-textarea:focus{border-color:var(--focus-bd,var(--steel-3));box-shadow:var(--focus-ring,0 0 0 3px rgba(60,67,77,.12))}
 .k-textarea{resize:none;min-height:86px;line-height:1.7;overflow:hidden}
 /* 밝은 영역 스크롤바: 얇고 연하게 (v1.8) */
-.k-textarea,.panel,.mng-box{scrollbar-color:#c9ccd2 transparent;scrollbar-width:thin}
+.k-textarea,.panel,.mng-box{scrollbar-color:var(--sb-thumb,#c9ccd2) transparent;scrollbar-width:thin}
 .k-textarea::-webkit-scrollbar,.panel ::-webkit-scrollbar,.mng-box ::-webkit-scrollbar{width:8px}
 .k-textarea::-webkit-scrollbar-track,.panel ::-webkit-scrollbar-track,.mng-box ::-webkit-scrollbar-track{background:transparent}
-.k-textarea::-webkit-scrollbar-thumb,.panel ::-webkit-scrollbar-thumb,.mng-box ::-webkit-scrollbar-thumb{background:#c9ccd2;border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+.k-textarea::-webkit-scrollbar-thumb,.panel ::-webkit-scrollbar-thumb,.mng-box ::-webkit-scrollbar-thumb{background:var(--sb-thumb,#c9ccd2);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
 .k-label{display:block;font-size:calc(11.5px*var(--fs,1));font-weight:700;color:var(--sub);margin:0 0 6px;letter-spacing:.05em}
 /* 체크박스 15px — 체크 정중앙 (v1.6) */
 /* 시각 정렬 보정 (v1.9) — line-height=박스 높이(글리프 위쏠림 해소) + 크기·보더를 정수 px로
@@ -1097,7 +1097,10 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .rel-tabs > button.on{color:var(--ink);border-bottom-color:var(--ink)}
 /* 페어 문답 (QUESTIONS, v1.8) — PC 기준 세로 700px */
 .qa-wrap{display:grid;grid-template-columns:1fr 290px;gap:18px;height:700px}
-.qa-today{display:flex;flex-direction:column;overflow:auto;padding-right:6px;scrollbar-color:#c9ccd2 transparent;scrollbar-width:thin}
+/* 답변만 스크롤하고 입력란은 아래에 고정 (v2.0 사용자 발견) — 예전엔 입력란까지 한 상자에 들어
+   있어 답변이 길어지면 입력란이 밀려 UI가 어긋났다 */
+.qa-today{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.qa-answers{flex:1;min-height:0;overflow:auto;padding-right:6px;scrollbar-color:var(--sb-thumb,#c9ccd2) transparent;scrollbar-width:thin;display:flex;flex-direction:column}
 .qa-no{font-size:calc(10px*var(--fs,1));letter-spacing:.3em;color:var(--faint)}
 .qa-q{font-family:'Noto Serif KR',serif;font-size:calc(20px*var(--fs,1));font-weight:700;line-height:1.5;margin:6px 0 4px}
 /* 질문에 대한 오너 설명 — 질문 바로 아래, 답변보다 한 톤 낮게 (v2.0) */
@@ -1125,7 +1128,7 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
   box-shadow:0 10px 30px rgba(0,0,0,.35);text-align:left;white-space:normal;
 }
 .qa-ans.r .bub[data-note]:hover::after{left:auto;right:0}
-.qa-input{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:11px;align-items:stretch}
+.qa-input{flex-shrink:0;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:11px;align-items:stretch}
 .qa-input .char-pick{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:var(--cur-pointer,pointer);flex-shrink:0}
 .qa-input .char-pick .f{width:56px;height:56px;border-radius:12px;overflow:hidden} /* 입력칸 높이에 맞게 확대 (v1.9 사용자 피드백) */
 .qa-input .char-pick small{font-size:calc(11px*var(--fs,1));font-weight:600;color:var(--ink);white-space:nowrap} /* 이름 확대 (v1.9 사용자 피드백) */
@@ -1133,13 +1136,16 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .qa-search{display:flex;align-items:center;gap:7px;border:1.5px solid var(--line);border-radius:9px;background:#fff;padding:7px 11px;margin-bottom:11px}
 .qa-search input{border:none;outline:none;font-size:calc(12px*var(--fs,1));flex:1;background:none;color:var(--ink)}
 .qa-search span{color:var(--faint);font-size:calc(13px*var(--fs,1))}
-.qa-scroll{overflow:auto;flex:1;scrollbar-color:#c9ccd2 transparent;scrollbar-width:thin}
+.qa-scroll{overflow:auto;flex:1;scrollbar-color:var(--sb-thumb,#c9ccd2) transparent;scrollbar-width:thin}
 .qa-item{padding:10px 11px;border-radius:9px;cursor:var(--cur-pointer,pointer);transition:.13s;margin-bottom:2px}
 .qa-item:hover{background:#f0f1f4}
-.qa-item.on{background:var(--ink);color:#fff}
+/* 고른 질문 — 진한 버튼과 같은 색을 따라간다 (v2.0 사용자 요청).
+   예전엔 --ink(가장 짙은 글씨색)를 그대로 써서 다른 선택 상태보다 유난히 짙었다.
+   진한 버튼색은 디자인 탭에서 정하는 값이라, 홈 색을 바꾸면 여기도 함께 따라온다 */
+.qa-item.on{background:var(--btn-dark,var(--ink));color:var(--btn-dark-fg,#fff)}
 .qa-item b{font-size:calc(12px*var(--fs,1));display:block;line-height:1.5;font-weight:600}
 .qa-item small{font-size:calc(10px*var(--fs,1));color:var(--faint)}
-.qa-item.on small{color:#aab0ba}
+.qa-item.on small{color:var(--btn-dark-fg,#fff);opacity:.72}
 /* 자관 연동 리스트(역극·TRPG)도 중앙 좁힘 */
 .page-rel-detail .g2{max-width:1010px;margin-left:auto;margin-right:auto}
 
@@ -1387,7 +1393,7 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .roadview-item .art .meta b{display:block;font-size:calc(15px*var(--fs,1));letter-spacing:.06em}
 /* 댓글 입력창은 항상 사이드 맨 아래 — 그림이 세로로 길어도 리스트가 내부 스크롤로 흡수 */
 .cmt-side{display:flex;flex-direction:column;border-left:1px solid var(--line);min-height:0;height:100%}
-.cmt-side .list{flex:1;min-height:120px;padding:16px;overflow:auto;scrollbar-color:#c9ccd2 transparent;scrollbar-width:thin}
+.cmt-side .list{flex:1;min-height:120px;padding:16px;overflow:auto;scrollbar-color:var(--sb-thumb,#c9ccd2) transparent;scrollbar-width:thin}
 .roadview-item{grid-auto-rows:minmax(0,auto)}
 .roadview-item .cmt-side{max-height:none}
 

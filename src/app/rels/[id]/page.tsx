@@ -1075,6 +1075,8 @@ export default function RelDetailPage() {
             <div className="qa-today">
               {curQa ? (
                 <>
+                  {/* 스크롤은 여기까지 — 입력란은 밖에 두어 답변이 길어져도 자리를 지킨다 (v2.0 사용자 발견) */}
+                  <div className="qa-answers">
                   <div className="qa-no">TODAY&apos;S QUESTION · Q.{String(curQa.no).padStart(3, '0')}
                     {/* 질문에 대한 오너 설명 — 관리자만 작성 (v2.0 사용자 요청) */}
                     {isAdmin && (
@@ -1099,11 +1101,15 @@ export default function RelDetailPage() {
                           e.preventDefault();
                           setAnsCtx({ x: e.clientX, y: e.clientY, idx: i });
                         }}>
-                        <div className="who" style={{ fontFamily: familyOf(c?.fontId) }}>{c?.name}</div>
+                        {/* 같은 캐릭터가 연달아 답하면 이름을 한 번만 (v2.0 사용자 요청) */}
+                        {curAnswers[i - 1]?.charId !== a.charId && (
+                          <div className="who" style={{ fontFamily: familyOf(c?.fontId) }}>{c?.name}</div>
+                        )}
                         <div className="bub" {...(a.note ? { 'data-note': a.note } : {})}>{a.text}</div>
                       </div>
                     );
                   })}
+                  </div>
                   {answerableIds.length > 0 && (
                     <div className="qa-input">
                       {/* 페어: 클릭 순환 · 다인: 드롭다운으로 선택 (v1.9 사용자 확정) — 권한 있는 캐릭터만 */}
