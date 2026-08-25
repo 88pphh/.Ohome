@@ -231,6 +231,11 @@ a{color:inherit;text-decoration:none}
    헤더가 짧아지면서 위로 삐져나간다 — 슬롯이 상단 메뉴까지 올라갔다 (v2.0 사용자 발견).
    위에 붙여 제목과 나란히 두고 아래로 자라게 한다: 설명이 있든 없든 슬롯 자리가 그대로다 */
 .head-actions.stack{top:0;bottom:auto;flex-direction:column;align-items:flex-end;gap:10px}
+/* 2단 액션은 헤더보다 키가 커서 아래로 자란다 — 그만큼 헤더가 자리를 갖지 않으면
+   검색·등록 버튼이 아래 리스트와 겹친다 (v2.0 사용자 발견) */
+/* 액션을 위에 붙였으므로 제목도 위에 맞춘다 — 아래 정렬로 두면 설명을 끈 순간
+   제목만 아래로 내려가 슬롯과 어긋난다 */
+.page-head.head-stack{min-height:calc(80px*var(--fs,1));align-items:start}
 
 /* 게시판 공통 검색 (6.4) — 접힘형, 세로 35px 통일 */
 /* 검색창 — 테마 토큰 (환경설정 > 디자인 「검색창」에서 색 지정, 라이트/다크 자동 연동) */

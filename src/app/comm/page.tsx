@@ -39,7 +39,7 @@ export default function CommListPage() {
 
   return (
     <section className="page">
-      <div className="page-head">
+      <div className="page-head head-stack">
         <PageTitle>COMMISSION</PageTitle>
         <EditableDesc k="comm-desc" def="그림 커미션 안내 · 모집" />
         {/* 우측 스택: 슬롯(위) + 검색·등록(아래) — 제목 옆 배치라 리스트와 멀어지지 않음 (사용자 확정) */}

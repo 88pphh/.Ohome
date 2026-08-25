@@ -534,11 +534,13 @@ export function ApplyWidget({ conf }: { conf: WidgetConf }) {
   };
 
   return (
-    <div className="panel widget" style={{ cursor: isAdmin ? 'pointer' : undefined }}
+    /* 누르면 관리자든 아니든 신청자 페이지로 간다 (v2.0 사용자 요청).
+       설정은 편집모드에서 우클릭 > 설정으로만 — 목록을 보러 눌렀는데 관리 창이 뜨면 안 된다 */
+    <div className="panel widget" style={{ cursor: 'var(--cur-pointer,pointer)' }}
       onClick={e => {
         if ((e.target as HTMLElement).closest('.modal-ov')) return;
-        if (editOn) return;
-        if (isAdmin) setOpen(true); else router.push('/comm-apply');
+        if (editOn) return;   // 편집모드에서는 배치·우클릭 메뉴가 우선
+        router.push('/comm-apply');
       }}>
       <h4>COMMISSION <span className="more" onClick={e => { e.stopPropagation(); router.push('/comm-apply'); }}>전체 ›</span></h4>
       {shown.map(a => {

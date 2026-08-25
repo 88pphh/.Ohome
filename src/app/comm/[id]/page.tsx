@@ -12,13 +12,12 @@ import {
 import { useFonts } from '@/lib/fontStore';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { useBlobUrl } from '@/lib/blobStore';
-import { CropImg } from '@/components/ui/CropEditor';
+import { CropImg, CropEditor, CropValue } from '@/components/ui/CropEditor';
 import { Tip } from '@/components/ui/Kit';
 import { ConfirmModal } from '@/components/ui/Modal';
 import { PageTitle } from '@/components/ui/PageText';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { CommFormFill } from '@/components/comm/FormFill';
-import { OrderMenu, orderNoOf, moveToOrder } from '@/components/ui/OrderMenu';
 
 /** 편지봉투 픽토그램 (선 아이콘 — 4.18 문의 링크) */
 function MailIcon() {
@@ -43,10 +42,19 @@ function ViewerImg({ fileRef, ph }: { fileRef?: string; ph: string }) {
   );
 }
 
-function StripThumb({ fileRef, ph }: { fileRef?: string; ph: string }) {
+function StripThumb({ fileRef, ph, crop }: { fileRef?: string; ph: string; crop?: CropValue }) {
   const url = useBlobUrl(fileRef);
   if (!url) return <div className={`ph ${ph}`} style={{ position: 'absolute', inset: 0 }} />;
-  return <CropImg src={url} />;
+  return <CropImg src={url} crop={crop} />;
+}
+
+/** 썸네일 위치 잡기 — 줄의 칸과 같은 4:3으로 (v2.0 사용자 요청) */
+function StripCropModal({ fileRef, crop, onClose, onApply }: {
+  fileRef: string; crop?: CropValue; onClose: () => void; onApply: (c: CropValue) => void;
+}) {
+  const url = useBlobUrl(fileRef);
+  if (!url) return null;
+  return <CropEditor open src={url} aspect="4:3" initial={crop} onClose={onClose} onApply={onApply} />;
 }
 
 export default function CommDetailPage() {
@@ -60,7 +68,7 @@ export default function CommDetailPage() {
   const [delAsk, setDelAsk] = useState(false);
   const [lbOpen, setLbOpen] = useState(false); // 대표 이미지 클릭 확대 보기
   // 썸네일 우클릭 순서 바꾸기 (v2.0) — 훅이므로 조기 return보다 먼저
-  const [ordAt, setOrdAt] = useState<{ i: number; x: number; y: number } | null>(null);
+  const [cropFor, setCropFor] = useState<string | null>(null);   // 썸네일 위치 잡는 중인 이미지
 
   const c = items.find(x => x.id === id);
 
@@ -89,16 +97,14 @@ export default function CommDetailPage() {
   const imgs: (string | undefined)[] = c.images.length ? c.images : [undefined];
   const curIdx = Math.min(cur, imgs.length - 1);
 
-  /* 썸네일 순서 바꾸기 (v2.0 사용자 요청) — 우클릭해서 번호로 옮긴다.
-     로그·도토리 목록과 같은 방식이라 쓰던 대로 쓰면 된다(첫째 10, 둘째 20 …).
-     보고 있던 이미지는 자리가 바뀌어도 계속 보고 있게 따라간다. */
-  const moveImage = (from: number, wanted: number) => {
-    const watching = imgs[curIdx];
-    const next = moveToOrder(c.images, from, wanted);
-    setItems(items.map(x => (x.id === c.id ? { ...x, images: next } : x)));
-    const back = next.indexOf(watching as string);
-    if (back >= 0) setCur(back);
-    setOrdAt(null);
+  /* 썸네일 위치 잡기 (v2.0 사용자 요청) — 우클릭 「썸네일 위치」.
+     줄의 칸은 4:3이라 세로로 긴 그림은 가운데가 잘려 얼굴이 안 보인다. 이미지마다 따로 잡는다.
+     원본은 건드리지 않고 어디를 보여 줄지만 저장한다(다른 자리의 이미지는 그대로). */
+  const saveStripCrop = (ref: string, cv: CropValue) => {
+    setItems(items.map(x => (x.id === c.id
+      ? { ...x, stripCrops: { ...(x.stripCrops ?? {}), [ref]: cv } }
+      : x)));
+    setCropFor(null);
   };
   const sc = SLOT_CHARS[c.slotShape];
 
@@ -141,13 +147,13 @@ export default function CommDetailPage() {
         <div className="cm-strip">
           {imgs.map((im, i) => (
             <div key={i} className={`t ${i === curIdx ? 'on' : ''}`} onClick={() => setCur(i)}
-              data-tip={isAdmin ? '우클릭 — 순서 바꾸기' : undefined}
+              data-tip={isAdmin && im ? '우클릭 — 썸네일 위치' : undefined}
               onContextMenu={e => {
-                if (!isAdmin || !c.images.length) return;
+                if (!isAdmin || !im) return;
                 e.preventDefault();
-                setOrdAt({ i, x: e.clientX, y: e.clientY });
+                setCropFor(im);
               }}>
-              <StripThumb fileRef={im} ph={c.ph} />
+              <StripThumb fileRef={im} ph={c.ph} crop={im ? c.stripCrops?.[im] : undefined} />
             </div>
           ))}
         </div>
@@ -195,10 +201,10 @@ export default function CommDetailPage() {
       </div>
 
       {/* 대표 이미지 확대 보기 — 현재 순번에서 시작, ‹ ›로 이어 넘김 */}
-      {/* 썸네일 우클릭 > 순서 번호 (v2.0 사용자 요청) */}
-      {ordAt && (
-        <OrderMenu at={ordAt} current={orderNoOf(ordAt.i)} total={c.images.length}
-          onApply={n => moveImage(ordAt.i, n)} onClose={() => setOrdAt(null)} />
+      {/* 썸네일 우클릭 > 썸네일 위치 (v2.0 사용자 요청) */}
+      {cropFor && (
+        <StripCropModal fileRef={cropFor} crop={c.stripCrops?.[cropFor]}
+          onClose={() => setCropFor(null)} onApply={cv => saveStripCrop(cropFor, cv)} />
       )}
 
       {lbOpen && c.images.length > 0 && (
