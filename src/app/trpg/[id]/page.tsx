@@ -3,6 +3,8 @@
 // 일반 텍스트면 로그용 기본 서식으로 표시
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useHrefBlock } from '@/components/shell/MenuGuard';
+import { sectionHref, MAIN_SEC } from '@/lib/sectionStore';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
 import { TrpgLog, TRPG_SEED, TrpgLogBody, TRPG_BODY_SEED, bodyVisibility, showAsHtml, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
@@ -52,6 +54,10 @@ export default function TrpgDetailPage() {
   const gotHeightRef = useRef(false);   // 안쪽에서 높이 보고가 왔는지 (안 오면 기본 높이로 되돌린다)
 
   const l = logs.find(x => x.id === id);
+  /* 이 글이 속한 곳이 비공개면 주소로 들어와도 열리지 않게 (v2.0 사용자 요청).
+     글 주소에는 섹션이 없어 MenuGuard가 못 막는다 — 글을 읽어 소속을 알아낸 여기서 판정한다.
+     **다른 early return보다 먼저 불러야 한다**(훅이므로 렌더마다 개수가 같아야 한다) */
+  const blocked = useHrefBlock(l && sectionHref('trpg', l.secId ?? MAIN_SEC));
   const bd = bodies.find(x => x.id === id);   // 분리 저장된 본문 — 권한이 없으면 애초에 안 온다 (undefined)
 
   // 접근권한 (4.3) — 관리자 / 공개범위 충족 / 비밀번호 입력자 /
@@ -215,6 +221,8 @@ export default function TrpgDetailPage() {
   };
 
   // 없거나 볼 수 없으면 위 useEffect가 홈으로 보낸다 — 그 사이엔 빈 화면만 (v2.0)
+  // 막힌 곳이면 여기서 되돌아간다 — 훅을 모두 부른 뒤여야 렌더마다 개수가 같다
+  if (blocked) return blocked;
   if (!loaded || !l) return <section className="page" />;
   if (!baseAllowed && !unlocked) {
     if (!l.password) return <section className="page" />;

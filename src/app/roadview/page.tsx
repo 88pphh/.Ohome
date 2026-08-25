@@ -294,8 +294,10 @@ function RoadviewPageInner() {
           canComment={allow(menuSet.roadComment) && (!!user || menuSet.roadComment === 'guest')}
           guestMode={!user && menuSet.roadComment === 'guest'}
           editLevel={editLevel} delLevel={delLevel}
-          canEditItem={it.authorId === user?.id}
-          canDeleteItem={isAdmin || it.authorId === user?.id}
+          /* authorId 없는 항목 + 비로그인이면 둘 다 undefined라 통과하던 것 (v2.0 발견) —
+             손님이 올린 것은 이제 관리자만 손댈 수 있다(손님 확인 수단이 없다) */
+          canEditItem={!!it.authorId && it.authorId === user?.id}
+          canDeleteItem={isAdmin || (!!it.authorId && it.authorId === user?.id)}
           onEdit={() => { setEditFor(it); setENo(String(it.no ?? '')); setEAdult(it.fold?.type === 'adult'); }}
           onDelete={() => setDelFor(it)} />
       ))}
