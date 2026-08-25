@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocalList, newId } from '@/lib/postStore';
+import { useSectionParam, secStamp, secQuery } from '@/lib/sectionStore';
 import { ThreadWork, THREAD_SEED, useThreadSettings } from '@/lib/threadStore';
 import { useFonts } from '@/lib/fontStore';
 import { putBlob, useBlobUrl } from '@/lib/blobStore';
@@ -16,6 +17,8 @@ export function ThreadForm({ editId }: { editId?: string }) {
   const router = useRouter();
   const toast = useToast();
   const [works, setWorks, loaded] = useLocalList<ThreadWork>('ohome.threads.v1', THREAD_SEED);
+  // 어느 감상타래에서 눌러 왔는지 (v2.0)
+  const sec = useSectionParam('threads');
   const [settings] = useThreadSettings();
   const { fonts, familyOf } = useFonts();
   const orig = editId ? works.find(w => w.id === editId) : undefined;
@@ -70,10 +73,10 @@ export function ThreadForm({ editId }: { editId?: string }) {
         ph: PHS[works.length % PHS.length],
         created: new Date().toISOString(), posts: [],
       };
-      setWorks([w, ...works]);
+      setWorks([{ ...w, ...secStamp(sec.id) }, ...works]);
       toast('타래가 시작되었습니다');
     }
-    router.push('/threads');
+    router.push('/threads' + secQuery(sec.id));
   };
 
   return (
@@ -143,7 +146,7 @@ export function ThreadForm({ editId }: { editId?: string }) {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
-            <button className="btn btn-ghost" onClick={() => router.push('/threads')}>CANCEL</button>
+            <button className="btn btn-ghost" onClick={() => router.push('/threads' + secQuery(sec.id))}>CANCEL</button>
             <button className="btn btn-dark" onClick={save}>{orig ? 'SAVE' : 'ADD'}</button>
           </div>
         </div>

@@ -4,7 +4,7 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useSectionParam, filterSection, sectionSetter } from '@/lib/sectionStore';
+import { useSectionParam, filterSection, sectionSetter, secQuery } from '@/lib/sectionStore';
 import { useLocalList, fmtDate } from '@/lib/postStore';
 import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
 import { SearchBar } from '@/components/ui/Kit';
@@ -63,7 +63,7 @@ function BackupPageInner() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <SearchBar onSearch={setQ} />
-          {user && <button className="btn btn-dark" onClick={() => router.push('/backup/write')}>✎ WRITE</button>}
+          {user && <button className="btn btn-dark" onClick={() => router.push('/backup/write' + secQuery(sec.id))}>✎ WRITE</button>}
         </div>
       </div>
 

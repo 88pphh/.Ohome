@@ -1421,7 +1421,7 @@ export default function RelDetailPage() {
       </Modal>
       {/* 답변 수정·오너 부연 (v1.9) — 텍스트는 작성자 본인, 부연설명은 관리자 */}
       <Modal open={ansEdit !== null} onClose={() => setAnsEdit(null)} small
-        title={ansEdit && canEditAns(curAnswers[ansEdit.idx] ?? { charId: '', text: '' }) ? '답변 수정' : '오너 부연설명'}
+        title={ansEdit && canEditAns(curAnswers[ansEdit.idx] ?? { charId: '', text: '' }) ? '답변 수정 · 부연설명' : '부연설명'}
         dirty={!!ansEdit}
         actions={<>
           <button className="btn btn-ghost" onClick={() => setAnsEdit(null)}>CANCEL</button>
@@ -1433,9 +1433,12 @@ export default function RelDetailPage() {
               <KTextarea value={ansEdit.text} onChange={e => setAnsEdit(s => s && { ...s, text: e.target.value })}
                 style={{ minHeight: 60 }} />
             )}
-            {isAdmin && (
+            {/* 부연설명은 **답변을 고칠 수 있는 사람**이면 쓸 수 있다 (v2.0 사용자 발견).
+                예전엔 관리자만 가능해서, 캐릭터 권한을 받아 답변을 단 회원은 자기 답변에조차
+                부연을 못 달았다 — 답변은 되는데 설명만 안 되는 건 앞뒤가 안 맞는다 */}
+            {(isAdmin || canEditAns(curAnswers[ansEdit.idx] ?? { charId: '', text: '' })) && (
               <div>
-                <label className="k-label" style={{ marginBottom: 5 }}>오너 부연설명 — 말풍선에 마우스를 올리면 표시 (비우면 없음)</label>
+                <label className="k-label" style={{ marginBottom: 5 }}>부연설명 — 말풍선에 마우스를 올리면 표시 (비우면 없음)</label>
                 <KTextarea value={ansEdit.note} onChange={e => setAnsEdit(s => s && { ...s, note: e.target.value })}
                   style={{ minHeight: 46 }} />
               </div>
@@ -1487,7 +1490,7 @@ export default function RelDetailPage() {
                 <button onClick={() => {
                   setAnsEdit({ qNo: curQa.no, idx: ansCtx.idx, text: a.text, note: a.note ?? '' });
                   setAnsCtx(null);
-                }}>{canEditAns(a) ? '수정' : '오너 부연설명'}</button>
+                }}>{canEditAns(a) ? '수정 · 부연설명' : '부연설명'}</button>
               )}
               {canDelAns(a) && (
                 <button className="danger" onClick={() => { const i = ansCtx.idx; setAnsCtx(null); deleteAns(curQa.no, i); }}>삭제</button>

@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList, newId, FoldType } from '@/lib/postStore';
+import { useSectionParam, secStamp, secQuery } from '@/lib/sectionStore';
 import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
 import { useBoardSettings, DEFAULT_GALLERY_CATS } from '@/lib/boardStore';
 import { useConfirmDelete } from '@/components/ui/Modal';
@@ -47,6 +48,8 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
   const { user } = useAuth();
   const toast = useToast();
   const [posts, setPosts] = useLocalList<BackupPost>('ohome.backup.v1', BACKUP_SEED);
+  // 어느 갤러리에서 눌러 왔는지 (v2.0) — 새 글을 그 목록에 넣고, 끝나면 그 목록으로 돌아간다
+  const sec = useSectionParam('gallery');
   const isNew = !initial;
   const [title, setTitle] = useState(initial?.title ?? '');
   const [type, setType] = useState<'log' | 'single' | 'vlist'>(initial?.type ?? 'log');
@@ -104,7 +107,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
         visibility,
         fold: foldType === 'none' ? null : { type: foldType, label: foldType === 'custom' ? foldLabel : undefined },
       };
-      setPosts([p, ...posts]);
+      setPosts([{ ...p, ...secStamp(sec.id) }, ...posts]);
       toast('등록되었습니다 — 이미지는 이 브라우저에 실제 저장됩니다');
       router.push(`/backup/${p.id}`);
     } else {
