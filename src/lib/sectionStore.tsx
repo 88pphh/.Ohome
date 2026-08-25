@@ -7,8 +7,10 @@
  * 어디 소속인지만 들고 있다. 그래서 **DB 구조를 바꿀 필요가 없다**(포크 쓰는 사람이 SQL을
  * 다시 실행하지 않아도 된다 — 스키마 캐시 문제를 겪은 뒤라 이게 중요하다).
  *
- * 개별로 두는 것은 **이름뿐**이고 말머리·무드·카테고리 같은 세부 설정은 함께 쓴다(사용자 확정).
+ * 개별로 두는 것은 **이름뿐**이고 말머리·무드 같은 세부 설정은 함께 쓴다(사용자 확정).
  * 그래야 설정 화면에 「어느 것을 편집할지」 고르는 줄이 안 생겨 지금처럼 깔끔하게 남는다.
+ * **예외는 분류/카테고리다** — 감상타래와 스케줄러는 다루는 것이 달라지면 분류도 달라지므로
+ * 각자 따로 갖는다(사용자 요청). 정한 적이 없으면 기본 것을 그대로 쓴다.
  *
  * 섹션을 지워도 **항목 데이터는 남긴다**(3장 원칙) — 메뉴에서만 사라진다.
  */
@@ -18,7 +20,7 @@ import { getRawSetting, setSetting } from './settingStore';
 import { newId } from './postStore';
 
 export type SectionKind =
-  | 'gallery' | 'roadview' | 'trpg' | 'dotori' | 'playlog' | 'comm' | 'diary' | 'threads';
+  | 'gallery' | 'roadview' | 'trpg' | 'dotori' | 'playlog' | 'comm' | 'diary' | 'threads' | 'sched';
 
 /** 섹션 종류별 기본 정보 — 설정 탭 이름과 페이지 주소 */
 export const SECTION_META: Record<SectionKind, { label: string; href: string; defName: string }> = {
@@ -30,6 +32,7 @@ export const SECTION_META: Record<SectionKind, { label: string; href: string; de
   comm:     { label: '커미션',    href: '/comm',     defName: '커미션' },
   diary:    { label: '다이어리',  href: '/diary',    defName: '다이어리' },
   threads:  { label: '감상타래',  href: '/threads',  defName: '감상타래' },
+  sched:    { label: '스케줄러',  href: '/cal',      defName: '스케줄러' },
 };
 
 export const SECTION_KINDS = Object.keys(SECTION_META) as SectionKind[];

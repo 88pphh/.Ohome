@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { WidgetConf, useMainStore, WIDGET_META, decoSlides } from '@/lib/mainStore';
 import { useAuth } from '@/lib/auth';
 import { boardEntries, useMenuSettings, buildMenu, canViewHref } from '@/lib/menuStore';
-import { sectionHref, MAIN_SEC } from '@/lib/sectionStore';
+import { sectionHref, MAIN_SEC, useSections } from '@/lib/sectionStore';
 import { useBoards } from '@/lib/boardStore';
 import { Modal } from '@/components/ui/Modal';
 import { KTextarea, KSelect, KStep, KCheck } from '@/components/ui/Kit';
@@ -325,14 +325,20 @@ export function TodoWidget({ conf }: { conf: WidgetConf }) {
 export function UpcomingWidget() {
   const router = useRouter();
   const { user, isAdmin } = useAuth();
-  const { st } = useSched();
-  // 메뉴에서 비공개로 둔 스케줄러는 위젯에도 안 나온다 (v2.0)
+  const { st } = useSched();   // 인자 없이 = 모든 스케줄러 (v2.0 — 어느 것이든 다가오는 일정은 다가온다)
+  /* 메뉴에서 비공개로 둔 스케줄러는 위젯에도 안 나온다 (v2.0).
+     스케줄러를 여러 개 만들 수 있으므로 **일정마다 그 스케줄러 기준**으로 따지고,
+     볼 수 있는 스케줄러가 하나도 없을 때만 위젯을 통째로 감춘다. */
   const [menuSet] = useMenuSettings();
-  const canSee = canViewHref(menuSet, '/cal', { loggedIn: !!user, isAdmin });
+  const { list } = useSections();
+  const viewer = { loggedIn: !!user, isAdmin };
+  const seeSec = (secId?: string) => canViewHref(menuSet, sectionHref('sched', secId ?? MAIN_SEC), viewer);
+  const canSee = list('sched').some(s => seeSec(s.id));
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   // 오늘 포함 이후 일정 — 매년 반복은 올해 날짜로 환산해 가장 가까운 3개
   const upcoming = st.events
+    .filter(e => seeSec(e.secId))
     .filter(e => isAdmin || e.visibility === 'public' || (e.visibility === 'member' && !!user))
     .map(e => {
       let d = e.start;
