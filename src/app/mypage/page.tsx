@@ -45,15 +45,32 @@ export default function MyPage() {
   const [avColor, setAvColor] = useState('#6b7280');
 
   // 백엔드를 붙이기 전에 올린 프로필 사진은 참조가 이 브라우저의 파일 id라 다른 데서 로그인하면
-  // 안 보인다 (v2.0 사용자 발견). 원본이 여기 남아 있으면 조용히 저장소로 올리고 주소로 바꿔 둔다 —
-  // 사진이 남아 있는 브라우저에서 한 번만 들르면 그 뒤로는 어디서든 보인다.
+  // 안 보인다 (v2.0 사용자 발견). 원본이 여기 남아 있으면 저장소로 올리고 주소로 바꿔 둔다.
+  //
+  // 처음엔 조용히 처리했는데, 안 될 때 아무 말이 없어서 「올렸는데 왜 안 보이지」에서 막혔다
+  // (v2.0 사용자 지적). 못 옮겼으면 **왜** 못 옮겼는지 사진 밑에 그대로 적어 준다.
   const avatarRef = user?.avatarUrl;
+  const [avNote, setAvNote] = useState('');
   useEffect(() => {
-    if (!avatarRef) return;
+    if (!avatarRef) { setAvNote(''); return; }
     let alive = true;
-    promoteToStorage(avatarRef)
-      .then(url => { if (alive && url) updateProfile({ avatarUrl: url }); })
-      .catch(() => { /* 실패하면 그대로 둔다 — 다음에 다시 시도된다 */ });
+    void (async () => {
+      const r = await promoteToStorage(avatarRef);
+      if (!alive) return;
+      if (r.kind === 'uploaded') {
+        const up = await updateProfile({ avatarUrl: r.url });
+        if (!alive) return;
+        setAvNote(up.ok ? '' : `저장소에는 올렸지만 프로필에 반영하지 못했습니다 — ${up.error}`);
+      } else if (r.kind === 'no-origin') {
+        setAvNote('이 사진의 원본이 이 브라우저에 없어 저장소로 옮길 수 없습니다 — 사진을 다시 올려 주세요');
+      } else if (r.kind === 'local-mode') {
+        setAvNote('서버에 연결되어 있지 않아 이 사진은 이 브라우저에만 저장됩니다');
+      } else if (r.kind === 'failed') {
+        setAvNote(`저장소로 올리지 못했습니다 — ${r.error}`);
+      } else {
+        setAvNote('');
+      }
+    })();
     return () => { alive = false; };
   }, [avatarRef, updateProfile]);
 
@@ -75,7 +92,16 @@ export default function MyPage() {
   };
   const changeAvatar = async (f: File | undefined) => {
     if (!f) return;
-    const id = await putBlob(f);
+    // 올리기가 실패하면 예전엔 여기서 그냥 튕겨서 **아무 말도 없이** 끝났다 — 모달만 열린 채라
+    // 저장된 줄 알고 넘어가게 된다 (v2.0 사용자 지적: 「저장 안 됐는지 다른 브라우저에서 안 보인다」).
+    // 저장소 규칙을 안 붙였거나 버킷 설정이 없으면 여기서 걸리므로, 이유를 그대로 보여 준다.
+    let id: string;
+    try {
+      id = await putBlob(f);
+    } catch (e) {
+      toast(`이미지를 저장소에 올리지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
     const r = await updateProfile({ avatarUrl: id });
     setAvOpen(false);
     toast(r.ok ? '프로필 이미지가 변경되었습니다' : r.error!);
@@ -119,6 +145,12 @@ export default function MyPage() {
               </div>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
                 onChange={e => { changeAvatar(e.target.files?.[0]); e.target.value = ''; }} />
+              {/* 이 사진이 다른 곳에서 안 보이는 이유 — 있을 때만 (v2.0 사용자 지적) */}
+              {avNote && (
+                <p className="hint" style={{ margin: 0, maxWidth: 190, textAlign: 'center', lineHeight: 1.5 }}>
+                  {avNote}
+                </p>
+              )}
             </div>
             <div style={{ flex: 1, minWidth: 220, display: 'grid', gap: 10 }}>
               <div>
