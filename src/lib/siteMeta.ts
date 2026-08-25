@@ -55,10 +55,11 @@ function fromFirestore(doc: unknown): SiteMeta | null {
   const subtitle = m?.subtitle?.stringValue;
   const crawlDesc = m?.crawlDesc?.stringValue;
   const favicon = httpOnly(m?.favicon?.stringValue);
+  // 제목을 안 정했어도 설명·아이콘은 살린다 — 예전엔 제목이 비면 통째로 버려서,
+  // 크롤링 문구만 적어 둔 경우 그 문구가 조용히 무시됐다 (v2.0)
   const t = (docTitle || '').trim() || (title ? `${title} — 개인홈` : '');
-  // 제목이 비어 있어도 아이콘만 지정했을 수 있다 — 그 경우 제목은 기본값으로 두고 아이콘만 살린다
-  if (!t) return favicon ? { ...FALLBACK, favicon } : null;
-  return { title: t, subtitle, crawlDesc, favicon };
+  if (!t && !crawlDesc && !subtitle && !favicon) return null;
+  return { title: t || FALLBACK.title, subtitle, crawlDesc, favicon };
 }
 
 /**
@@ -86,10 +87,10 @@ export async function siteMeta(): Promise<SiteMeta> {
     const rows = await res.json() as
       { value?: { title?: string; docTitle?: string; subtitle?: string; crawlDesc?: string; favicon?: string } }[];
     const v = rows?.[0]?.value;
+    // 제목을 안 정했어도 설명·아이콘은 살린다 (위 Firestore 쪽과 같은 이유)
     const t = (v?.docTitle || '').trim() || (v?.title ? `${v.title} — 개인홈` : '');
     const favicon = httpOnly(v?.favicon);
-    if (!t) return favicon ? { ...FALLBACK, favicon } : FALLBACK;
-    return { title: t, subtitle: v?.subtitle, crawlDesc: v?.crawlDesc, favicon };
+    return { title: t || FALLBACK.title, subtitle: v?.subtitle, crawlDesc: v?.crawlDesc, favicon };
   } catch {
     return FALLBACK;   // 네트워크·권한 문제면 기본 제목으로
   }
