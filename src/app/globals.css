@@ -1503,6 +1503,10 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
    보이지 않는 공백을 하나 넣어 한 줄만큼의 자리를 만든다 */
 .post-body p:empty::before{content:"\00a0"}
 .post-body img{max-width:100%;border-radius:9px}
+/* 본문 안 이미지 — 눌러서 크게 볼 수 있다는 걸 커서로 알린다 (v2.0 사용자 요청).
+   링크로 감싼 이미지는 그 링크가 할 일이 따로 있으므로 제외 */
+.html-body img{cursor:zoom-in}
+.html-body a img{cursor:inherit}
 .post-body a{color:var(--accent);text-decoration:underline}
 .post-body blockquote{border-left:3px solid var(--line);padding:2px 14px;color:var(--sub);margin:10px 0}
 .post-body pre{background:#f0f1f3;border-radius:9px;padding:12px 14px;font-size:calc(12px*var(--fs,1));overflow-x:auto;margin:10px 0}
