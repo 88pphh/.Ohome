@@ -4,6 +4,11 @@ export type Visibility = 'public' | 'member' | 'private'; // 공개범위 3단�
 
 export interface ColorChip { hex: string; label: string }
 
+/** 테마컬러 점 테두리 (v2.0 사용자 요청) — 미지정이면 지금까지의 옅은 테두리 그대로,
+ *  'none'이면 없음, hex면 그 색으로 1px */
+export const chipBorder = (bd?: string): string =>
+  (bd === 'none' ? 'none' : `inset 0 0 0 1px ${bd ?? 'rgba(0,0,0,.1)'}`);
+
 export interface CharTab {
   id: string;
   icon: string;          // 아이콘 문자 (업로드 아이콘은 후속)
@@ -20,6 +25,9 @@ export interface Character {
   // 상세 페이지 테마 (v1.9 사용자 확정) — custom이면 대표 테마색으로 홈 팔레트 임시 전환 (4.18 방식)
   themeMode?: 'default' | 'custom';
   colors: ColorChip[];   // 테마 컬러 나열
+  /** 테마컬러 점 테두리 (v2.0 사용자 요청) — 'none' = 없음 · hex = 그 색으로 1px.
+   *  미지정이면 지금까지와 같은 옅은 테두리(안 정한 홈은 모습이 안 바뀐다) */
+  colorBd?: string;
   colorTipMode?: 'hex' | 'both' | 'label'; // 색 점 툴팁 표기: hex / 이름+hex / 이름만
   specs: { label: string; value: string }[];
   tabs: CharTab[];       // 기본 정보 외 추가 탭
@@ -346,6 +354,10 @@ export interface Relation {
   cp?: RelCpTag;                 // 자관 기본 CP/NCP (등록 시 선택, v1.9)
   fullFront?: string;            // 전신 모드에서 앞에 보일 캐릭터 id (v1.9 — 미리보기에서 클릭 선택)
   pairRight?: string;            // 페어에서 오른쪽 자리에 둘 캐릭터 id (v2.0 — 없으면 등록 순서대로)
+  /** 상세 중앙 일러가 어디를 보여 줄지 (v2.0 사용자 요청) — 리스트 썸네일(thumbCrop)과 별개.
+    *  **이미지 참조를 키로** 두어 여러 장을 각각 잡을 수 있고, AU의 일러도 같은 자리에 담긴다
+    *  (참조가 다르므로 섞이지 않는다). 원본은 건드리지 않는다. */
+   artCrops?: Record<string, import('@/components/ui/CropEditor').CropValue>;
   timeline: TlItem[];            // base AU의 타임라인
   questions: QaEntry[];          // base AU의 문답
   qaPool?: string[];             // base AU의 대기 질문 풀 (v1.9 — 랜덤 출제 대기)

@@ -2,7 +2,7 @@
 // 자관 상세 (4.5) — 2인: 헤더 블러 + 대형 타이틀 + 좌우 카드 + 중앙 일러(전신/일러 토글) + AU
 // 하단: TIMELINE / QUESTIONS 탭 (v1.8) + 역극·로그 연동 리스트 · 다인(3인+): 멤버 리스트형
 // 관리자: 멤버 추가(내/상대 캐릭터) · 타임라인 항목 추가 · 질문 추가
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -78,6 +78,18 @@ function rgbTriple(hex: string): string {
 /** 프로필에 덧붙일 메모 — 「회원 ○○ 연결됨」처럼 알려 줄 게 있을 때만.
  *  예전엔 상대 캐릭터를 등록하면 「상대 캐릭터」라고 적어 뒀는데, 상대 캐릭터 자리에 있는 게
  *  상대 캐릭터인 건 굳이 적을 일이 아니라 뺐다 (v2.0 사용자 요청 — 이미 저장된 것도 안 보이게) */
+/** 중앙 일러 위치 편집기 (v2.0) — 실제 표시 영역의 비율 그대로 열어야 보이는 대로 맞출 수 있다 */
+function RelArtCropModal({ fileRef, ratio, crop, onClose, onApply }: {
+  fileRef: string; ratio: number; crop?: CropValue; onClose: () => void; onApply: (c: CropValue) => void;
+}) {
+  const url = useBlobUrl(fileRef);
+  if (!url) return null;
+  return (
+    <CropEditor open src={url} aspect={ratio} aspectLabel="상세 화면과 같은 비율"
+      initial={crop} onClose={onClose} onApply={onApply} />
+  );
+}
+
 const noteOf = (m: RelMember) => (m.linkedNote === '상대 캐릭터' ? '' : m.linkedNote ?? '');
 
 function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side, onMoveSide, onFaceCrop }: {
@@ -175,6 +187,7 @@ function MiniProf({ member, char, isAdmin, onGo, onRemove, auUnregistered, side,
         </div>
       )}
       {lb !== null && <Lightbox srcs={gallery} index={lb} onClose={() => setLb(null)} />}
+
       {/* 우클릭 메뉴 — 관리자만 (멤버 제거) */}
       {ctx && createPortal(
         <div className="ctx-menu on" style={{ left: ctx.x, top: ctx.y }} onClick={e => e.stopPropagation()}>
@@ -282,6 +295,24 @@ export default function RelDetailPage() {
   const [tSays, setTSays] = useState<{ id: string; charId: string; text: string }[]>([]);
   const [tlSort, setTlSort] = useState(false); // 타임라인 정렬 모드 (드래그앤드롭)
   const [artIdx, setArtIdx] = useState(0);
+  /* 중앙 일러 우클릭 → 상세에 보일 위치 조정 (v2.0 사용자 요청).
+     리스트 썸네일 좌표만 잡을 수 있고 상세는 못 잡던 것 — 여러 장이면 보고 있는 장을 잡는다.
+     표시 영역은 화면 높이에 따라 달라지므로 고정 비율이 아니라 **실제 상자 비율**로 연다. */
+  const [artCtx, setArtCtx] = useState<{ x: number; y: number; ref: string } | null>(null);
+  const [artCropOpen, setArtCropOpen] = useState<{ ref: string; ratio: number } | null>(null);
+  const artBoxRef = useRef<HTMLDivElement>(null);
+  const artBoxRatio = () => {
+    const r = artBoxRef.current?.getBoundingClientRect();
+    return r && r.height > 1 ? r.width / r.height : 3 / 4;
+  };
+  useEffect(() => {
+    if (!artCtx) return;
+    const close = () => setArtCtx(null);
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setArtCtx(null); };
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('click', close); window.removeEventListener('keydown', key); };
+  }, [artCtx]);
   const [qOpen, setQOpen] = useState(false);
   const [qText, setQText] = useState('');
   const [auOpen, setAuOpen] = useState(false);
@@ -343,6 +374,15 @@ export default function RelDetailPage() {
   const auArts = (isBaseAu ? rel?.arts : au?.arts) ?? [];
   const auTimeline = (isBaseAu ? rel?.timeline : au?.timeline) ?? [];
   const auQuestions = (isBaseAu ? rel?.questions : au?.questions) ?? [];
+  const curArt = auArts[Math.min(artIdx, Math.max(0, auArts.length - 1))];
+  /** 이 장의 위치만 저장 — 참조를 키로 두어 다른 장·AU 것은 그대로 (v2.0) */
+  const saveArtCrop = (ref: string, c: CropValue | undefined) => updateRel({
+    artCrops: (() => {
+      const next = { ...(rel!.artCrops ?? {}) };
+      if (c) next[ref] = c; else delete next[ref];
+      return next;
+    })(),
+  });
   const auQaPool = (isBaseAu ? rel?.qaPool : au?.qaPool) ?? [];   // 대기 질문 풀 (v1.9)
   const auCpTag: RelCpTag | undefined = au?.cp ?? rel?.cp;
   const qaOn = (isBaseAu ? rel?.qaEnabled : au?.qaEnabled) ?? auQuestions.length > 0;
@@ -824,11 +864,17 @@ export default function RelDetailPage() {
                 </div>
               );
             })}
-            <div className="single" style={{ cursor: auArts.length > 1 ? 'pointer' : undefined }}
-              onClick={() => { const n = auArts.length; if (n > 1) setArtIdx(i => (i + 1) % n); }}>
+            <div className="single" ref={artBoxRef} style={{ cursor: auArts.length > 1 ? 'pointer' : undefined }}
+              onClick={() => { const n = auArts.length; if (n > 1) setArtIdx(i => (i + 1) % n); }}
+              onContextMenu={e => {
+                if (!isAdmin || !curArt) return;
+                e.preventDefault();
+                setArtCtx({ x: e.clientX, y: e.clientY, ref: curArt });
+              }}>
               {auArts.length > 0 ? (
                 <>
-                  <BlobImg fileRef={auArts[Math.min(artIdx, auArts.length - 1)]} ph="" label="MAIN ILLUST" />
+                  {/* 잡아 둔 위치가 있으면 그대로 (v2.0) — 없으면 예전처럼 통째로 */}
+                  <CroppedBlobImg fileRef={auArts[Math.min(artIdx, auArts.length - 1)]} crop={rel.artCrops?.[curArt]} ph="" label="MAIN ILLUST" />
                   {auArts.length > 1 && (
                     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 44, display: 'flex', justifyContent: 'center', gap: 5, zIndex: 3 }}>
                       {auArts.map((_, i) => (
@@ -910,12 +956,17 @@ export default function RelDetailPage() {
           </div>
 
           {/* 우: 그룹 일러 — 여러 장이면 클릭 넘김 + 도트 */}
-          <div className="multi-illust"
+          <div className="multi-illust" ref={artBoxRef}
             style={{ cursor: auArts.length > 1 ? 'pointer' : undefined }}
-            onClick={() => { const n = auArts.length; if (n > 1) setArtIdx(i => (i + 1) % n); }}>
+            onClick={() => { const n = auArts.length; if (n > 1) setArtIdx(i => (i + 1) % n); }}
+            onContextMenu={e => {
+              if (!isAdmin || !curArt) return;
+              e.preventDefault();
+              setArtCtx({ x: e.clientX, y: e.clientY, ref: curArt });
+            }}>
             {auArts.length > 0 ? (
               <>
-                <BlobImg fileRef={auArts[Math.min(artIdx, auArts.length - 1)]} ph="" label="GROUP ILLUST" />
+                <CroppedBlobImg fileRef={auArts[Math.min(artIdx, auArts.length - 1)]} crop={rel.artCrops?.[curArt]} ph="" label="GROUP ILLUST" />
                 {auArts.length > 1 && (
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: 14, display: 'flex', justifyContent: 'center', gap: 5, zIndex: 3 }}>
                     {auArts.map((_, i) => (
@@ -1311,6 +1362,25 @@ export default function RelDetailPage() {
           </div>
         </div>
       </Modal>
+
+{/* 중앙 일러 우클릭 — 상세에 보일 위치 (v2.0 사용자 요청). 여러 장이면 보고 있는 장 */}
+      {artCtx && createPortal(
+        <div className="ctx-menu on" style={{ left: artCtx.x, top: artCtx.y }} onClick={e => e.stopPropagation()}>
+          <div className="ctx-ttl">중앙 일러{auArts.length > 1 ? ` ${Math.min(artIdx, auArts.length - 1) + 1}/${auArts.length}` : ''}</div>
+          <button onClick={() => { setArtCropOpen({ ref: artCtx.ref, ratio: artBoxRatio() }); setArtCtx(null); }}>
+            이미지 위치 조정
+          </button>
+          {rel.artCrops?.[artCtx.ref] && (
+            <button onClick={() => { saveArtCrop(artCtx.ref, undefined); setArtCtx(null); }}>위치 지정 해제</button>
+          )}
+        </div>,
+        document.body,
+      )}
+      {artCropOpen && (
+        <RelArtCropModal fileRef={artCropOpen.ref} ratio={artCropOpen.ratio} crop={rel.artCrops?.[artCropOpen.ref]}
+          onClose={() => setArtCropOpen(null)}
+          onApply={c => { saveArtCrop(artCropOpen.ref, c); setArtCropOpen(null); }} />
+      )}
 
       {/* ---------- QUESTIONS 섹션 추가 — 질문 리스트 선택 (v1.9) ---------- */}
       <Modal open={qsetOpen} onClose={() => setQsetOpen(false)} small title="질문 리스트 추가"
