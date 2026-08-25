@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useSectionParam, filterSection, sectionSetter, secQuery } from '@/lib/sectionStore';
 import { useLocalList, newId } from '@/lib/postStore';
 import {
-  ThreadWork, ThreadPost, THREAD_SEED, useThreadSettings, catLabel, threadBadgeStyle, lastDate, fmtMD, fmtMDHM,
+  ThreadWork, ThreadPost, THREAD_SEED, useThreadSettings, threadCats, catLabel, threadBadgeStyle, lastDate, fmtMD, fmtMDHM,
 } from '@/lib/threadStore';
 import { useFonts } from '@/lib/fontStore';
 import { putBlob, BlobImg, useBlobUrl } from '@/lib/blobStore';
@@ -68,6 +68,8 @@ function ThreadsPageInner() {
   // 저장은 이 섹션 자리만 교체 — 걸러진 목록을 그대로 넘겨도 다른 섹션이 지워지지 않는다
   const setWorks = sectionSetter(worksAll, sec.id, setWorksAll);
   const [settings, , setLoaded] = useThreadSettings();
+  // 분류는 섹션마다 따로 (v2.0 사용자 요청) — 정한 적 없으면 기본 섹션 것
+  const cats = threadCats(settings, sec.id);
 
   const [view, setView] = useState<'thread' | 'list'>('thread');
   const [lb, setLb] = useState<{ srcs: string[]; idx: number } | null>(null); // 이미지 확대 보기
@@ -180,7 +182,7 @@ function ThreadsPageInner() {
         {/* 분류 필터 (환경설정 관리 리스트) */}
         <div className="seg">
           <button className={cat === 'all' ? 'on' : ''} onClick={() => setCat('all')}>전체</button>
-          {settings.cats.map(c => (
+          {cats.map(c => (
             <button key={c.id} className={cat === c.id ? 'on' : ''} onClick={() => setCat(c.id)}>{c.label}</button>
           ))}
         </div>
@@ -209,8 +211,8 @@ function ThreadsPageInner() {
               onClick={() => { setSelId(w.id); setView('thread'); }}>
               <div className="th">
                 <CroppedBlobImg fileRef={w.posterId} crop={w.posterCrop} ph={w.ph} />
-                <span className="pill dark" style={threadBadgeStyle(settings.cats.find(c => c.id === w.catId))}>
-                  {catLabel(settings.cats, w.catId)}
+                <span className="pill dark" style={threadBadgeStyle(cats.find(c => c.id === w.catId))}>
+                  {catLabel(cats, w.catId)}
                 </span>
               </div>
               <div className="info">
@@ -228,8 +230,8 @@ function ThreadsPageInner() {
             {sel && (
               <>
                 <div className="thr-head">
-                  <span className="cat-badge" style={threadBadgeStyle(settings.cats.find(c => c.id === sel.catId))}>
-                    {catLabel(settings.cats, sel.catId)}
+                  <span className="cat-badge" style={threadBadgeStyle(cats.find(c => c.id === sel.catId))}>
+                    {catLabel(cats, sel.catId)}
                   </span>
                   <div className="poster">
                     <CroppedBlobImg fileRef={sel.posterId} crop={sel.posterCrop} ph={sel.ph} />
@@ -307,7 +309,7 @@ function ThreadsPageInner() {
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <b>{w.title}</b>
-                  <small>{catLabel(settings.cats, w.catId)} · 글 {w.posts.length} · {fmtMD(lastDate(w))}</small>
+                  <small>{catLabel(cats, w.catId)} · 글 {w.posts.length} · {fmtMD(lastDate(w))}</small>
                 </div>
               </div>
             ))}

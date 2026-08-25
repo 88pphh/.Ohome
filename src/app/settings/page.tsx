@@ -19,7 +19,7 @@ import {
   useBoardSettings, boardBadgeStyle, BoardBadge,
   useBoards, Board, BoardSkin, BoardPerm, DEFAULT_BOARD_CATS, MAIN_BOARD_ID,
 } from '@/lib/boardStore';
-import { useThreadSettings, ThreadWork, THREAD_SEED, ThreadCat, threadBadgeStyle } from '@/lib/threadStore';
+import { useThreadSettings, ThreadWork, THREAD_SEED, ThreadCat, threadBadgeStyle, threadCats, threadCatsPatch } from '@/lib/threadStore';
 import { useTrpgSettings, DOTORI_STATUS_KEYS, DotoriStatus, dotoriBadgeStyle } from '@/lib/galleryStore';
 import { useMemoSettings } from '@/lib/memoStore';
 import {
@@ -29,7 +29,7 @@ import {
 } from '@/lib/menuStore';
 import { FEATURES } from '@/lib/menu';
 import { SectionsBlock } from '@/components/settings/SectionList';
-import { useSections, sectionMenuEntries } from '@/lib/sectionStore';
+import { useSections, sectionMenuEntries, MAIN_SEC, inSection } from '@/lib/sectionStore';
 import { useSiteDraft } from '@/lib/siteStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCursorSettings, CursorState, CURSOR_STATE_LABEL } from '@/lib/cursorStore';
@@ -2391,8 +2391,16 @@ function ThreadPane() {
   const [settings, patch] = useThreadSettings();
   const [works] = useLocalList<ThreadWork>('ohome.threads.v1', THREAD_SEED);
   const del = useConfirmDelete();
+  /* 분류는 감상타래마다 따로 (v2.0 사용자 요청) — 여러 개로 만들었으면 어느 것의 분류를
+     고칠지 먼저 고른다. 하나뿐이면 고를 것이 없으니 선택 줄을 아예 두지 않는다. */
+  const { list } = useSections();
+  const secs = list('threads');
+  const [secId, setSecId] = useState(MAIN_SEC);
+  const cur = secs.find(s => s.id === secId) ? secId : MAIN_SEC;
+  const cats = threadCats(settings, cur);
+  const setCats = (next: ThreadCat[]) => patch(threadCatsPatch(settings, cur, next));
   const patchCat = (id: string, p: Partial<ThreadCat>) =>
-    patch({ cats: settings.cats.map(c => (c.id === id ? { ...c, ...p } : c)) });
+    setCats(cats.map(c => (c.id === id ? { ...c, ...p } : c)));
   return (
     <div className="set-sec">
       <h3>기본 보기</h3>
@@ -2408,8 +2416,18 @@ function ThreadPane() {
       </div>
 
       <h3 style={{ marginTop: 26 }}>분류 리스트</h3>
-      <div className="d">작품 분류 뱃지 — 이름 · 배경/테두리/글씨색 · ⠿ 드래그로 순서 · 추가/삭제</div>
-      <DragList items={settings.cats} keyOf={c => c.id} onReorder={cats => patch({ cats })}
+      <div className="d">
+        작품 분류 뱃지 — 이름 · 배경/테두리/글씨색 · ⠿ 드래그로 순서 · 추가/삭제
+        {secs.length > 1 && <><br />감상타래마다 따로 정합니다 — <b>손대기 전까지는 기본 감상타래의 분류를 그대로 씁니다</b></>}
+      </div>
+      {secs.length > 1 && (
+        <div className="mini-seg" style={{ flexWrap: 'wrap', marginBottom: 10 }}>
+          {secs.map(s => (
+            <button key={s.id} className={cur === s.id ? 'on' : ''} onClick={() => setSecId(s.id)}>{s.name}</button>
+          ))}
+        </div>
+      )}
+      <DragList items={cats} keyOf={c => c.id} onReorder={next => setCats(next)}
         render={c => (
           <div className="set-row" style={{ width: '100%' }}>
             <div className="l" style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
@@ -2427,9 +2445,9 @@ function ThreadPane() {
               <ColorField value={c.fg ?? '#ffffff'} onChange={hex => patchCat(c.id, { fg: hex })} />
               <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
                 onClick={() => {
-                  const used = works.filter(w => w.catId === c.id).length;
+                  const used = works.filter(w => w.catId === c.id && inSection(w.secId, cur)).length;
                   del.ask(`분류 「${c.label}」를 삭제하시겠습니까?`,
-                    () => patch({ cats: settings.cats.filter(x => x.id !== c.id) }),
+                    () => setCats(cats.filter(x => x.id !== c.id)),
                     used > 0 ? `이 분류의 타래 ${used}개는 유지되지만 분류가 「기타」로 표시됩니다.` : undefined);
                 }}>DELETE</button>
             </div>
@@ -2437,7 +2455,7 @@ function ThreadPane() {
         )} />
       <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
         <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }}
-          onClick={() => patch({ cats: [...settings.cats, { id: newId(), label: '새 분류' }] })}>
+          onClick={() => setCats([...cats, { id: newId(), label: '새 분류' }])}>
           ＋ ADD
         </button>
       </div>
