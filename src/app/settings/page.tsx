@@ -1508,8 +1508,11 @@ function DataPane() {
       const rows = await findOrphanFiles(be);
       setOrphans(rows);
       toast(rows.length ? `쓰지 않는 이미지 ${rows.length}개를 찾았습니다` : '정리할 이미지가 없습니다');
-    } catch {
-      toast('이미지 목록을 읽지 못했습니다 — 저장소 권한(규칙)을 확인해 주세요');
+    } catch (e) {
+      // 멈춘 이유를 그대로 보여 준다 (v2.0) — 「권한 문제」로 뭉뚱그리면 진짜 원인을 놓친다
+      toast(e instanceof Error && e.message
+        ? e.message
+        : '이미지 목록을 읽지 못했습니다 — 저장소 권한(규칙)을 확인해 주세요');
     }
     setScanning(false);
   };
