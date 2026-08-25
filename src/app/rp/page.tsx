@@ -76,9 +76,9 @@ export default function RpPage() {
     return isAdmin ? chars.filter(c => c.own) : chars.filter(c => !!charGrant(c, user?.id));
   }, [rel, chars, isAdmin, user?.id]);
 
-  const [speaker, setSpeaker] = useState<string>('');   // charId | 'player' | 'desc'
+  const [speaker, setSpeaker] = useState<string>('');   // charId | 'desc' (플레이어 발화는 없앴다, v2.0)
   const [pickOpen, setPickOpen] = useState(false);
-  useEffect(() => { setSpeaker(speakChars[0]?.id ?? 'player'); setPickOpen(false); }, [sel?.id, speakChars]);
+  useEffect(() => { setSpeaker(speakChars[0]?.id ?? 'desc'); setPickOpen(false); }, [sel?.id, speakChars]);
 
   // 입장 시 읽음 처리 (N 뱃지 해제) — 브라우저에만 기록한다 (v2.0).
   // 예전엔 방 문서의 lastRead에 써서, 방을 열어 보기만 해도 남의 방을 UPDATE 하게 되어
@@ -101,7 +101,7 @@ export default function RpPage() {
     if (!sel || !user) return;
     let t = text.trim();
     if (!t) return;
-    let kind: RpMessage['kind'] = speaker === 'desc' ? 'desc' : speaker === 'player' ? 'player' : 'char';
+    let kind: RpMessage['kind'] = speaker === 'desc' ? 'desc' : 'char';
     if (t.startsWith('/desc ')) { kind = 'desc'; t = t.slice(6).trim(); } // /desc 명령 (v1.8)
     if (!t) return;
     const m: RpMessage = {
@@ -245,7 +245,7 @@ export default function RpPage() {
         return `<p style="text-align:center;color:#4a505a;line-height:1.8;margin:14px 0">${esc(m.text)}</p>`;
       }
       const ch = chars.find(c => c.id === m.charId);
-      const name = m.kind === 'player' ? '플레이어' : (ch?.name ?? '');
+      const name = ch?.name ?? '';
       const color = ch?.color ?? '#5d636d';
       return `<div style="margin:10px 0;line-height:1.7"><b style="color:${color};letter-spacing:.05em">${esc(name)}</b> — ${esc(m.text)}</div>`;
     }).join('\n');
@@ -296,9 +296,7 @@ ${rows}
   ].join(' · ');
 
   // 회원 계정(오너) 이름은 화면에 내지 않는다 — 계정은 접근 권한용일 뿐 (v2.0 사용자 요청).
-  // 본인 발화는 캐릭터가 아니므로 「플레이어」로 표기 (HTML 내보내기와 같은 표기)
-  const speakerLabel = speaker === 'desc' ? '지문 (DESC)' : speaker === 'player'
-    ? '플레이어' : (chars.find(c => c.id === speaker)?.name ?? '');
+  const speakerLabel = speaker === 'desc' ? '지문 (DESC)' : (chars.find(c => c.id === speaker)?.name ?? '');
   const speakerChar = chars.find(c => c.id === speaker);
 
   return (
@@ -395,15 +393,14 @@ ${rows}
                     );
                   }
                   const ch = chars.find(c => c.id === m.charId);
-                  // 회원 계정 이름 대신 「플레이어」 (v2.0 사용자 요청)
-                  const name = m.kind === 'player' ? '플레이어' : (ch?.name ?? '');
+                  const name = ch?.name ?? '';
                   // 영역은 「보는 사람」 기준 (v2.0 사용자 확정): 내가 권한을 가진 캐릭터가 오른쪽,
                   // 아닌 캐릭터가 왼쪽. 관리자에게는 자캐(own)가 자기 캐릭터다.
                   // 그래서 같은 방이라도 사람마다 좌우가 반대로 보인다(각자 자기 쪽이 오른쪽).
                   // 삭제된 캐릭터는 발화 당시 기록(charOwn)으로 판단.
-                  const rightSide = m.kind === 'player'
-                    ? mine
-                    : (ch ? (!!charGrant(ch, user.id) || (!!ch.own && isAdmin)) : (!!m.charOwn && isAdmin));
+                  const rightSide = ch
+                    ? (!!charGrant(ch, user.id) || (!!ch.own && isAdmin))
+                    : (!!m.charOwn && isAdmin);
                   return (
                     <div key={m.id} className={`msg ${rightSide ? 'me' : ''}`} style={{ ['--cc' as string]: hexRgb(ch?.color) }}>
                       <Face ch={ch} className="face" />
@@ -428,13 +425,11 @@ ${rows}
 
               {sel.status === 'ongoing' && (
                 <div className="rp-input">
-                  {/* 발화자 선택 — 캐릭터 / 플레이어 / 지문 (v1.8) */}
+                  {/* 발화자 선택 — 캐릭터 / 지문 (v2.0 사용자 확정: 역극에는 이 둘만 있으면 된다) */}
                   <div className="char-pick" onClick={() => setPickOpen(o => !o)}>
                     {speaker === 'desc'
                       ? <div className="f" style={{ display: 'grid', placeItems: 'center', fontSize: 13, color: 'var(--sub)' }}>❝</div>
-                      : speaker === 'player'
-                        ? <div className="f" style={{ display: 'grid', placeItems: 'center', fontSize: 13, color: 'var(--sub)' }}>◉</div>
-                        : <Face ch={speakerChar} className="f" />}
+                      : <Face ch={speakerChar} className="f" />}
                     <small>{speakerLabel} ▾</small>
                     {pickOpen && (
                       <div className="rp-pick-pop" onClick={e => e.stopPropagation()}>
@@ -443,10 +438,6 @@ ${rows}
                             <Face ch={c} className="f" />{c.name}
                           </button>
                         ))}
-                        <button onClick={() => { setSpeaker('player'); setPickOpen(false); }}>
-                          <span className="f" style={{ display: 'grid', placeItems: 'center', color: 'var(--sub)' }}>◉</span>
-                          플레이어
-                        </button>
                         <button onClick={() => { setSpeaker('desc'); setPickOpen(false); }}>
                           <span className="f" style={{ display: 'grid', placeItems: 'center', color: 'var(--sub)' }}>❝</span>
                           지문 (DESC)

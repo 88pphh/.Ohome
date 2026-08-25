@@ -3,7 +3,9 @@
 // 실시간 송수신·입력 중 표시·참여자 전원 동의 흐름은 Supabase Realtime 연동 시 활성화.
 export interface RpMessage {
   id: string;
-  kind: 'char' | 'desc' | 'player'; // 캐릭터 발화 / 지문(가운데 서술) / 플레이어 본인 발화
+  // 캐릭터 발화 / 지문(가운데 서술). 'player'(회원 본인 발화)는 없앴다 —
+  // 역극에는 캐릭터와 지문만 있으면 된다 (v2.0 사용자 확정). 옛 기록은 읽을 때 지문으로 바꿔 준다
+  kind: 'char' | 'desc' | 'player';
   charId?: string;                  // kind==='char'일 때 발화 캐릭터
   charOwn?: boolean;                // 발화 당시 내 캐릭터(자캐)였는지 — 삭제된 캐릭터 재연동 시 리스트 판별용
   authorId: string;                 // 작성 회원 (수정/삭제 권한)
@@ -72,11 +74,13 @@ export interface RpMessageRow extends RpMessage { roomId: string }
 
 export const RP_MSG_SEED: RpMessageRow[] = [];
 
-/** 방 하나의 발화 — 옛 방 안의 것 + 따로 저장된 것을 시간순으로 */
+/** 방 하나의 발화 — 옛 방 안의 것 + 따로 저장된 것을 시간순으로.
+ *  없앤 '플레이어' 발화는 **지우지 않고 지문으로 읽는다** — 남이 실제로 한 말이라 사라지면 안 된다 */
 export function messagesFor(rows: RpMessageRow[], roomId: string, legacy: RpMessage[] = []): RpMessage[] {
   const mine = rows.filter(r => r.roomId === roomId);
   const seen = new Set(mine.map(r => r.id));
   return [...legacy.filter(m => !seen.has(m.id)), ...mine]
+    .map(m => (m.kind === 'player' ? { ...m, kind: 'desc' as const, charId: undefined } : m))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
