@@ -108,6 +108,14 @@ export function charWithAu(c: Character, auKey?: string | null): Character {
 
 export interface CharGrant { userId: string; level: 'play' | 'edit' }
 
+/** 이 자관의 멤버 캐릭터 중 하나라도 권한을 받은 회원인가 (v2.0) — 문답 숨김 판정 */
+export function hasRelGrant(
+  members: { charId: string }[], chars: Character[], userId?: string,
+): boolean {
+  if (!userId) return false;
+  return members.some(m => !!charGrant(chars.find(c => c.id === m.charId) ?? { grants: [] } as unknown as Character, userId));
+}
+
 /** 회원의 캐릭터 권한 — edit는 play를 포함 */
 export function charGrant(c: Character, userId?: string): 'play' | 'edit' | null {
   if (!userId) return null;
@@ -362,6 +370,11 @@ export interface Relation {
   questions: QaEntry[];          // base AU의 문답
   qaPool?: string[];             // base AU의 대기 질문 풀 (v1.9 — 랜덤 출제 대기)
   qaEnabled?: boolean;           // base AU의 QUESTIONS 섹션 사용 여부 (구버전은 questions 존재로 판정)
+  /** 문답 답변 숨기기 (v2.0 사용자 요청) — 질문은 그대로 두고 **답변 내용만** 가린다.
+   *  켜면 **관리자와 이 자관 캐릭터에 권한을 받은 회원만** 볼 수 있다(사용자 확정).
+   *  **화면에서 가리는 것일 뿐 완전한 차단이 아니다** — 답변은 공개로 저장돼 있어 주소를 직접
+   *  다루는 사람에게는 보일 수 있다. 설정 화면에도 그대로 적어 둔다. */
+  qaHide?: boolean;
 }
 
 export const CHAR_SEED: Character[] = [];

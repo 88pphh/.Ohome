@@ -10,7 +10,7 @@ import { useTheme } from '@/lib/ThemeProvider';
 import { useLocalList, newId } from '@/lib/postStore';
 import {
   Relation, REL_SEED, Character, CHAR_SEED, RelMember, QaEntry, QaAnswer, TlItem, findChar, Visibility, CharGrant,
-  auMember, auStyle, fullShadow,
+  auMember, auStyle, fullShadow, hasRelGrant,
   RelAu, RelCpTag, charWithAu, charGrant,
   QaAnswerRow, QA_KEY, QA_SEED, MergedAnswer, answersFor,
 } from '@/lib/charStore';
@@ -391,6 +391,16 @@ export default function RelDetailPage() {
   const answersOf = (no: number): MergedAnswer[] =>
     answersFor(qaRows, rel?.id ?? '', au?.id ?? 'base', no, auQuestions.find(q => q.no === no)?.answers ?? []);
   const curAnswers = curQa ? answersOf(curQa.no) : [];
+  /* 답변 내용 가리기 (v2.0 사용자 요청) — 질문은 그대로 두고 말풍선 안만 가린다.
+     화면에서 가리는 것일 뿐 완전한 차단이 아니라는 점은 설정 화면에 적어 두었다.
+     관리자와 그 답변을 쓴 본인에게는 늘 보인다 — 자기가 쓴 걸 못 보게 하면 고칠 수도 없다. */
+  const qaMasked = (a: MergedAnswer) => {
+    if (!rel?.qaHide || isAdmin) return false;
+    // 자기가 쓴 답변은 늘 보인다 — 안 보이면 고칠 수도 없다
+    if (a.authorId && a.authorId === user?.id) return false;
+    // 이 자관 캐릭터에 권한을 받은 회원은 볼 수 있다 (사용자 확정)
+    return !hasRelGrant(rel.members, chars, user?.id);
+  };
 
   /* 새 답변이 달리면 아래로 내려 최신 것을 보여 준다 (v2.0 사용자 요청 — 역극 채팅과 같은 동작).
      다만 **위로 올려 예전 답변을 읽는 중이면 끌어내리지 않는다** — 읽던 자리를 뺏기면 성가시다.
@@ -1129,7 +1139,10 @@ export default function RelDetailPage() {
                         {curAnswers[i - 1]?.charId !== a.charId && (
                           <div className="who" style={{ fontFamily: familyOf(c?.fontId) }}>{c?.name}</div>
                         )}
-                        <div className="bub" {...(a.note ? { 'data-note': a.note } : {})}>{a.text}</div>
+                        {/* 숨김이면 내용 대신 안내만 — 부연설명도 함께 가린다 (v2.0 사용자 요청) */}
+                        {qaMasked(a)
+                          ? <div className="bub bub-hidden">비공개 답변</div>
+                          : <div className="bub" {...(a.note ? { 'data-note': a.note } : {})}>{a.text}</div>}
                       </div>
                     );
                   })}
