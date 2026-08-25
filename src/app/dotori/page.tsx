@@ -142,11 +142,10 @@ export default function DotoriPage() {
               <small className="meta">
                 {[it.writer, it.rule, it.people].filter(Boolean).join(' · ')}
               </small>
-              {it.tags.length > 0 && (
-                <div className="kw-row" style={{ marginTop: 7 }}>
-                  {it.tags.map(t => <span key={t} className="pill">{t}</span>)}
-                </div>
-              )}
+              {/* 태그가 없어도 줄은 남긴다 — 태그 유무로 카드 키가 달라지지 않게 (v2.0 사용자 요청) */}
+              <div className="kw-row">
+                {it.tags.map(t => <span key={t} className="pill">{t}</span>)}
+              </div>
             </div>
           </div>
           );

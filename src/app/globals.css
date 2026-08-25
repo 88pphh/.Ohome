@@ -1287,12 +1287,15 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .dt-card .th{position:relative;aspect-ratio:16/9;overflow:hidden}
 .dt-card .bd{padding:13px 15px 15px}
 /* 제목이 길면 두 줄로 늘어나지 않고 말줄임 (v1.9 사용자 확정 — 카드 높이 유지) */
-.dt-card .nm{display:block;font-size:calc(13.5px*var(--fs,1));letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-card .nm{display:block;font-size:calc(13.5px*var(--fs,1));line-height:1.5;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dt-card .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 링크 있는 시나리오 이름 — 클릭 시 새 탭 (카드 클릭=편집과 분리) */
 .dt-card .nm.has-link{cursor:var(--cur-pointer,pointer);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
 .dt-card .nm.has-link:hover{color:var(--accent);text-decoration-color:var(--accent)}
-.dt-card .meta{display:block;margin-top:3px;font-size:calc(10.5px*var(--fs,1));color:var(--faint)}
+.dt-card .meta{display:block;margin-top:3px;font-size:calc(10.5px*var(--fs,1));line-height:1.5;color:var(--faint)}
+/* 태그 줄은 있든 없든 같은 자리를 차지한다 — 태그 유무로 카드 키가 달라지지 않게 (v2.0 사용자 요청).
+   태그가 많아도 한 줄까지만 (넘치면 잘림) */
+.dt-card .kw-row{margin-top:7px;height:22px;overflow:hidden;flex-wrap:nowrap}
 /* 상태 뱃지 — 공수표·일정 확정만, 이미지 우상단 (4.15) */
 /* 색은 환경설정 > TRPG 탭에서 상태별 지정 (인라인 스타일) */
 /* 한글 잉크 위쏠림 보정 (v1.9 실측) — line-height 11px + 상하 대칭 패딩 (잉크 중심 = 뱃지 중심) */
@@ -1326,7 +1329,8 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .pl-table th{font-size:calc(10px*var(--fs,1));letter-spacing:.14em;color:var(--faint);font-weight:600;text-align:center;padding:10px 6px;border-bottom:1.5px solid var(--line)}
 .pl-table th.sortable{cursor:var(--cur-pointer,pointer);user-select:none}
 .pl-table th.sortable:hover{color:var(--ink)}
-.pl-table td{padding:10px 6px;border-bottom:1px dashed var(--line);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 줄 높이를 px로 못박는다 — 배수(1.55)로 두면 글꼴마다 소수점이 달라 줄마다 미세하게 어긋난다 */
+.pl-table td{padding:10px 6px;line-height:calc(20px*var(--fs,1));border-bottom:1px dashed var(--line);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pl-table tr:last-child td{border-bottom:none}
 .pl-table .td-sc{font-weight:600}  /* Scenario — 가장 넓고 가운데 정렬 (4.16) */
 .pl-table .td-sc a{border-bottom:1px solid var(--line);transition:.15s}
@@ -1338,9 +1342,10 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
   .pl-table .td-pt.linked{text-decoration:underline;text-underline-offset:3px;cursor:var(--cur-pointer,pointer)}
   .pl-table .td-pt.linked:active{color:var(--accent)}
 }
-.pl-table .td-url a{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;color:var(--sub);transition:.14s}
+.pl-table .td-url{position:relative}
+.pl-table .td-url a{position:absolute;inset:0;margin:auto;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;color:var(--sub);transition:.14s}
 .pl-table .td-url a:hover{background:rgba(127,127,127,.14);color:var(--ink)}
-.pl-table .td-mng button{width:22px;height:22px;border-radius:6px;font-size:calc(10.5px*var(--fs,1));color:var(--faint);transition:.13s}
+.pl-table .td-mng button{width:22px;height:22px;border-radius:6px;font-size:calc(10.5px*var(--fs,1));color:var(--faint);transition:.13s;vertical-align:middle;margin:-2px 0}
 .pl-table .td-mng button:hover{background:rgba(127,127,127,.14);color:var(--ink)}
 /* 모바일 기본 4열: Date/Scenario/Role/Playtime (4.16 — 열 선택 설정은 메뉴 관리 구현 시) */
 @media (max-width:620px){.pl-table .hide-m,.pl-table col.c-wr,.pl-table col.c-with,.pl-table col.c-url,.pl-table col.c-mng{display:none}}
