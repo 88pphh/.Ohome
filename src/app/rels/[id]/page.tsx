@@ -391,6 +391,26 @@ export default function RelDetailPage() {
   const answersOf = (no: number): MergedAnswer[] =>
     answersFor(qaRows, rel?.id ?? '', au?.id ?? 'base', no, auQuestions.find(q => q.no === no)?.answers ?? []);
   const curAnswers = curQa ? answersOf(curQa.no) : [];
+
+  /* 새 답변이 달리면 아래로 내려 최신 것을 보여 준다 (v2.0 사용자 요청 — 역극 채팅과 같은 동작).
+     다만 **위로 올려 예전 답변을 읽는 중이면 끌어내리지 않는다** — 읽던 자리를 뺏기면 성가시다.
+     바닥 근처에 있을 때만 따라 내려가고, 질문을 바꾸면 무조건 맨 아래(최신)에서 시작한다. */
+  const ansRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  const onAnsScroll = () => {
+    const el = ansRef.current;
+    if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  };
+  useEffect(() => {
+    const el = ansRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;   // 질문을 바꾸거나 탭을 열면 최신 답변부터
+    stickRef.current = true;
+  }, [curQa?.no, tab]);
+  useEffect(() => {
+    const el = ansRef.current;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [curAnswers.length]);
   // 전신이 하나도 등록되지 않았으면 전신 모드를 두지 않는다 —
   // 빈 자리에 「○○ 전신」 자리표시자를 세우는 대신 대표 일러스트만 보여 준다 (사용자 확정)
   const fullRefOf = (cid: string) =>
@@ -1076,7 +1096,7 @@ export default function RelDetailPage() {
               {curQa ? (
                 <>
                   {/* 스크롤은 여기까지 — 입력란은 밖에 두어 답변이 길어져도 자리를 지킨다 (v2.0 사용자 발견) */}
-                  <div className="qa-answers">
+                  <div className="qa-answers" ref={ansRef} onScroll={onAnsScroll}>
                   <div className="qa-no">TODAY&apos;S QUESTION · Q.{String(curQa.no).padStart(3, '0')}
                     {/* 질문에 대한 오너 설명 — 관리자만 작성 (v2.0 사용자 요청) */}
                     {isAdmin && (
