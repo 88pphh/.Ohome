@@ -898,6 +898,12 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 /* 우클릭 메뉴 제목 — 어떤 위젯인지 표시 (중복 추가 위젯은 번호 포함, v1.9) */
 .ctx-menu .ctx-ttl{padding:7px 12px 4px;font-size:calc(10.5px*var(--fs,1));font-weight:700;letter-spacing:.06em;color:#8b919b;cursor:default;white-space:nowrap}
 .ctx-menu button.danger:hover{background:rgba(214,69,80,.22);color:#ff9aa2}
+/* 순서 번호 입력 (v2.0 사용자 요청) — 페이지로 나뉘면 드래그로 못 옮기니 번호로 옮긴다 */
+.ctx-menu .ord-input{width:100%;box-sizing:border-box;padding:7px 10px;border-radius:7px;
+  border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;
+  font-family:inherit;font-size:calc(13px*var(--fs,1));font-weight:700;text-align:center}
+.ctx-menu .ord-input:focus{outline:none;border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.1)}
+.ctx-menu .ord-hint{margin:6px 2px 4px;font-size:calc(10px*var(--fs,1));color:#8b919b;line-height:1.45;text-align:center}
 
 /* 공통 드래그 리스트 (v1.9 — 들어 올림 + 빈 자리 + FLIP) */
 .dl-row{transition:transform .18s ease}

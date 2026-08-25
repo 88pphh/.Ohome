@@ -178,10 +178,45 @@ export type RelCpTag = 'cp' | 'ncp';
 
 /** AU 한 항목 (v1.9 확장) — 캐치프레이즈만이 아니라 프로필 전체가 AU별로 분리:
  *  중앙 일러(arts)·타임라인·문답·CP/NCP. base(원본)는 Relation 최상위 필드를 그대로 사용 (기존 데이터 호환) */
+/**
+ * AU에서만 다르게 보여 줄 멤버 값 (v2.0 사용자 발견).
+ *
+ * 전신 위치·크기, 한마디, 대사 색, 이름 크기는 **자관 멤버(RelMember)에만** 있었다. AU 수정
+ * 화면에서 고쳐도 결국 자관 공통 값을 고치는 것이라 **다른 AU 페이지까지 같이 바뀌었다.**
+ * AU 쪽에 따로 담아 두고, 여기 없는 값만 자관 기본을 그대로 쓴다(→ `auMember`).
+ */
+export interface RelAuMember {
+  quote?: string;
+  fullScale?: number;
+  fullOffX?: number;
+  fullOffY?: number;
+  nameSize?: number;
+  quoteColor?: string;
+  quoteMarkColor?: string;
+}
+
+/** 이 AU에서 이 멤버를 어떻게 보여 줄지 — AU에 정해 둔 값이 있으면 그것, 없으면 자관 기본.
+ *  base(원본) AU이거나 정해 둔 게 없으면 자관 멤버를 그대로 돌려준다. */
+export function auMember(m: RelMember, au?: RelAu): RelMember {
+  const o = au?.mset?.[m.charId];
+  if (!o) return m;
+  const out = { ...m };
+  // undefined는 「안 정했다」는 뜻 — 그대로 덮으면 자관 기본까지 지워진다
+  (Object.keys(o) as (keyof RelAuMember)[]).forEach(k => {
+    const v = o[k];
+    if (v !== undefined) (out as Record<string, unknown>)[k] = v;
+  });
+  return out;
+}
+
 export interface RelAu {
   id: string;
   label: string;
   catchphrase: string;
+  /** AU별 자관명 (v2.0 사용자 요청) — 비우면 자관 이름을 그대로 쓴다 */
+  name?: string;
+  /** AU별 멤버 표시값 — 없으면 자관 기본 (위 RelAuMember 설명 참조) */
+  mset?: Record<string, RelAuMember>;
   quotes?: string[];
   cp?: RelCpTag;          // 없으면 자관 기본(Relation.cp)
   arts?: string[];        // AU별 중앙/그룹 일러 (base는 Relation.arts)

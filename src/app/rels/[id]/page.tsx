@@ -10,6 +10,7 @@ import { useTheme } from '@/lib/ThemeProvider';
 import { useLocalList, newId } from '@/lib/postStore';
 import {
   Relation, REL_SEED, Character, CHAR_SEED, RelMember, QaEntry, QaAnswer, TlItem, findChar, Visibility, CharGrant,
+  auMember,
   RelAu, RelCpTag, charWithAu, charGrant,
   QaAnswerRow, QA_KEY, QA_SEED, MergedAnswer, answersFor,
 } from '@/lib/charStore';
@@ -617,11 +618,13 @@ export default function RelDetailPage() {
 
   /* 페어 좌우 배치 (v2.0 사용자 요청) — 예전에는 등록 순서가 곧 자리라, 처음 넣은 캐릭터는
      오른쪽 카드에서 추가해도 무조건 왼쪽에 들어갔다. pairRight로 오른쪽에 둘 캐릭터를 지정한다. */
+  // 한마디·대사 색·전신 위치는 AU마다 다를 수 있다 (v2.0) — 이 AU 값이 있으면 그것으로 갈아 끼운다
+  const asAu = (m: RelMember | null) => (m && !isBaseAu ? auMember(m, au) : m);
   const pairSlots: (RelMember | null)[] = isDuo
     ? (rel.pairRight
-      ? [rel.members.find(m => m.charId !== rel.pairRight) ?? null,
-        rel.members.find(m => m.charId === rel.pairRight) ?? null]
-      : [rel.members[0] ?? null, rel.members[1] ?? null])
+      ? [asAu(rel.members.find(m => m.charId !== rel.pairRight) ?? null),
+        asAu(rel.members.find(m => m.charId === rel.pairRight) ?? null)]
+      : [asAu(rel.members[0] ?? null), asAu(rel.members[1] ?? null)])
     : [];
 
   /** 이 멤버를 반대쪽 자리로 (좌 ↔ 우) */
@@ -719,10 +722,11 @@ export default function RelDetailPage() {
         )}
         {/* 자관명·캐치프레이즈 글씨색 — 직접 지정 시 (v1.9 사용자 요청, 미지정: 테마) */}
         {/* 이름 그림자 — 색·강도 직접 지정 (v2.0 사용자 요청, 미지정: 검정 60% · 기존과 동일) */}
+        {/* 이름 자체는 AU마다 다르게 붙일 수 있다 (v2.0 사용자 요청) — 안 정했으면 자관 이름 그대로 */}
         <h1 style={{
           fontFamily: familyOf(rel.fontId), color: rel.nameColor,
           textShadow: `0 4px 30px ${withAlpha(rel.nameShadowColor ?? '#000000', 0.6 * ((rel.nameShadow ?? 100) / 100))}`,
-        }}>{rel.name}</h1>
+        }}>{(!isBaseAu && au?.name?.trim()) || rel.name}</h1>
         <div className="catch" style={{ color: rel.cpColor }}>
           {au?.catchphrase || rel.catchphrase}
         </div>
@@ -749,7 +753,8 @@ export default function RelDetailPage() {
             {/* 전신 — 등록 이미지(AU별 우선) + 크기/앞뒤는 자관 수정의 미리보기에서 (v1.9) */}
             {pairSlots.map((sl, i) => {
               const cid = sl?.charId ?? '';
-              const m = rel.members.find(x => x.charId === cid);
+              // 전신 위치·크기도 AU 값 우선 (v2.0) — sl이 이미 AU 값으로 갈아 끼운 멤버다
+              const m = sl ?? rel.members.find(x => x.charId === cid);
               // AU는 자기 전신만 — base 전신을 물려받지 않음 (v1.9 사용자 확정)
               const fullRef = isBaseAu ? m?.fullImgId : au?.fulls?.[cid];
               if (!fullRef) return null;   // 등록 안 된 전신은 자리도 만들지 않는다

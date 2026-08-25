@@ -3,7 +3,7 @@
 // 아트 다중 등록(첫 장 = 대표 · 리스트 썸네일 4:3 크롭) · 등록 시 내 캐릭터 연동
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Character, Relation, Visibility, RelCpTag } from '@/lib/charStore';
+import { Character, Relation, Visibility, RelCpTag, RelMember, auMember } from '@/lib/charStore';
 import { ColorField } from '@/components/ui/ColorField';
 import { isValidSlug, slugify } from '@/lib/link';
 import { CP_LABEL } from '@/lib/relqStore';
@@ -57,6 +57,7 @@ export interface RelFormValue {
   nameSizes?: Record<string, number>;                           // 멤버 카드 이름 크기 px (v2.0)
   quoteColors?: Record<string, { fg?: string; mark?: string }>; // 히어로 대사 글씨/따옴표색 (페어, v1.9)
   fullFront?: string;                          // 앞에 보일 캐릭터 id
+  auName?: string;           // AU별 자관명 (v2.0 사용자 요청 — AU 편집일 때만)
   pickedCharIds: string[];   // 등록 시 연동할 내 캐릭터 (수정 모드에선 빈 배열)
 }
 
@@ -235,20 +236,25 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
     }
     return o;
   });
+  // AU를 편집 중이면 그 AU에 정해 둔 값부터 본다 (v2.0 사용자 발견 — 예전엔 자관 공통 값만 봐서
+  // AU에서 고친 게 다른 AU에도 그대로 나타났다). 정해 둔 게 없으면 자관 기본값.
+  const mOf = (m: RelMember) => (auObj ? auMember(m, auObj) : m);
   const [fullScales, setFullScales] = useState<Record<string, number>>(
-    () => Object.fromEntries(pairMembers.map(m => [m.charId, m.fullScale ?? 90])));
+    () => Object.fromEntries(pairMembers.map(m => [m.charId, mOf(m).fullScale ?? 90])));
   // 전신 위치 오프셋 % (v1.9 — 드래그로 이동, 상세와 동일 좌표계)
   const [fullOffsets, setFullOffsets] = useState<Record<string, { x: number; y: number }>>(
-    () => Object.fromEntries(pairMembers.map(m => [m.charId, { x: m.fullOffX ?? 0, y: m.fullOffY ?? 0 }])));
+    () => Object.fromEntries(pairMembers.map(m => [m.charId, { x: mOf(m).fullOffX ?? 0, y: mOf(m).fullOffY ?? 0 }])));
   // 히어로 좌/우 한마디 — 색만 정할 수 있고 문구를 고칠 곳이 없었다 (v2.0 사용자 발견)
   const [quotes, setQuotes] = useState<Record<string, string>>(
-    () => Object.fromEntries(pairMembers.map(m => [m.charId, m.quote ?? ''])));
+    () => Object.fromEntries(pairMembers.map(m => [m.charId, mOf(m).quote ?? ''])));
   // 멤버 카드 이름 크기 (v2.0) — 카드 폭이 좁아 이름마다 알맞은 크기가 다르다
   const [nameSizes, setNameSizes] = useState<Record<string, number>>(
-    () => Object.fromEntries(pairMembers.map(m => [m.charId, m.nameSize ?? 17])));
+    () => Object.fromEntries(pairMembers.map(m => [m.charId, mOf(m).nameSize ?? 17])));
   // 히어로 대사 글씨/따옴표색 (페어, v1.9)
   const [quoteColors, setQuoteColors] = useState<Record<string, { fg?: string; mark?: string }>>(
-    () => Object.fromEntries(pairMembers.map(m => [m.charId, { fg: m.quoteColor, mark: m.quoteMarkColor }])));
+    () => Object.fromEntries(pairMembers.map(m => [m.charId, { fg: mOf(m).quoteColor, mark: mOf(m).quoteMarkColor }])));
+  // AU별 자관명 (v2.0 사용자 요청) — 비우면 자관 이름 그대로
+  const [auName, setAuName] = useState(auObj?.name ?? '');
   const [fullFront, setFullFront] = useState<string | undefined>(initial?.fullFront);
 
   // 내 캐릭터 연동 목록 — 선택된 캐릭터는 항상 표시, 나머지는 검색 필터 후 총 6명까지
@@ -318,6 +324,7 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
       themeColor: themeMode === 'custom' ? themeColor : undefined,
       themeTone: themeMode === 'custom' ? themeTone : undefined,
       cp,
+      auName: auObj ? auName.trim() : undefined,
       fulls: pairMembers.length
         ? Object.fromEntries(await Promise.all(pairMembers.map(async m => {
           const d = fulls[m.charId];
@@ -610,6 +617,18 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
           <div style={{ display: 'grid', gap: 9 }}>
             <KInput placeholder="자관 이름" value={name} onChange={e => setName(e.target.value)}
               style={{ fontFamily: familyOf(fontId), letterSpacing: '.1em' }} />
+            {/* AU별 자관명 (v2.0 사용자 요청) — 이 AU를 볼 때만 쓰는 이름. 비우면 위 이름 그대로 */}
+            {auObj && (
+              <div>
+                <label className="k-label" style={{ marginBottom: 5 }}>{auObj.label} AU 이름</label>
+                <KInput placeholder={name || '자관 이름 그대로'} value={auName}
+                  onChange={e => setAuName(e.target.value)}
+                  style={{ fontFamily: familyOf(fontId), letterSpacing: '.1em' }} />
+                <p className="hint" style={{ margin: '5px 0 0' }}>
+                  이 AU를 볼 때만 쓰는 이름 — 비우면 자관 이름을 그대로 씁니다
+                </p>
+              </div>
+            )}
             {/* 페이지 주소 (v1.9) — /rels/{slug}, 비우면 자동 · 중복이면 경고 */}
             {isNew && (
               <div>
