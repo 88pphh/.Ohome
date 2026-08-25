@@ -107,6 +107,21 @@ export const DEFAULT_MENU_SETTINGS: MenuSettings = {
 
 const KEY = 'ohome.menuset.v1';
 
+/**
+ * 훅 없이 지금 저장된 메뉴 설정 읽기 (v2.0).
+ * 저장 시점에 글 공개범위를 정할 때처럼 **렌더 밖에서** 필요하다 — 그쪽은 훅을 쓸 수 없다.
+ */
+export function currentMenuSettings(): MenuSettings {
+  try {
+    const raw = getRawSetting(KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<MenuSettings>;
+      return { ...DEFAULT_MENU_SETTINGS, ...p, tree: p.tree ?? migrateTree(p) };
+    }
+  } catch { /* 기본값 */ }
+  return DEFAULT_MENU_SETTINGS;
+}
+
 export function useMenuSettings(): [MenuSettings, (patch: Partial<MenuSettings>) => void, boolean] {
   const [st, setSt] = useState<MenuSettings>(DEFAULT_MENU_SETTINGS);
   const [loaded, setLoaded] = useState(false);

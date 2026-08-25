@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useHrefBlock } from '@/components/shell/MenuGuard';
-import { sectionHref, MAIN_SEC } from '@/lib/sectionStore';
+import { sectionHref, MAIN_SEC, secStamp } from '@/lib/sectionStore';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
 import { TrpgLog, TRPG_SEED, TrpgLogBody, TRPG_BODY_SEED, bodyVisibility, showAsHtml, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
@@ -170,6 +170,7 @@ export default function TrpgDetailPage() {
       bodyHtml: bodyDisp === 'auto' ? undefined : bodyDisp === 'html',
       ...bodyPatch,
       visibility: bodyVisibility(nextLog),
+      ...secStamp(nextLog.secId ?? MAIN_SEC),   // 소속 (v2.0) — 본문 문서도 비공개 판정을 받게
     };
     setBodies(bd ? bodies.map(x => x.id === id ? nextBody : x) : [nextBody, ...bodies]);
     if (bodyMode !== 'keep') setBodyText(null); // 본문 다시 로드

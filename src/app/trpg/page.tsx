@@ -4,7 +4,7 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useSectionParam, filterSection, sectionSetter } from '@/lib/sectionStore';
+import { useSectionParam, filterSection, sectionSetter, secStamp } from '@/lib/sectionStore';
 import { useLocalList, newId } from '@/lib/postStore';
 import { TrpgLog, TRPG_SEED, TrpgLogBody, TRPG_BODY_SEED, bodyVisibility, decodeLogText, logNo, saveLogBody } from '@/lib/galleryStore';
 import { Relation, REL_SEED } from '@/lib/charStore';
@@ -214,6 +214,7 @@ function TrpgPageInner() {
       originalFileId: nFile ? await putBlob(nFile) : undefined,
       originalName: nFile?.name,
       visibility: bodyVisibility(log),
+      ...secStamp(sec.id),   // 소속 (v2.0) — 본문 문서도 비공개 판정을 받게
     };
     setLogs([log, ...logs]);
     setBodies([body, ...bodies]);
