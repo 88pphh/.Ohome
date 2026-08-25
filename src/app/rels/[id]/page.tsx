@@ -394,13 +394,11 @@ export default function RelDetailPage() {
   /* 답변 내용 가리기 (v2.0 사용자 요청) — 질문은 그대로 두고 말풍선 안만 가린다.
      화면에서 가리는 것일 뿐 완전한 차단이 아니라는 점은 설정 화면에 적어 두었다.
      관리자와 그 답변을 쓴 본인에게는 늘 보인다 — 자기가 쓴 걸 못 보게 하면 고칠 수도 없다. */
-  const qaMasked = (a: MergedAnswer) => {
-    if (!rel?.qaHide || isAdmin) return false;
-    // 자기가 쓴 답변은 늘 보인다 — 안 보이면 고칠 수도 없다
-    if (a.authorId && a.authorId === user?.id) return false;
-    // 이 자관 캐릭터에 권한을 받은 회원은 볼 수 있다 (사용자 확정)
-    return !hasRelGrant(rel.members, chars, user?.id);
-  };
+  /* 답변 영역을 통째로 가릴지 (v2.0 사용자 확정) — 말풍선을 하나씩 가리면 몇 명이 무슨 순서로
+     답했는지가 그대로 드러난다. 아예 「비공개 답변」 한 줄만 보여 준다.
+     **관리자와 이 자관 캐릭터에 권한을 받은 회원은 전부 본다** — 답을 달 수 있는 사람이
+     곧 권한자이므로, 자기 답변을 못 보는 경우는 생기지 않는다. */
+  const qaHidden = !!rel?.qaHide && !isAdmin && !hasRelGrant(rel.members, chars, user?.id);
 
   /* 새 답변이 달리면 아래로 내려 최신 것을 보여 준다 (v2.0 사용자 요청 — 역극 채팅과 같은 동작).
      다만 **위로 올려 예전 답변을 읽는 중이면 끌어내리지 않는다** — 읽던 자리를 뺏기면 성가시다.
@@ -1124,7 +1122,8 @@ export default function RelDetailPage() {
                   {curQa.note && <div className="qa-note">{curQa.note}</div>}
                   {/* 날짜만, 오른쪽 정렬 (v1.9 사용자 피드백) */}
                   <div className="qa-date" style={{ textAlign: 'right' }}>{curQa.date.replace(/-/g, '.')}</div>
-                  {curAnswers.map((a, i) => {
+                  {qaHidden && <div className="qa-locked">비공개 답변</div>}
+                  {!qaHidden && curAnswers.map((a, i) => {
                     const c = charOf(a.charId);
                     return (
                       <div key={i} className={`qa-ans ${sideOf(a.charId) === 'r' ? 'r' : ''}`}
@@ -1139,15 +1138,12 @@ export default function RelDetailPage() {
                         {curAnswers[i - 1]?.charId !== a.charId && (
                           <div className="who" style={{ fontFamily: familyOf(c?.fontId) }}>{c?.name}</div>
                         )}
-                        {/* 숨김이면 내용 대신 안내만 — 부연설명도 함께 가린다 (v2.0 사용자 요청) */}
-                        {qaMasked(a)
-                          ? <div className="bub bub-hidden">비공개 답변</div>
-                          : <div className="bub" {...(a.note ? { 'data-note': a.note } : {})}>{a.text}</div>}
+                        <div className="bub" {...(a.note ? { 'data-note': a.note } : {})}>{a.text}</div>
                       </div>
                     );
                   })}
                   </div>
-                  {answerableIds.length > 0 && (
+                  {!qaHidden && answerableIds.length > 0 && (
                     <div className="qa-input">
                       {/* 페어: 클릭 순환 · 다인: 드롭다운으로 선택 (v1.9 사용자 확정) — 권한 있는 캐릭터만 */}
                       <div className="char-pick" onClick={e => {
