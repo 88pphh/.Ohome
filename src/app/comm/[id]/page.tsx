@@ -18,6 +18,7 @@ import { ConfirmModal } from '@/components/ui/Modal';
 import { PageTitle } from '@/components/ui/PageText';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { CommFormFill } from '@/components/comm/FormFill';
+import { OrderMenu, orderNoOf, moveToOrder } from '@/components/ui/OrderMenu';
 
 /** 편지봉투 픽토그램 (선 아이콘 — 4.18 문의 링크) */
 function MailIcon() {
@@ -58,6 +59,8 @@ export default function CommDetailPage() {
   const [cur, setCur] = useState(0);
   const [delAsk, setDelAsk] = useState(false);
   const [lbOpen, setLbOpen] = useState(false); // 대표 이미지 클릭 확대 보기
+  // 썸네일 우클릭 순서 바꾸기 (v2.0) — 훅이므로 조기 return보다 먼저
+  const [ordAt, setOrdAt] = useState<{ i: number; x: number; y: number } | null>(null);
 
   const c = items.find(x => x.id === id);
 
@@ -85,6 +88,18 @@ export default function CommDetailPage() {
   const sv = slotView(c, settings);
   const imgs: (string | undefined)[] = c.images.length ? c.images : [undefined];
   const curIdx = Math.min(cur, imgs.length - 1);
+
+  /* 썸네일 순서 바꾸기 (v2.0 사용자 요청) — 우클릭해서 번호로 옮긴다.
+     로그·도토리 목록과 같은 방식이라 쓰던 대로 쓰면 된다(첫째 10, 둘째 20 …).
+     보고 있던 이미지는 자리가 바뀌어도 계속 보고 있게 따라간다. */
+  const moveImage = (from: number, wanted: number) => {
+    const watching = imgs[curIdx];
+    const next = moveToOrder(c.images, from, wanted);
+    setItems(items.map(x => (x.id === c.id ? { ...x, images: next } : x)));
+    const back = next.indexOf(watching as string);
+    if (back >= 0) setCur(back);
+    setOrdAt(null);
+  };
   const sc = SLOT_CHARS[c.slotShape];
 
   return (
@@ -125,7 +140,13 @@ export default function CommDetailPage() {
       {imgs.length > 1 && (
         <div className="cm-strip">
           {imgs.map((im, i) => (
-            <div key={i} className={`t ${i === curIdx ? 'on' : ''}`} onClick={() => setCur(i)}>
+            <div key={i} className={`t ${i === curIdx ? 'on' : ''}`} onClick={() => setCur(i)}
+              data-tip={isAdmin ? '우클릭 — 순서 바꾸기' : undefined}
+              onContextMenu={e => {
+                if (!isAdmin || !c.images.length) return;
+                e.preventDefault();
+                setOrdAt({ i, x: e.clientX, y: e.clientY });
+              }}>
               <StripThumb fileRef={im} ph={c.ph} />
             </div>
           ))}
@@ -174,6 +195,12 @@ export default function CommDetailPage() {
       </div>
 
       {/* 대표 이미지 확대 보기 — 현재 순번에서 시작, ‹ ›로 이어 넘김 */}
+      {/* 썸네일 우클릭 > 순서 번호 (v2.0 사용자 요청) */}
+      {ordAt && (
+        <OrderMenu at={ordAt} current={orderNoOf(ordAt.i)} total={c.images.length}
+          onApply={n => moveImage(ordAt.i, n)} onClose={() => setOrdAt(null)} />
+      )}
+
       {lbOpen && c.images.length > 0 && (
         <Lightbox srcs={c.images} index={curIdx} onClose={() => setLbOpen(false)} />
       )}
