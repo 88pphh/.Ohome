@@ -85,9 +85,14 @@ export function charWithAu(c: Character, auKey?: string | null): Character {
     ...(p.specs !== undefined ? { specs: p.specs } : {}),
     ...(p.tabs !== undefined ? { tabs: p.tabs } : {}),
     ...(p.basicHtml !== undefined ? { basicHtml: p.basicHtml } : {}),
-    ...(p.arts !== undefined ? { arts: p.arts, artId: p.arts[0] } : {}),
-    ...(p.thumbId !== undefined ? { thumbId: p.thumbId } : {}),
-    ...(p.thumbCrop !== undefined ? { thumbCrop: p.thumbCrop } : {}),
+    // 이미지는 **물려받지 않는다** (v2.0 사용자 요청) — AU 프로필에 안 넣었으면 비워 둔다.
+    // 글씨(이름·소개·스펙)는 AU에서 안 고쳤으면 base를 쓰는 게 자연스럽지만, 그림은 다르다:
+    // 학원 AU를 만들어 놓고 그림을 아직 안 넣었는데 원본 그림이 그대로 떠 있으면
+    // 그 AU의 그림인 줄 알게 된다. 자관 전신이 이미 같은 규칙이다(「AU는 자기 전신만」).
+    arts: p.arts ?? [],
+    artId: p.arts?.[0],
+    thumbId: p.thumbId,
+    thumbCrop: p.thumbCrop,
     ...(p.fontId !== undefined ? { fontId: p.fontId } : {}),
     ...(p.bodyFontId !== undefined ? { bodyFontId: p.bodyFontId } : {}),
   };
