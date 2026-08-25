@@ -293,6 +293,7 @@ export default function RelDetailPage() {
   const [qaRows, setQaRows] = useLocalList<QaAnswerRow>(QA_KEY, QA_SEED);
   const [qsetOpen, setQsetOpen] = useState(false);        // QUESTIONS 섹션 추가 — 질문 리스트 선택 모달
   const [delAsk, setDelAsk] = useState(false);   // 자관 삭제 확인
+  const [auDelAsk, setAuDelAsk] = useState<string | null>(null);  // AU 삭제 확인 (v2.0 — 자관 삭제와 별개)
   const del = useConfirmDelete();                // 멤버·타임라인 등 개별 삭제 확인
 
   const rel = rels.find(r => r.id === id);
@@ -686,14 +687,38 @@ export default function RelDetailPage() {
         <div className="rel-admin-actions">
           {/* AU 선택 중이면 그 AU의 일러·캐치프레이즈를 편집 (v1.9) */}
           <button className="btn btn-dark" style={{ height: 30, padding: '0 13px', fontSize: 11 }}
-            onClick={() => router.push(`/rels/${rel.id}/edit${isBaseAu ? '' : `?au=${au!.id}`}`)}>EDIT</button>
+            onClick={() => router.push(`/rels/${rel.id}/edit${isBaseAu ? '' : `?au=${au!.id}`}`)}>
+            {isBaseAu ? 'EDIT' : `EDIT ${au!.label}`}
+          </button>
+          {/* AU를 보는 중이면 지워지는 것도 그 AU다 (v2.0 사용자 발견 — 자관이 통째로 지워졌다).
+              EDIT은 AU를 따라가는데 DELETE만 안 따라가서, AU 화면에서 누르면 자관 전체가 날아갔다.
+              버튼 글씨에도 무엇이 지워지는지 그대로 쓴다 */}
           <button className="btn btn-dark" style={{ height: 30, padding: '0 13px', fontSize: 11 }}
-            onClick={() => setDelAsk(true)}>DELETE</button>
+            onClick={() => (isBaseAu ? setDelAsk(true) : setAuDelAsk(au!.id))}>
+            {isBaseAu ? 'DELETE' : `DELETE ${au!.label}`}
+          </button>
         </div>
       )}
 
+      {/* AU 하나만 삭제 (v2.0 사용자 발견) — 자관 삭제와 확실히 구분되게 무엇이 남는지까지 적는다 */}
+      <ConfirmModal open={auDelAsk !== null}
+        title={`AU 「${rel.aus.find(a => a.id === auDelAsk)?.label ?? ''}」를 삭제하시겠습니까?`}
+        body="이 AU의 일러·타임라인·문답이 함께 삭제되며 복구할 수 없습니다. 자관과 다른 AU는 그대로 남습니다."
+        onClose={() => setAuDelAsk(null)}
+        buttons={[
+          { label: 'DELETE', kind: 'accent', onClick: () => {
+            const gone = auDelAsk!;
+            updateRel({ aus: rel.aus.filter(a => a.id !== gone) });
+            // 이 AU에 달렸던 문답 답변도 함께 (주인 없는 줄이 남지 않게)
+            setQaRows(qaRows.filter(r => !(r.relId === rel.id && r.auId === gone)));
+            if (auId === gone) setAuId('base');
+            setAuDelAsk(null);
+          } },
+          { label: 'CANCEL', kind: 'ghost', onClick: () => setAuDelAsk(null) },
+        ]} />
+
       <ConfirmModal open={delAsk} title="자관을 삭제하시겠습니까?"
-        body="타임라인·문답·AU 정보가 함께 삭제되며 복구할 수 없습니다. 연동된 캐릭터 자체는 삭제되지 않습니다."
+        body={`「${rel.name}」 자관 전체가 삭제됩니다 — 타임라인·문답·AU ${rel.aus.length}개가 모두 함께 사라지며 복구할 수 없습니다. 연동된 캐릭터 자체는 삭제되지 않습니다.`}
         onClose={() => setDelAsk(false)}
         buttons={[
           { label: 'DELETE', kind: 'accent', onClick: () => {
