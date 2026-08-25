@@ -1,9 +1,10 @@
 'use client';
 // 감상타래 (4.17) — 본 것·읽은 것의 감상을 트위터식 타래로.
 // 보기 2종(타래/리스트, 기본 보기는 환경설정) · 분류 필터 · 작품명 검색 · 이어쓰기 컴포저
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useSectionParam, filterSection, sectionSetter, secQuery } from '@/lib/sectionStore';
 import { useLocalList, newId } from '@/lib/postStore';
 import {
   ThreadWork, ThreadPost, THREAD_SEED, useThreadSettings, catLabel, threadBadgeStyle, lastDate, fmtMD, fmtMDHM,
@@ -54,13 +55,18 @@ function PostImgs({ p, onOpen }: { p: ThreadPost; onOpen: (ids: string[], idx: n
   );
 }
 
-export default function ThreadsPage() {
+function ThreadsPageInner() {
   const router = useRouter();
   const { user, isAdmin } = useAuth();
   const toast = useToast();
   const del = useConfirmDelete();
   const { familyOf } = useFonts();
-  const [works, setWorks, loaded] = useLocalList<ThreadWork>('ohome.threads.v1', THREAD_SEED);
+  const [worksAll, setWorksAll, loaded] = useLocalList<ThreadWork>('ohome.threads.v1', THREAD_SEED);
+  // 여러 개로 만든 섹션 (v2.0) — 주소의 ?s= 가 가리키는 것만 보여 준다
+  const sec = useSectionParam('threads');
+  const works = filterSection(worksAll, sec.id);
+  // 저장은 이 섹션 자리만 교체 — 걸러진 목록을 그대로 넘겨도 다른 섹션이 지워지지 않는다
+  const setWorks = sectionSetter(worksAll, sec.id, setWorksAll);
   const [settings, , setLoaded] = useThreadSettings();
 
   const [view, setView] = useState<'thread' | 'list'>('thread');
@@ -166,7 +172,7 @@ export default function ThreadsPage() {
   return (
     <section className="page">
       <div className="page-head">
-        <PageTitle>THREADS</PageTitle>
+        <PageTitle>{sec.id === 'main' ? 'THREADS' : sec.name}</PageTitle>
         <EditableDesc k="threads-desc" def="본 것, 읽은 것의 감상을 타래로" />
       </div>
 
@@ -186,7 +192,7 @@ export default function ThreadsPage() {
           <SearchBar onSearch={setQ} />
           {isAdmin && (
             <button className="btn btn-dark" style={{ whiteSpace: 'nowrap' }}
-              onClick={() => router.push('/threads/new')}>＋ NEW THREAD</button>
+              onClick={() => router.push('/threads/new' + secQuery(sec.id))}>＋ NEW THREAD</button>
           )}
         </div>
       </div>
@@ -352,4 +358,9 @@ export default function ThreadsPage() {
       {del.element}
     </section>
   );
+}
+
+/** ?s= 를 읽으므로 Suspense 경계가 필요하다 (Next App Router) */
+export default function ThreadsPage() {
+  return <Suspense fallback={<section className="page" />}><ThreadsPageInner /></Suspense>;
 }

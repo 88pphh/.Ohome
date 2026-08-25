@@ -7,6 +7,8 @@ import { getRawSetting, setSetting } from './settingStore';
 
 /* ---------- 로드뷰 (4.10) ---------- */
 export interface RoadItem {
+  /** 소속 섹션 (v2.0) — 여러 개로 만들었을 때. 없으면 기본 섹션 */
+  secId?: string;
   id: string;
   title: string;
   author: string;
@@ -26,6 +28,8 @@ export const ROAD_SEED: RoadItem[] = [];
 
 /* ---------- 그림백업 (4.11) ---------- */
 export interface BackupPost {
+  /** 소속 섹션 (v2.0) — 여러 개로 만들었을 때. 없으면 기본 섹션 */
+  secId?: string;
   id: string;
   title: string;
   type: 'log' | 'single' | 'vlist';    // 로그형(틈 없이 세로) / 단일형(좌우 넘김) / 단일 세로정렬(갭 있는 세로, v1.9)
@@ -48,6 +52,8 @@ export const BACKUP_CATEGORIES = ['합작', '낙서', '커미션', '설정화'];
 
 /* ---------- TRPG 백업 (4.3) ---------- */
 export interface TrpgLog {
+  /** 소속 섹션 (v2.0) — 여러 개로 만들었을 때. 없으면 기본 섹션 */
+  secId?: string;
   id: string;
   no: number;                // 내부 순번 (정렬용 — 자동 부여)
   noText?: string;           // № 자리 표시 텍스트 (선택 — 비우면 자동 № 0XX)
@@ -196,6 +202,8 @@ export function useTrpgSettings(): [TrpgSettings, (patch: Partial<TrpgSettings>)
 }
 
 export interface DotoriItem {
+  /** 소속 섹션 (v2.0) — 여러 개로 만들었을 때. 없으면 기본 섹션 */
+  secId?: string;
   id: string;
   name: string;              // 시나리오 이름 (필수)
   writer: string;            // 라이터
@@ -214,6 +222,8 @@ export const DOTORI_SEED: DotoriItem[] = [];
 
 /* ---------- TRPG 플레이기록 (4.16) — 표 형식 ---------- */
 export interface PlayRecord {
+  /** 소속 섹션 (v2.0) — 여러 개로 만들었을 때. 없으면 기본 섹션 */
+  secId?: string;
   id: string;
   date?: string;             // Date (optional — 비우면 표 맨 아래)
   scenario: string;          // Scenario (필수)

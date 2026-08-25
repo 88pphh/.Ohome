@@ -1,7 +1,8 @@
 'use client';
 // 그림게시판 로드뷰 (4.10) — 목록 없이 최신순 즉시 표시 · 좌 그림/우 댓글 · 즉시 업로드 · 접기
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { useSectionParam, filterSection, sectionSetter } from '@/lib/sectionStore';
 import {
   useLocalList, newId, fmtDate, Comment,
   CommentRow, COMMENT_KEY, COMMENT_SEED, commentsFor,
@@ -175,14 +176,19 @@ function RoadBlock({ item, comments, onComment, onEditComment, onDeleteComment, 
   );
 }
 
-export default function RoadviewPage() {
+function RoadviewPageInner() {
   const { user, isAdmin } = useAuth();
   const toast = useToast();
   // 업로드·댓글 권한 3단계 (4.10 v1.7 — 환경설정 > 메뉴 관리의 로드뷰 항목).
   // 방문자(비로그인) 실사용은 Supabase 익명 처리 시 — mock 단계에선 로그인 전제
   const [menuSet] = useMenuSettings();
   const allow = (p: MenuPerm) => (p === 'admin' ? isAdmin : p === 'member' ? !!user : true);
-  const [items, setItems, roadLoaded] = useLocalList<RoadItem>('ohome.road.v1', ROAD_SEED);
+  const [itemsAll, setItemsAll, roadLoaded] = useLocalList<RoadItem>('ohome.road.v1', ROAD_SEED);
+  // 여러 개로 만든 섹션 (v2.0) — 주소의 ?s= 가 가리키는 것만 보여 준다
+  const sec = useSectionParam('roadview');
+  const items = filterSection(itemsAll, sec.id);
+  // 저장은 이 섹션 자리만 교체 — 걸러진 목록을 그대로 넘겨도 다른 섹션이 지워지지 않는다
+  const setItems = sectionSetter(itemsAll, sec.id, setItemsAll);
   // 댓글은 항목과 따로 저장한다 (v2.0) — 항목 안에 두면 댓글을 달 때 항목을 UPDATE 해야 해서
   // 일반 회원이 남의 그림에 댓글을 달 수 없었다 (게시판과 같은 원인)
   const [cmtRows, setCmtRows] = useLocalList<CommentRow>(COMMENT_KEY, COMMENT_SEED);
@@ -267,7 +273,7 @@ export default function RoadviewPage() {
   return (
     <section className="page">
       <div className="page-head">
-        <PageTitle>LOAD-B</PageTitle>
+        <PageTitle>{sec.id === 'main' ? 'LOAD-B' : sec.name}</PageTitle>
         <EditableDesc k="roadview-desc" def="그림이 좋아서 모았습니다" />
         <div className="head-actions">
           {allow(menuSet.roadUpload) && !!user && (
@@ -341,4 +347,9 @@ export default function RoadviewPage() {
         ]} />
     </section>
   );
+}
+
+/** ?s= 를 읽으므로 Suspense 경계가 필요하다 (Next App Router) */
+export default function RoadviewPage() {
+  return <Suspense fallback={<section className="page" />}><RoadviewPageInner /></Suspense>;
 }

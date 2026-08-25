@@ -1,9 +1,10 @@
 'use client';
 // EditableDesc 주입
 // 그림백업게시판 (4.11) — 갤러리/리스트 토글 · 로그/단일 뱃지 · 접기 썸네일 블러
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useSectionParam, filterSection, sectionSetter } from '@/lib/sectionStore';
 import { useLocalList, fmtDate } from '@/lib/postStore';
 import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
 import { SearchBar } from '@/components/ui/Kit';
@@ -16,11 +17,16 @@ import { useMenuSettings } from '@/lib/menuStore';
 
 const FOLD_LABEL = { spoiler: '스포일러', adult: '수위 주의' };
 
-export default function BackupPage() {
+function BackupPageInner() {
   const router = useRouter();
   const { user, isAdmin } = useAuth();
   const { editOn } = useMainStore();
-  const [posts, setPosts] = useLocalList<BackupPost>('ohome.backup.v1', BACKUP_SEED);
+  const [postsAll, setPostsAll] = useLocalList<BackupPost>('ohome.backup.v1', BACKUP_SEED);
+  // 여러 개로 만든 섹션 (v2.0) — 주소의 ?s= 가 가리키는 것만 보여 준다
+  const sec = useSectionParam('gallery');
+  const posts = filterSection(postsAll, sec.id);
+  // 저장은 이 섹션 자리만 교체 — 걸러진 목록을 그대로 넘겨도 다른 섹션이 지워지지 않는다
+  const setPosts = sectionSetter(postsAll, sec.id, setPostsAll);
   // 기본 보기 — 환경설정 > 메뉴 관리의 갤러리 항목에서 지정 (5.2)
   const [menuSet, , menuLoaded] = useMenuSettings();
   const [view, setView] = useState<'gal' | 'list'>('gal');
@@ -47,7 +53,7 @@ export default function BackupPage() {
   return (
     <section className="page">
       <div className="page-head">
-        <PageTitle>GALLERY</PageTitle>
+        <PageTitle>{sec.id === 'main' ? 'GALLERY' : sec.name}</PageTitle>
         <EditableDesc k="backup-desc" def="로그형(웹툰 스크롤) / 단일형(좌우 넘김) · 리스트/갤러리 보기 전환" />
       </div>
       <div className="toolrow">
@@ -117,4 +123,9 @@ export default function BackupPage() {
       )}
     </section>
   );
+}
+
+/** ?s= 를 읽으므로 Suspense 경계가 필요하다 (Next App Router) */
+export default function BackupPage() {
+  return <Suspense fallback={<section className="page" />}><BackupPageInner /></Suspense>;
 }

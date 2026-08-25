@@ -29,6 +29,7 @@ import {
 } from '@/lib/menuStore';
 import { FEATURES } from '@/lib/menu';
 import { SectionsBlock } from '@/components/settings/SectionList';
+import { useSections, sectionMenuEntries } from '@/lib/sectionStore';
 import { useSiteDraft } from '@/lib/siteStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCursorSettings, CursorState, CURSOR_STATE_LABEL } from '@/lib/cursorStore';
@@ -1900,7 +1901,10 @@ function MenuPane() {
   const toast = useToast();
   const del = useConfirmDelete();
   const saved = ms.tree ?? defaultTree();
-  const defLabel = (href: string) => menuLabelFor(href, boardEntries(boards)) ?? href;
+  // 게시판 + 여러 개로 만든 섹션 — 메뉴가 아는 「추가 항목」 전체 (v2.0)
+  const { map: secMap } = useSections();
+  const extraAll = [...boardEntries(boards), ...sectionMenuEntries(secMap)];
+  const defLabel = (href: string) => menuLabelFor(href, extraAll) ?? href;
 
   // 드래프트 — 모든 편집(삭제 포함)은 SAVE를 눌러야 실제 메뉴에 반영 (v1.9 사용자 피드백)
   const [draft, setDraft] = useState<MenuGroupNode[] | null>(null);
@@ -1958,17 +1962,16 @@ function MenuPane() {
     if (!msLoaded || !bLoaded) return;
     let next: MenuGroupNode[] = saved
       .map(g => (g.href
-        ? (menuLabelFor(g.href, boardEntries(boards)) === null ? null : g)
-        : { ...g, items: g.items.filter(it => menuLabelFor(it.href, boardEntries(boards)) !== null) }))
+        ? (menuLabelFor(g.href, extraAll) === null ? null : g)
+        : { ...g, items: g.items.filter(it => menuLabelFor(it.href, extraAll) !== null) }))
       .filter((g): g is MenuGroupNode => !!g);
     const placed = new Set(next.flatMap(g => (g.href ? [g.href] : g.items.map(i => i.href))));
-    for (const b of boards) {
-      if (b.id === MAIN_BOARD_ID) continue;
-      const href = extraBoardHref(b.id);
+    for (const b of extraAll) {
+      const href = b.href;
       if (placed.has(href) || ms.removedBoards.includes(href)) continue;
-      const hi = next.findIndex(g => !g.href && g.items.some(i => i.href === '/board'));
+      const hi = next.findIndex(g => !g.href && g.items.some(i => i.href === b.anchor));
       if (hi >= 0) {
-        const at = next[hi].items.findIndex(i => i.href === '/board');
+        const at = next[hi].items.findIndex(i => i.href === b.anchor);
         next = next.map((g, i) => (i === hi
           ? { ...g, items: [...g.items.slice(0, at + 1), { href }, ...g.items.slice(at + 1)] } : g));
       } else {
@@ -1983,16 +1986,19 @@ function MenuPane() {
   const placedSet = new Set(tree.flatMap(g => (g.href ? [g.href] : g.items.map(i => i.href))));
   const unplaced = [
     ...FEATURES.filter(f => !placedSet.has(f.href)),
-    ...boards.filter(b => b.id !== MAIN_BOARD_ID)
-      .map(b => ({ href: extraBoardHref(b.id), label: b.name }))
-      .filter(x => !placedSet.has(x.href)),
+    // 게시판·갤러리·다이어리 등 여러 개로 만든 것도 여기 뜬다 (v2.0 사용자 요청) —
+    // 자동 배치된 자리가 마음에 안 들면 빼서 원하는 상위 메뉴로 다시 넣을 수 있다
+    ...extraAll.map(b => ({ href: b.href, label: b.name })).filter(x => !placedSet.has(x.href)),
   ];
 
   const patchGroup = (id: string, p: Partial<MenuGroupNode>) =>
     setTree(tree.map(g => (g.id === id ? { ...g, ...p } : g)));
   // 배치 해제 시 게시판이면 자동 편입 제외 목록에 (다시 배치하면 해제) — 드래프트에만
   const markRemoved = (hrefs: string[]) => {
-    const bs = hrefs.filter(h => h.startsWith('/board?b='));
+    // 추가 항목(게시판·섹션)은 빼 두면 자동 배치가 다시 넣지 않도록 기억한다 —
+    // 기억하지 않으면 빼는 순간 자동 배치가 원래 자리로 되돌려 놓는다
+    const known = new Set(extraAll.map(b => b.href));
+    const bs = hrefs.filter(h => known.has(h));
     if (bs.length) setDraftRemoved([...new Set([...removed, ...bs])]);
   };
   const removeGroup = (g: MenuGroupNode) => {

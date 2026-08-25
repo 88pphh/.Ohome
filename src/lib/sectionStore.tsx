@@ -13,6 +13,7 @@
  * 섹션을 지워도 **항목 데이터는 남긴다**(3장 원칙) — 메뉴에서만 사라진다.
  */
 import { useCallback, useEffect, useReducer } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { getRawSetting, setSetting } from './settingStore';
 import { newId } from './postStore';
 
@@ -114,6 +115,50 @@ export function useSections(): {
     loaded,
   };
 }
+
+/**
+ * 지금 보고 있는 섹션 (v2.0) — 주소의 `?s=`를 읽는다. 없으면 기본 섹션.
+ *
+ * 지워진 섹션의 주소로 들어오면 기본 섹션으로 돌린다 — 빈 화면 대신 원래 페이지가 나오게.
+ * `useSearchParams`는 Suspense 경계가 필요하므로 쓰는 쪽 페이지를 감싸 준다(자관 수정과 같은 방식).
+ */
+export function useSectionParam(kind: SectionKind): { id: string; name: string; items: SectionItem[] } {
+  const sp = useSearchParams();
+  const { list } = useSections();
+  const items = list(kind);
+  const want = sp.get('s') ?? MAIN_SEC;
+  const found = items.find(s => s.id === want) ?? items[0];
+  return { id: found.id, name: found.name, items };
+}
+
+/** 목록에서 이 섹션 것만 (v2.0) — 예전 데이터는 전부 기본 섹션 소속 */
+export function filterSection<T extends { secId?: string }>(rows: T[], cur: string): T[] {
+  return rows.filter(r => inSection(r.secId, cur));
+}
+
+/**
+ * 이 섹션만 갈아 끼우는 저장 함수 (v2.0) — **다른 섹션 것을 지우지 않게 하는 핵심**.
+ *
+ * 화면은 걸러진 목록만 보므로 `setItems(items.filter(...))`처럼 쓰면 **보이지 않던 다른 섹션이
+ * 통째로 사라진다**. 그래서 저장 함수를 이걸로 바꿔 두면 기존 코드를 한 줄도 안 고치고도
+ * 「이 섹션 자리만 교체 + 나머지는 그대로」가 된다. 새로 들어온 항목에는 소속을 찍어 준다.
+ */
+export function sectionSetter<T extends { secId?: string }>(
+  all: T[], cur: string, setAll: (next: T[]) => void,
+): (next: T[]) => void {
+  return (next: T[]) => {
+    const others = all.filter(r => !inSection(r.secId, cur));
+    // 기본 섹션은 표시를 남기지 않는다 — 예전 데이터와 같은 모습이라 되돌리기도 쉽다
+    const mine = cur === MAIN_SEC ? next : next.map(r => (r.secId === cur ? r : { ...r, secId: cur }));
+    setAll([...mine, ...others]);
+  };
+}
+
+/** 새로 만들기 페이지로 넘길 때 지금 섹션을 달고 간다 — 기본 섹션이면 아무것도 안 붙인다 */
+export const secQuery = (id: string) => (id === MAIN_SEC ? '' : `?s=${id}`);
+
+/** 새 항목에 찍을 소속 — 기본 섹션은 표시를 남기지 않는다(예전 데이터와 같은 모습) */
+export const secStamp = (id: string): { secId?: string } => (id === MAIN_SEC ? {} : { secId: id });
 
 /** 메뉴에 얹을 추가 항목 — 기본 섹션은 원래 메뉴가 이미 있으므로 뺀다 */
 export function sectionMenuEntries(map: SectionMap): { id: string; name: string; href: string; anchor: string }[] {

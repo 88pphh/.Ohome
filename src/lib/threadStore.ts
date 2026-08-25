@@ -15,6 +15,8 @@ export interface ThreadPost {
 }
 
 export interface ThreadWork {
+  /** 소속 섹션 (v2.0) — 여러 개로 만들었을 때. 없으면 기본 섹션 */
+  secId?: string;
   id: string;
   title: string;             // 작품명 (필수)
   titleFontId?: string;      // 작품명 폰트 개별 지정 (5.1 폰트 라이브러리)
