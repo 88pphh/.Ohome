@@ -1,7 +1,7 @@
 ﻿'use client';
 // 환경설정 (기획서 5장) — 0차: 「디자인」 탭(테마) 실동작.
 // 나머지 카테고리는 해당 기능 마일스톤에서 함께 구현.
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth, inviteCode, setInviteCode } from '@/lib/auth';
 import { useMembers } from '@/lib/members';
 import { useTheme } from '@/lib/ThemeProvider';
@@ -36,6 +36,7 @@ import { SymbolInput } from '@/components/ui/SymbolInput';
 import { allBlobs, putBlobAs, useBlobUrl, getBlob } from '@/lib/blobStore';
 import { parseAni } from '@/lib/aniCursor';
 import { fileDrop } from '@/lib/dnd';
+import { Character, CHAR_SEED, Relation, REL_SEED } from '@/lib/charStore';
 import { useLocalList } from '@/lib/postStore';
 import { Mood, MOOD_SEED, moodTint } from '@/lib/diaryStore';
 import {
@@ -1487,6 +1488,25 @@ function DataPane() {
     toast(`이미지 ${n}개를 지웠습니다`);
   };
 
+  /* 어디에도 안 걸린 상대 캐릭터 정리 (v2.0 사용자 요청).
+     자관을 지워도 그 자관에서 만든 상대 캐릭터는 남는다. **일부러 그렇게 둔다** — 실수로 자관을
+     지웠을 때 캐릭터까지 사라지면 되돌릴 방법이 없기 때문(사용자 판단). 대신 정말 아무 자관에도
+     안 걸린 것만 골라 여기서 지운다. 내 캐릭터(own)는 자관과 무관하게 존재하므로 건드리지 않는다. */
+  const [chars, setChars] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
+  const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
+  const [charAsk, setCharAsk] = useState(false);
+  const orphanChars = useMemo(() => {
+    const used = new Set<string>();
+    rels.forEach(r => r.members.forEach(m => used.add(m.charId)));
+    return chars.filter(c => !c.own && !used.has(c.id));
+  }, [chars, rels]);
+
+  const cleanChars = () => {
+    const gone = new Set(orphanChars.map(c => c.id));
+    setChars(chars.filter(c => !gone.has(c.id)));
+    toast(`상대 캐릭터 ${gone.size}명을 지웠습니다`);
+  };
+
   // 이 브라우저에 저장돼 있던 사이트 설정을 서버로 올린다 (연결 직후 1회면 충분)
   const doPush = async () => {
     setPushing(true);
@@ -1629,6 +1649,22 @@ function DataPane() {
           </div>
         </div>
       )}
+      {/* 어디에도 안 걸린 상대 캐릭터 정리 (v2.0 사용자 요청) — 자관을 지워도 캐릭터는 일부러 남긴다.
+          실수로 지웠을 때 되돌릴 수 있게. 정말 안 쓰는 것만 여기서 골라 지운다 */}
+      <div className="set-row" style={{ flexWrap: 'wrap' }}>
+        <div className="l"><b>등록되지 않은 상대 캐릭터 정리</b>
+          <small>자관을 지워도 상대 캐릭터는 남습니다(실수로 지웠을 때를 위해) — 어느 자관에도 없는 캐릭터만 골라 지웁니다</small></div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="hint">
+            {orphanChars.length > 0 ? `${orphanChars.length}명` : '정리할 것 없음'}
+          </span>
+          {orphanChars.length > 0 && (
+            <button className="btn btn-accent" style={{ padding: '9px 18px' }}
+              onClick={() => setCharAsk(true)}>{orphanChars.length}명 지우기</button>
+          )}
+        </div>
+      </div>
+
       {/* 백업 두 갈래 (v1.9 사용자 확정) — 회원 계정 포함 여부 선택 */}
       <div className="set-row" style={{ flexWrap: 'wrap' }}>
         <div className="l"><b>백업 내보내기</b><small>글·캐릭터·설정 + 이미지 → zip · 회원 계정(가입자·가입코드) 포함 여부 선택</small></div>
@@ -1776,6 +1812,15 @@ function DataPane() {
         buttons={[
           { label: '지우기', kind: 'accent', onClick: () => { setCleanAsk(false); void cleanOrphans(); } },
           { label: 'CANCEL', kind: 'ghost', onClick: () => setCleanAsk(false) },
+        ]} />
+
+      {/* 지울 캐릭터 이름을 그대로 보여 준다 (v2.0) — 개수만으로는 무엇이 사라지는지 알 수 없다 */}
+      <ConfirmModal open={charAsk} title={`상대 캐릭터 ${orphanChars.length}명을 지울까요?`}
+        body={`${orphanChars.slice(0, 12).map(c => c.name).join(', ')}${orphanChars.length > 12 ? ` 외 ${orphanChars.length - 12}명` : ''} — 어느 자관에도 등록돼 있지 않은 캐릭터입니다. 지우면 복구할 수 없습니다.`}
+        onClose={() => setCharAsk(false)}
+        buttons={[
+          { label: '지우기', kind: 'accent', onClick: () => { setCharAsk(false); cleanChars(); } },
+          { label: 'CANCEL', kind: 'ghost', onClick: () => setCharAsk(false) },
         ]} />
 
       <ConfirmModal open={resetAsk} title="선택한 항목을 초기화할까요?"

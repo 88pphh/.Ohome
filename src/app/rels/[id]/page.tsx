@@ -10,7 +10,7 @@ import { useTheme } from '@/lib/ThemeProvider';
 import { useLocalList, newId } from '@/lib/postStore';
 import {
   Relation, REL_SEED, Character, CHAR_SEED, RelMember, QaEntry, QaAnswer, TlItem, findChar, Visibility, CharGrant,
-  auMember,
+  auMember, auStyle, fullShadow,
   RelAu, RelCpTag, charWithAu, charGrant,
   QaAnswerRow, QA_KEY, QA_SEED, MergedAnswer, answersFor,
 } from '@/lib/charStore';
@@ -32,7 +32,8 @@ import { useToast } from '@/components/ui/Toast';
 import { PageTitle } from '@/components/ui/PageText';
 
 /** 전신 이미지 — 비율 유지, 하단 정렬, 크기 %는 자관 수정 미리보기에서 지정 (v1.9) */
-function FullImg({ refId, scale, offX = 0, offY = 0 }: { refId: string; scale: number; offX?: number; offY?: number }) {
+// 전신 그림자는 「그림자 직접 지정」의 색·강도를 따른다 (v2.0 사용자 요청) — 자관명 그림자와 같은 설정
+function FullImg({ refId, scale, offX = 0, offY = 0, shadow }: { refId: string; scale: number; offX?: number; offY?: number; shadow?: string }) {
   const url = useBlobUrl(refId);
   if (!url) return null;
   return (
@@ -40,7 +41,7 @@ function FullImg({ refId, scale, offX = 0, offY = 0 }: { refId: string; scale: n
     <img src={url} alt="" draggable={false} style={{
       position: 'absolute', bottom: `${offY}%`, left: `calc(50% + ${offX}%)`, transform: 'translateX(-50%)',
       height: `${scale}%`, maxWidth: 'none',
-      filter: 'drop-shadow(0 8px 18px rgba(0,0,0,.35))',
+      filter: shadow,
     }} />
   );
 }
@@ -313,9 +314,11 @@ export default function RelDetailPage() {
   }, [pageColor, pageTone, setPageTheme]);
 
   // 자관별 페이지 배경 (v2.0 사용자 요청) — 이 페이지에 있는 동안만, 벗어나면 원래 배경으로
-  const bgG1 = rel?.pageBgG1;
-  const bgG2 = rel?.pageBgG2;
-  const bgAngle = rel?.pageBgAngle;
+  // 색·배경은 AU마다 따로 정할 수 있다 (v2.0 사용자 요청) — 정한 게 없으면 자관 기본
+  const themeAuStyle = rel ? auStyle(rel, rel.aus.find(a => a.id === auId)) : undefined;
+  const bgG1 = themeAuStyle?.pageBgG1;
+  const bgG2 = themeAuStyle?.pageBgG2;
+  const bgAngle = themeAuStyle?.pageBgAngle;
   useEffect(() => {
     if (!bgG1 && !bgG2) return;
     setPageBg({ g1: bgG1 ?? '#2b3038', g2: bgG2 ?? '#121418', angle: bgAngle ?? 180 });
@@ -621,6 +624,8 @@ export default function RelDetailPage() {
      오른쪽 카드에서 추가해도 무조건 왼쪽에 들어갔다. pairRight로 오른쪽에 둘 캐릭터를 지정한다. */
   // 한마디·대사 색·전신 위치는 AU마다 다를 수 있다 (v2.0) — 이 AU 값이 있으면 그것으로 갈아 끼운다
   const asAu = (m: RelMember | null) => (m && !isBaseAu ? auMember(m, au) : m);
+  // 색·배경도 AU마다 따로 (v2.0 사용자 요청) — AU에 정해 둔 게 없으면 자관 기본이 그대로 나온다
+  const auSt = auStyle(rel, au);
   const pairSlots: (RelMember | null)[] = isDuo
     ? (rel.pairRight
       ? [asAu(rel.members.find(m => m.charId !== rel.pairRight) ?? null),
@@ -658,11 +663,11 @@ export default function RelDetailPage() {
             </div>
           );
         }
-        if (!rel.headerBgG1 && !rel.headerBgG2) return null;
+        if (!auSt.headerBgG1 && !auSt.headerBgG2) return null;
         return (
           <div className="rel-backdrop">
             <div className="img custom" style={{
-              background: `linear-gradient(${rel.headerBgAngle ?? 180}deg, ${rel.headerBgG1 ?? '#3a4150'}, ${rel.headerBgG2 ?? '#1a1d22'})`,
+              background: `linear-gradient(${auSt.headerBgAngle ?? 180}deg, ${auSt.headerBgG1 ?? '#3a4150'}, ${auSt.headerBgG2 ?? '#1a1d22'})`,
             }} />
           </div>
         );
@@ -740,8 +745,8 @@ export default function RelDetailPage() {
         {/* CP/NCP 뱃지 — 자관명 위 가운데 (v2.0 사용자 요청) · 색은 자관 수정에서 */}
         {auCpTag && (
           <div className="cp-top">
-            <span className="pill" style={rel.cpTagBg || rel.cpTagFg
-              ? { background: rel.cpTagBg, color: rel.cpTagFg, borderColor: rel.cpTagBg }
+            <span className="pill" style={auSt.cpTagBg || auSt.cpTagFg
+              ? { background: auSt.cpTagBg, color: auSt.cpTagFg, borderColor: auSt.cpTagBg }
               : undefined}>{CP_LABEL[auCpTag]}</span>
           </div>
         )}
@@ -749,10 +754,10 @@ export default function RelDetailPage() {
         {/* 이름 그림자 — 색·강도 직접 지정 (v2.0 사용자 요청, 미지정: 검정 60% · 기존과 동일) */}
         {/* 이름 자체는 AU마다 다르게 붙일 수 있다 (v2.0 사용자 요청) — 안 정했으면 자관 이름 그대로 */}
         <h1 style={{
-          fontFamily: familyOf(rel.fontId), color: rel.nameColor,
-          textShadow: `0 4px 30px ${withAlpha(rel.nameShadowColor ?? '#000000', 0.6 * ((rel.nameShadow ?? 100) / 100))}`,
+          fontFamily: familyOf(rel.fontId), color: auSt.nameColor,
+          textShadow: `0 4px 30px ${withAlpha(auSt.nameShadowColor ?? '#000000', 0.6 * ((auSt.nameShadow ?? 100) / 100))}`,
         }}>{(!isBaseAu && au?.name?.trim()) || rel.name}</h1>
-        <div className="catch" style={{ color: rel.cpColor }}>
+        <div className="catch" style={{ color: auSt.cpColor }}>
           {au?.catchphrase || rel.catchphrase}
         </div>
         {isDuo && pairSlots[1] && (
@@ -787,7 +792,8 @@ export default function RelDetailPage() {
               return (
                 <div key={i} className={`fb fb-${i === 0 ? 'l' : 'r'}`}
                   style={{ background: 'transparent', zIndex: front ? 3 : 2 }}>
-                  <FullImg refId={fullRef} scale={m?.fullScale ?? 90} offX={m?.fullOffX ?? 0} offY={m?.fullOffY ?? 0} />
+                  <FullImg refId={fullRef} scale={m?.fullScale ?? 90} offX={m?.fullOffX ?? 0} offY={m?.fullOffY ?? 0}
+                    shadow={fullShadow(auSt.nameShadowColor, auSt.nameShadow)} />
                 </div>
               );
             })}
@@ -812,8 +818,8 @@ export default function RelDetailPage() {
                 전신이 하나도 없으면 고를 것이 없으므로 스위치 자체를 숨긴다 */}
             {hasFull && (
               <div className="illu-toggle seg" style={{
-                ['--illu-bg' as string]: rel.illuBg,
-                ['--illu-on' as string]: rel.illuOn,
+                ['--illu-bg' as string]: auSt.illuBg,
+                ['--illu-on' as string]: auSt.illuOn,
               } as React.CSSProperties}>
                 <button className={!single ? 'on' : ''} onClick={() => setOneMode(false)}>전신</button>
                 <button className={single ? 'on' : ''} onClick={() => setOneMode(true)}>일러스트</button>

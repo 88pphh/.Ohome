@@ -81,6 +81,16 @@ function RelEditInner() {
                   ...a, arts: v.arts, catchphrase: v.catchphrase,
                   // AU별 자관명 (v2.0 사용자 요청) — 비우면 자관 이름 그대로 쓰게 아예 지운다
                   name: v.auName?.trim() ? v.auName.trim() : undefined,
+                  // AU별 색·배경 (v2.0 사용자 요청) — 「직접 지정」을 끄면 undefined가 되어
+                  // 자관 값으로 되돌아간다(auStyle이 묶음 단위로 판정한다)
+                  style: {
+                    nameColor: v.nameColor, cpColor: v.cpColor,
+                    cpTagBg: v.cpTagBg, cpTagFg: v.cpTagFg,
+                    nameShadowColor: v.nameShadowColor, nameShadow: v.nameShadow,
+                    headerBgG1: v.headerBgG1, headerBgG2: v.headerBgG2, headerBgAngle: v.headerBgAngle,
+                    pageBgG1: v.pageBgG1, pageBgG2: v.pageBgG2, pageBgAngle: v.pageBgAngle,
+                    illuBg: v.illuBg, illuOn: v.illuOn,
+                  },
                   // AU별 멤버 표시값 (v2.0 사용자 발견) — 이 AU에서만 쓰는 전신 위치·한마디·대사 색.
                   // 자관 공통(members)은 위에서 건드리지 않았으므로 다른 AU는 그대로다
                   mset: Object.fromEntries(r.members.map(m => [m.charId, {

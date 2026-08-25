@@ -3,7 +3,7 @@
 // 아트 다중 등록(첫 장 = 대표 · 리스트 썸네일 4:3 크롭) · 등록 시 내 캐릭터 연동
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Character, Relation, Visibility, RelCpTag, RelMember, auMember } from '@/lib/charStore';
+import { Character, Relation, Visibility, RelCpTag, RelMember, auMember, auStyle, fullShadow } from '@/lib/charStore';
 import { ColorField } from '@/components/ui/ColorField';
 import { isValidSlug, slugify } from '@/lib/link';
 import { CP_LABEL } from '@/lib/relqStore';
@@ -66,8 +66,8 @@ interface FullDraft { ref?: string; file?: File; url?: string }
 /** 전신 미리보기 한 장 (v1.9 조작 개편 — 사용자 확정)
  *  · 드래그 = 위치 이동 (가로·세로)  · 휠 = 크기 (비율 유지)  · 우클릭 = 앞으로/뒤로 메뉴
  *  배치는 상세 FullImg와 동일(부모 fb 박스 기준 하단 중앙 + 오프셋) — 미리보기 = 실제 */
-function FullPrevImg({ draft, scale, offX, offY, name, onScale, onOffset, onLayer }: {
-  draft?: FullDraft; scale: number; offX: number; offY: number; name: string;
+function FullPrevImg({ draft, scale, offX, offY, name, shadow, onScale, onOffset, onLayer }: {
+  draft?: FullDraft; scale: number; offX: number; offY: number; name: string; shadow?: string;
   onScale: (v: number) => void;
   onOffset: (x: number, y: number) => void;
   onLayer: (front: boolean) => void;
@@ -108,7 +108,7 @@ function FullPrevImg({ draft, scale, offX, offY, name, onScale, onOffset, onLaye
           position: 'absolute', bottom: `${offY}%`, left: `calc(50% + ${offX}%)`, transform: 'translateX(-50%)',
           height: `${scale}%`, maxWidth: 'none', cursor: 'var(--cur-grab,grab)',
           userSelect: 'none', touchAction: 'none',
-          filter: 'drop-shadow(0 6px 14px rgba(0,0,0,.35))',
+          filter: shadow,
         }}
         draggable={false}
         onPointerDown={e => {
@@ -198,32 +198,35 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
     (auObj?.theme?.mode ?? initial?.themeMode) ?? 'site');
   const [themeColor, setThemeColor] = useState((auObj?.theme?.color ?? initial?.themeColor) ?? '#c9a86a');
   const [themeTone, setThemeTone] = useState<'dark' | 'light'>((auObj?.theme?.tone ?? initial?.themeTone) ?? 'dark');
+  // 색·배경은 AU마다 따로 정할 수 있다 (v2.0 사용자 요청) — AU 편집 중이면 그 AU에 정해 둔 값부터 보고,
+  // 정한 게 없으면 자관 값이 그대로 채워진다. 체크를 끄면 AU에서 지워져 자관 값으로 되돌아간다.
+  const st = initial ? auStyle(initial, auObj) : undefined;
   // 전신/일러 스위치 색 (v1.9) — 직접 지정 안 하면 테마·포인트색
-  const [illuCustom, setIlluCustom] = useState(!!(initial?.illuBg || initial?.illuOn));
-  const [illuBg, setIlluBg] = useState(initial?.illuBg ?? '#1d2025');
-  const [illuOn, setIlluOn] = useState(initial?.illuOn ?? '#a63a45');
+  const [illuCustom, setIlluCustom] = useState(!!(st?.illuBg || st?.illuOn));
+  const [illuBg, setIlluBg] = useState(st?.illuBg ?? '#1d2025');
+  const [illuOn, setIlluOn] = useState(st?.illuOn ?? '#a63a45');
   // 자관명·캐치프레이즈 글씨색 (v1.9 사용자 요청) — 직접 지정 안 하면 테마색
-  const [txtCustom, setTxtCustom] = useState(!!(initial?.nameColor || initial?.cpColor));
-  const [nameColor, setNameColor] = useState(initial?.nameColor ?? '#e8eaee');
-  const [cpColor, setCpColor] = useState(initial?.cpColor ?? '#8a8f98');
+  const [txtCustom, setTxtCustom] = useState(!!(st?.nameColor || st?.cpColor));
+  const [nameColor, setNameColor] = useState(st?.nameColor ?? '#e8eaee');
+  const [cpColor, setCpColor] = useState(st?.cpColor ?? '#8a8f98');
   // CP/NCP 뱃지 색 (v2.0 사용자 요청) — 미지정이면 기본 pill 색
-  const [tagCustom, setTagCustom] = useState(!!(initial?.cpTagBg || initial?.cpTagFg));
-  const [cpTagBg, setCpTagBg] = useState(initial?.cpTagBg ?? '#eef0f2');
-  const [cpTagFg, setCpTagFg] = useState(initial?.cpTagFg ?? '#5d636d');
-  // 자관명 그림자 (v2.0 사용자 요청) — 색·강도. 미지정이면 기존 그대로(검정 60%)
-  const [shadowCustom, setShadowCustom] = useState(!!(initial?.nameShadowColor || initial?.nameShadow));
-  const [nameShadowColor, setNameShadowColor] = useState(initial?.nameShadowColor ?? '#000000');
-  const [nameShadow, setNameShadow] = useState(initial?.nameShadow ?? 100);
+  const [tagCustom, setTagCustom] = useState(!!(st?.cpTagBg || st?.cpTagFg));
+  const [cpTagBg, setCpTagBg] = useState(st?.cpTagBg ?? '#eef0f2');
+  const [cpTagFg, setCpTagFg] = useState(st?.cpTagFg ?? '#5d636d');
+  // 그림자 (v2.0) — 색·강도. 자관명과 전신 이미지에 함께 걸린다 (사용자 요청). 미지정이면 기존 그대로
+  const [shadowCustom, setShadowCustom] = useState(!!(st?.nameShadowColor || st?.nameShadow));
+  const [nameShadowColor, setNameShadowColor] = useState(st?.nameShadowColor ?? '#000000');
+  const [nameShadow, setNameShadow] = useState(st?.nameShadow ?? 100);
   // 헤더 이미지가 없을 때 대신 깔 배경 그라데이션 (v2.0 사용자 요청) — 디자인 탭 배경 설정과 같은 방식(색 2개+각도)
-  const [headerBgCustom, setHeaderBgCustom] = useState(!!(initial?.headerBgG1 || initial?.headerBgG2));
-  const [headerBgG1, setHeaderBgG1] = useState(initial?.headerBgG1 ?? '#3a4150');
-  const [headerBgG2, setHeaderBgG2] = useState(initial?.headerBgG2 ?? '#1a1d22');
-  const [headerBgAngle, setHeaderBgAngle] = useState(initial?.headerBgAngle ?? 180);
+  const [headerBgCustom, setHeaderBgCustom] = useState(!!(st?.headerBgG1 || st?.headerBgG2));
+  const [headerBgG1, setHeaderBgG1] = useState(st?.headerBgG1 ?? '#3a4150');
+  const [headerBgG2, setHeaderBgG2] = useState(st?.headerBgG2 ?? '#1a1d22');
+  const [headerBgAngle, setHeaderBgAngle] = useState(st?.headerBgAngle ?? 180);
   // 페이지 전체 배경 (v2.0 사용자 요청) — 디자인 탭의 사이트 배경과 같은 방식(색 2개 + 각도)
-  const [pageBgCustom, setPageBgCustom] = useState(!!(initial?.pageBgG1 || initial?.pageBgG2));
-  const [pageBgG1, setPageBgG1] = useState(initial?.pageBgG1 ?? '#2b3038');
-  const [pageBgG2, setPageBgG2] = useState(initial?.pageBgG2 ?? '#121418');
-  const [pageBgAngle, setPageBgAngle] = useState(initial?.pageBgAngle ?? 180);
+  const [pageBgCustom, setPageBgCustom] = useState(!!(st?.pageBgG1 || st?.pageBgG2));
+  const [pageBgG1, setPageBgG1] = useState(st?.pageBgG1 ?? '#2b3038');
+  const [pageBgG2, setPageBgG2] = useState(st?.pageBgG2 ?? '#121418');
+  const [pageBgAngle, setPageBgAngle] = useState(st?.pageBgAngle ?? 180);
   const [charQuery, setCharQuery] = useState('');
   // 전신 이미지 (v1.9 — 페어 · 수정 모드) — AU 편집이면 그 AU의 전신
   const pairMembers = !isNew && (initial!.kind ? initial!.kind === 'pair' : initial!.members.length === 2)
@@ -485,6 +488,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                       offX={fullOffsets[m.charId]?.x ?? 0}
                       offY={fullOffsets[m.charId]?.y ?? 0}
                       name={memberNames?.[m.charId] ?? m.charId}
+                      shadow={fullShadow(shadowCustom ? nameShadowColor : undefined,
+                        shadowCustom ? nameShadow : undefined, '0 6px 14px')}
                       onScale={v => setFullScales(s => ({ ...s, [m.charId]: v }))}
                       onOffset={(x, y) => setFullOffsets(s => ({ ...s, [m.charId]: { x, y } }))}
                       onLayer={front => {
@@ -589,8 +594,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
         )}
 
         {/* 헤더 이미지가 없을 때 대신 깔 배경 (v2.0 사용자 요청) — 디자인 탭 배경 설정과 같은 방식.
-            지정하지 않으면 예전처럼 그 자리엔 아무것도 안 그린다 */}
-        {!auObj && (
+            지정하지 않으면 예전처럼 그 자리엔 아무것도 안 그린다. AU마다 따로 정할 수 있다 */}
+        {(
           <div style={{ marginTop: 10 }}>
             <KCheck label="헤더 이미지 없을 때 배경 직접 지정" checked={headerBgCustom} onChange={setHeaderBgCustom} />
             {headerBgCustom && (
@@ -643,8 +648,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
               </div>
             )}
             <KInput placeholder="캐치프레이즈" value={catchphrase} onChange={e => setCatchphrase(e.target.value)} />
-            {/* 자관명·캐치프레이즈 글씨색 (v1.9 사용자 요청) — 기본은 테마색, AU 편집에서는 base 소관 */}
-            {!auObj && (
+            {/* 자관명·캐치프레이즈 글씨색 (v1.9 사용자 요청) — 기본은 테마색. AU마다 따로 정할 수 있다 (v2.0) */}
+            {(
               <div>
                 <KCheck label="자관명·캐치프레이즈 색 직접 지정" checked={txtCustom} onChange={setTxtCustom} />
                 {txtCustom && (
@@ -657,10 +662,10 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                 )}
               </div>
             )}
-            {/* 자관명 그림자 (v2.0 사용자 요청) — 어떤 색으로 얼마나 진하게 깔릴지 */}
-            {!auObj && (
+            {/* 그림자 (v2.0 사용자 요청) — 어떤 색으로 얼마나 진하게 깔릴지. 자관명과 전신에 함께 걸린다 */}
+            {(
               <div>
-                <KCheck label="자관명 그림자 직접 지정" checked={shadowCustom} onChange={setShadowCustom} />
+                <KCheck label="그림자 직접 지정 (자관명·전신)" checked={shadowCustom} onChange={setShadowCustom} />
                 {shadowCustom && (
                   <div className="cf-stack" style={{ marginTop: 8 }}>
                     <div className="cf-row">
@@ -684,8 +689,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                 ))}
               </div>
             </div>
-            {/* 뱃지 색 (v2.0 사용자 요청) — 자관명 위에 뜨는 CP/NCP 표시 */}
-            {!auObj && (
+            {/* 뱃지 색 (v2.0 사용자 요청) — 자관명 위에 뜨는 CP/NCP 표시. AU마다 따로 */}
+            {(
               <div>
                 <KCheck label="CP 뱃지 색 직접 지정" checked={tagCustom} onChange={setTagCustom} />
                 {tagCustom && (
@@ -745,8 +750,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                   : '이 페이지도 홈페이지 테마를 그대로 사용합니다'}
               </p>
             </div>
-            {/* 페이지 배경 (v2.0 사용자 요청) — 이 자관 페이지에 들어가 있는 동안의 바탕 그라데이션 */}
-            {!auObj && (
+            {/* 페이지 배경 (v2.0 사용자 요청) — 이 페이지에 있는 동안의 바탕 그라데이션. AU마다 따로 */}
+            {(
               <div>
                 <KCheck label="페이지 배경 직접 지정" checked={pageBgCustom} onChange={setPageBgCustom} />
                 {pageBgCustom && (
@@ -764,8 +769,8 @@ export function RelForm({ initial, auId, myChars, memberNames, existingIds, onSa
                 )}
               </div>
             )}
-            {/* 전신/일러 스위치 색 (v1.9 사용자 요청) — 페어 중앙 이미지의 전환 스위치, 기본은 테마·포인트색 */}
-            {!auObj && (
+            {/* 전신/일러 스위치 색 (v1.9 사용자 요청) — 페어 중앙 이미지의 전환 스위치. AU마다 따로 (v2.0) */}
+            {(
               <div>
                 <KCheck label="전신/일러 스위치 색 직접 지정" checked={illuCustom} onChange={setIlluCustom} />
                 {illuCustom && (

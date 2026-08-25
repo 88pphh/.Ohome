@@ -209,12 +209,81 @@ export function auMember(m: RelMember, au?: RelAu): RelMember {
   return out;
 }
 
+/**
+ * AU에서만 다르게 쓸 색·배경 (v2.0 사용자 요청 — 「AU 페이지에서도 색상 테마 같은 걸 다 따로」).
+ *
+ * 값이 있으면 그것, 없으면 자관 기본을 그대로 쓴다(→ `auStyle`). 자관 쪽 「직접 지정」 체크를
+ * 끄면 그 값들이 사라지듯, AU에서도 체크를 끄면 여기서 지워져 자관 값으로 되돌아간다.
+ */
+export interface RelAuStyle {
+  nameColor?: string;
+  cpColor?: string;
+  cpTagBg?: string;
+  cpTagFg?: string;
+  nameShadowColor?: string;
+  nameShadow?: number;
+  headerBgG1?: string; headerBgG2?: string; headerBgAngle?: number;
+  pageBgG1?: string; pageBgG2?: string; pageBgAngle?: number;
+  illuBg?: string; illuOn?: string;
+}
+
+/** 이 AU에서 실제로 쓸 색·배경 — AU에 정해 둔 값이 있으면 그것, 없으면 자관 기본 */
+export function auStyle(rel: Relation, au?: RelAu): RelAuStyle {
+  const s = au?.style;
+  const base: RelAuStyle = {
+    nameColor: rel.nameColor, cpColor: rel.cpColor,
+    cpTagBg: rel.cpTagBg, cpTagFg: rel.cpTagFg,
+    nameShadowColor: rel.nameShadowColor, nameShadow: rel.nameShadow,
+    headerBgG1: rel.headerBgG1, headerBgG2: rel.headerBgG2, headerBgAngle: rel.headerBgAngle,
+    pageBgG1: rel.pageBgG1, pageBgG2: rel.pageBgG2, pageBgAngle: rel.pageBgAngle,
+    illuBg: rel.illuBg, illuOn: rel.illuOn,
+  };
+  if (!s) return base;
+  const out = { ...base };
+  // 「자관 색·배경 묶음」 단위로 갈아 끼운다 — 한 묶음이라도 AU에 정해 뒀으면 그 묶음 전체를 AU 것으로.
+  // 색 하나만 AU 값이고 나머지는 자관 값이면 어울리지 않는 조합이 나온다
+  if (s.nameColor !== undefined || s.cpColor !== undefined) {
+    out.nameColor = s.nameColor; out.cpColor = s.cpColor;
+  }
+  if (s.cpTagBg !== undefined || s.cpTagFg !== undefined) {
+    out.cpTagBg = s.cpTagBg; out.cpTagFg = s.cpTagFg;
+  }
+  if (s.nameShadowColor !== undefined || s.nameShadow !== undefined) {
+    out.nameShadowColor = s.nameShadowColor; out.nameShadow = s.nameShadow;
+  }
+  if (s.headerBgG1 !== undefined || s.headerBgG2 !== undefined) {
+    out.headerBgG1 = s.headerBgG1; out.headerBgG2 = s.headerBgG2; out.headerBgAngle = s.headerBgAngle;
+  }
+  if (s.pageBgG1 !== undefined || s.pageBgG2 !== undefined) {
+    out.pageBgG1 = s.pageBgG1; out.pageBgG2 = s.pageBgG2; out.pageBgAngle = s.pageBgAngle;
+  }
+  if (s.illuBg !== undefined || s.illuOn !== undefined) {
+    out.illuBg = s.illuBg; out.illuOn = s.illuOn;
+  }
+  return out;
+}
+
+/** 전신 이미지에 깔 그림자 (v2.0 사용자 요청) — 「그림자 직접 지정」의 색·강도를 그대로 따른다.
+ *  미지정이면 예전과 같은 검정 35%. 강도를 0으로 두면 그림자를 아예 빼서 또렷하게 둘 수 있다.
+ *  geom은 자리마다 다르다 — 상세는 크게(0 8px 18px), 수정 미리보기는 작게(0 6px 14px). */
+export function fullShadow(color?: string, strength?: number, geom = '0 8px 18px'): string | undefined {
+  const pct = strength ?? 100;
+  if (pct <= 0) return undefined;
+  const a = 0.35 * (pct / 100);
+  const hex = (color ?? '#000000').replace('#', '');
+  const f = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(f.slice(i, i + 2), 16) || 0);
+  return `drop-shadow(${geom} rgba(${r},${g},${b},${a}))`;
+}
+
 export interface RelAu {
   id: string;
   label: string;
   catchphrase: string;
   /** AU별 자관명 (v2.0 사용자 요청) — 비우면 자관 이름을 그대로 쓴다 */
   name?: string;
+  /** AU별 색·배경 — 없으면 자관 기본 (위 RelAuStyle 설명 참조) */
+  style?: RelAuStyle;
   /** AU별 멤버 표시값 — 없으면 자관 기본 (위 RelAuMember 설명 참조) */
   mset?: Record<string, RelAuMember>;
   quotes?: string[];
