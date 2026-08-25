@@ -1236,8 +1236,21 @@ export default function RelDetailPage() {
           {rel.aus.map(a => (
             <div key={a.id} style={{ display: 'grid', gap: 7, padding: '9px 11px', border: '1.5px solid var(--line)', borderRadius: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <b style={{ fontSize: 12.5, flexShrink: 0 }}>{a.label}</b>
-                <small style={{ color: 'var(--faint)', fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.catchphrase}</small>
+                {/* AU 이름·캐치프레이즈는 등록할 때만 받고 그 뒤로는 고칠 곳이 없었다 (v2.0 사용자 발견).
+                    등록 폼과 같은 자리에서 바로 고치게 한다 — 자관 질문 세트 이름과 같은 방식 */}
+                <KInput value={a.label}
+                  onChange={e => updateRel({ aus: rel.aus.map(x => (x.id === a.id ? { ...x, label: e.target.value } : x)) })}
+                  style={{ width: 110, fontSize: 12, padding: '5px 9px', flexShrink: 0 }} />
+                <KInput value={a.id === 'base' ? rel.catchphrase : a.catchphrase} placeholder="캐치프레이즈"
+                  onChange={e => {
+                    const v = e.target.value;
+                    // 원본의 캐치프레이즈는 자관 본체에 있다 — 둘이 어긋나지 않게 함께 고친다
+                    updateRel({
+                      ...(a.id === 'base' ? { catchphrase: v } : {}),
+                      aus: rel.aus.map(x => (x.id === a.id ? { ...x, catchphrase: v } : x)),
+                    });
+                  }}
+                  style={{ fontSize: 11.5, padding: '5px 9px', minWidth: 0, flex: 1 }} />
                 {/* AU별 CP/NCP — 이름 줄 오른쪽 정렬 (v1.9 사용자 요청) */}
                 <div className="mini-seg" style={{ marginLeft: 'auto', flexShrink: 0 }}>
                   {(['cp', 'ncp'] as RelCpTag[]).map(t => (
