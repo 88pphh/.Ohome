@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { WidgetConf, useMainStore, WIDGET_META, decoSlides } from '@/lib/mainStore';
 import { useAuth } from '@/lib/auth';
-import { useMenuSettings, buildMenu } from '@/lib/menuStore';
+import { boardEntries, useMenuSettings, buildMenu } from '@/lib/menuStore';
 import { useBoards } from '@/lib/boardStore';
 import { Modal } from '@/components/ui/Modal';
 import { KTextarea, KSelect, KStep, KCheck } from '@/components/ui/Kit';
@@ -107,7 +107,7 @@ export function MenuListWidget() {
   const { user: wUser, isAdmin: wIsAdmin } = useAuth(); // 공개범위 필터 (v1.9)
   return (
     <div className="panel menu-list wgt-menu">
-      {(menuLoaded && boardsLoaded ? buildMenu(menuSet, boards, { loggedIn: !!wUser, isAdmin: wIsAdmin }) : []).map(m =>
+      {(menuLoaded && boardsLoaded ? buildMenu(menuSet, boardEntries(boards), { loggedIn: !!wUser, isAdmin: wIsAdmin }) : []).map(m =>
         m.children ? (
           <div key={m.label} className={`mgrp ${open === m.label ? 'open' : ''}`}>
             <a onClick={() => setOpen(o => (o === m.label ? null : m.label))}>{m.label}</a>
