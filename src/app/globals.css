@@ -1095,6 +1095,17 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .rel-tabs > button{font-family:var(--serif);letter-spacing:.2em;font-size:calc(15px*var(--fs,1));color:var(--faint);padding:6px 14px 12px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s}
 .rel-tabs > button:hover{color:var(--ink)}
 .rel-tabs > button.on{color:var(--ink);border-bottom-color:var(--ink)}
+/* 모바일 — 글자 대신 픽토그램만 (v2.0 사용자 요청). 좁은 폭에서 버튼 글씨가 줄줄이 늘어져
+   탭 줄이 두 줄로 넘어가던 것. 탭은 T·Q로 줄이고 갭만 넉넉히 줘 구분되게 한다.
+   버튼들은 인라인 style로 padding을 갖고 있어 여기서는 !important로 눌러야 한다 */
+.lb-m{display:none}
+@media (max-width:620px){
+  .lb-pc{display:none}
+  .lb-m{display:inline}
+  .rel-tabs{gap:16px}
+  .rel-tabs > button{padding:6px 2px 10px;letter-spacing:0}
+  .rel-tabs .btn{padding:0 11px !important;min-width:40px;font-size:calc(14px*var(--fs,1)) !important}
+}
 /* 페어 문답 (QUESTIONS, v1.8) — PC 기준 세로 700px */
 .qa-wrap{display:grid;grid-template-columns:1fr 290px;gap:18px;height:700px}
 /* 답변만 스크롤하고 입력란은 아래에 고정 (v2.0 사용자 발견) — 예전엔 입력란까지 한 상자에 들어

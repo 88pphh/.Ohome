@@ -1005,9 +1005,9 @@ export default function RelDetailPage() {
       {/* 타임라인 / 페어 문답 탭 (v1.8) */}
       <div className={`panel timeline ${!isDuo ? 'multi' : ''}`} style={{ fontFamily: familyOf(rel.bodyFontId) }}>
         <div className="rel-tabs">
-          <button className={tab === 'tl' ? 'on' : ''} onClick={() => setTab('tl')}>TIMELINE</button>
+          <button className={tab === 'tl' ? 'on' : ''} onClick={() => setTab('tl')}><span className="lb-pc">TIMELINE</span><span className="lb-m">T</span></button>
           {/* QUESTIONS 섹션은 ＋로 추가해야 생김 (v1.9) — 처음에는 타임라인만 */}
-          {qaOn && <button className={tab === 'qa' ? 'on' : ''} onClick={() => setTab('qa')}>QUESTIONS</button>}
+          {qaOn && <button className={tab === 'qa' ? 'on' : ''} onClick={() => setTab('qa')}><span className="lb-pc">QUESTIONS</span><span className="lb-m">Q</span></button>}
           {isAdmin && !qaOn && (
             <button data-tip="QUESTIONS 섹션 추가" style={{ color: 'var(--faint)', fontSize: 14, padding: '0 6px' }}
               onClick={() => setQsetOpen(true)}>＋</button>
@@ -1019,27 +1019,31 @@ export default function RelDetailPage() {
                 <button className={`btn ${tlSort ? 'btn-accent' : 'btn-ghost'}`}
                   style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
                   onClick={() => setTlSort(v => !v)}>
-                  {tlSort ? '정렬 완료' : '⠿ 정렬'}
+                  <span className="lb-pc">{tlSort ? '정렬 완료' : '⠿ 정렬'}</span>
+                  <span className="lb-m">⠿</span>
                 </button>
               )}
               {tab === 'tl'
-                ? <button className="btn btn-dark" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} onClick={() => setTlOpen(true)}>＋ ADD RECORD</button>
+                ? <button className="btn btn-dark" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} data-tip="기록 추가" onClick={() => setTlOpen(true)}><span className="lb-pc">＋ ADD RECORD</span><span className="lb-m">＋</span></button>
                 : <>
-                  <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} onClick={() => setQsetOpen(true)}>＋ 질문 리스트</button>
+                  <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} data-tip="질문 리스트 추가" onClick={() => setQsetOpen(true)}><span className="lb-pc">＋ 질문 리스트</span><span className="lb-m">≡</span></button>
                   {/* 되돌리기는 오른쪽 질문 리스트에서 우클릭 (v2.0 사용자 요청) — 여기엔 건너뛰기만 */}
                   {curQa && (
                     <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
                       data-tip="이 질문을 아주 버리고 다음 질문으로 — 다시 나오지 않음 (되돌리려면 오른쪽 리스트에서 우클릭)"
-                      onClick={skipQuestion}>질문 건너뛰기</button>
+                      onClick={skipQuestion}><span className="lb-pc">질문 건너뛰기</span><span className="lb-m">⏭</span></button>
                   )}
                   {/* 대기 풀에서 랜덤 출제 (v1.9) — 리스트를 넣어도 자동 출제되지 않으므로(v2.0)
                       아직 받은 질문이 없을 때는 「질문 받기」로 문구를 바꿔 이 버튼이 시작점임을 알린다 */}
                   {auQaPool.length > 0 && (
                     <button className={curQa ? 'btn btn-ghost' : 'btn btn-dark'} style={{ height: 35, padding: '0 14px', fontSize: 11.5 }}
                       data-tip={`대기 질문 ${auQaPool.length}개`}
-                      onClick={drawNextQuestion}>{curQa ? '완료 — 다음 질문' : '질문 받기'}</button>
+                      onClick={drawNextQuestion}>
+                      <span className="lb-pc">{curQa ? '완료 — 다음 질문' : '질문 받기'}</span>
+                      <span className="lb-m">↻</span>
+                    </button>
                   )}
-                  <button className="btn btn-dark" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} onClick={() => setQOpen(true)}>＋ ADD QUESTION</button>
+                  <button className="btn btn-dark" style={{ height: 35, padding: '0 14px', fontSize: 11.5 }} data-tip="질문 추가" onClick={() => setQOpen(true)}><span className="lb-pc">＋ ADD QUESTION</span><span className="lb-m">＋</span></button>
                 </>}
             </span>
           )}
