@@ -808,9 +808,13 @@ body.edit-on .main-grid{grid-template-columns:230px 1fr 260px}
 .banner .slide.on{opacity:1}
 .login-box{padding:18px}
 .login-box h3{font-size:calc(13px*var(--fs,1));letter-spacing:.08em;margin-bottom:12px;color:var(--sub)}
-.widget{padding:16px;margin-bottom:14px;container-type:inline-size;overflow:hidden}
-.widget h4{font-size:calc(11.5px*var(--fs,1));letter-spacing:.12em;color:var(--faint);margin-bottom:11px;display:flex;justify-content:space-between;align-items:center;gap:8px;white-space:nowrap;overflow:hidden}
-.widget h4 .more{font-size:calc(10px*var(--fs,1));color:var(--faint);cursor:var(--cur-pointer,pointer);flex-shrink:0;white-space:nowrap}
+/* 위젯 스타일 (v2.0 사용자 요청) — 배경·타이틀색·본문색·테두리를 디자인 탭에서 따로 정한다.
+   안 정하면 --wg-* 가 카드 색을 그대로 가리키므로 지금까지와 똑같이 보인다.
+   테두리는 --wg-bd-w 가 0px이라 켜기 전에는 그려지지 않는다(그림자만). */
+.widget{padding:16px;margin-bottom:14px;container-type:inline-size;overflow:hidden;
+  background:var(--wg-bg);color:var(--wg-fg);border:var(--wg-bd-w) solid var(--wg-bd)}
+.widget h4{font-size:calc(11.5px*var(--fs,1));letter-spacing:.12em;color:var(--wg-title);margin-bottom:11px;display:flex;justify-content:space-between;align-items:center;gap:8px;white-space:nowrap;overflow:hidden}
+.widget h4 .more{font-size:calc(10px*var(--fs,1));color:var(--wg-title);cursor:var(--cur-pointer,pointer);flex-shrink:0;white-space:nowrap}
 .main-grid .g2{align-items:start}
 .dday-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);font-size:calc(12.5px*var(--fs,1))}
 .dday-row:last-child{border:none}

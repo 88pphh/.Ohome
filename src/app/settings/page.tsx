@@ -71,6 +71,36 @@ function CP({ label, k, def }: { label?: string; k: keyof ThemeVars; def?: strin
   );
 }
 
+/**
+ * 위젯 스타일 (v2.0 사용자 요청) — 메인·사이드에 얹히는 카드의 배경·타이틀색·본문색·테두리.
+ *
+ * 색을 안 정하면 `--wg-*`가 카드 색을 그대로 가리키므로 지금까지와 똑같이 보인다. 그래서 값이
+ * 비어 있을 때 입력란에는 **지금 실제로 쓰이는 카드 색**을 채워 둔다 — 처음 열었을 때 엉뚱한
+ * 회색이 아니라 화면에 보이는 그 색이 나와야 조금만 바꿔 쓰기 쉽다.
+ * 테두리는 켤 때만 그린다(끄면 지금처럼 그림자만).
+ */
+function WidgetStyleRow() {
+  const { state, setVar } = useTheme();
+  const v = state.vars;
+  return (
+    <div className="set-row" style={{ flexWrap: 'wrap' }}>
+      <div className="l"><b>위젯</b>
+        <small>메인·사이드에 얹히는 카드 — 비워 두면 카드 색을 그대로 따라갑니다</small></div>
+      <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
+        <div className="cp-grid2">
+          <CP label="배경" k="wgBg" def={v.cardBg ?? '#fbfbfc'} />
+          <CP label="타이틀" k="wgTitle" def={v.pageDesc ?? '#8a8f98'} />
+          <CP label="본문" k="wgFg" def={v.cardFg ?? '#1d2025'} />
+        </div>
+        <div className="cf-row" style={{ justifyContent: 'flex-end' }}>
+          <KCheck label="테두리" checked={!!v.wgBorder} onChange={b => setVar('wgBorder', b)} />
+          {v.wgBorder && <CP label="색" k="wgBd" def="#e6e8ec" />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 역할 폰트 한 줄 — 폰트 + 굵기 + 크기 배율 (5.1, 폰트별 체감 크기 보정) */
 function FontRoleRow({ role }: { role: FontRole }) {
   const { fonts, roles, setRole, familyOf } = useFonts();
@@ -433,6 +463,9 @@ function DesignPane() {
           <CP label="글씨" k="segFg" />
         </div>
       </div>
+
+      {/* 위젯 스타일 (v2.0 사용자 요청) — 메인·사이드 카드. 안 정하면 카드 색을 그대로 따라간다 */}
+      <WidgetStyleRow />
 
       <div className="set-row">
         <div className="l"><b>진한 버튼</b><small>등록·저장 버튼과 체크박스·선택 필터 칩 공통</small></div>

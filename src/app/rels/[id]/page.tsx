@@ -675,12 +675,21 @@ export default function RelDetailPage() {
 
       {(rel.aus.length > 1 || isAdmin) && (
         <div className="au-list">
-          {rel.aus.map((a, i) => (
-            <div key={a.id} className={`au-item ph ${['cool', 'pale', 'red'][i % 3]} ${auId === a.id ? 'on' : ''}`}
-              onClick={() => { setAuId(a.id); setArtIdx(0); setQaNo(null); }}>
-              <small>{a.label}</small>
-            </div>
-          ))}
+          {/* AU 네모에 대표 이미지를 넣는다 (v2.0 사용자 요청 — 색만 들어가 있어 밋밋했다).
+              원본은 자관 썸네일(잡아 둔 크롭 그대로), 그 외 AU는 그 AU의 첫 아트 = 대표 이미지.
+              등록된 이미지가 없으면 예전처럼 색 플레이스홀더가 그대로 나온다 */}
+          {rel.aus.map((a, i) => {
+            const isBase = a.id === 'base';
+            const thumb = isBase ? (rel.thumbId ?? rel.arts?.[0]) : a.arts?.[0];
+            return (
+              <div key={a.id} className={`au-item ${auId === a.id ? 'on' : ''}`}
+                onClick={() => { setAuId(a.id); setArtIdx(0); setQaNo(null); }}>
+                <CroppedBlobImg fileRef={thumb} crop={isBase ? rel.thumbCrop : undefined}
+                  ph={['cool', 'pale', 'red'][i % 3]} />
+                <small>{a.label}</small>
+              </div>
+            );
+          })}
           {isAdmin && (
             <div className="au-item add" data-tip="AU 추가/관리" onClick={() => setAuOpen(true)}>＋</div>
           )}
