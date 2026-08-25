@@ -276,6 +276,12 @@ function DesignPane() {
         <DocTitleControl />
       </div>
 
+      {/* 브라우저 탭 아이콘 (v2.0 사용자 요청) — 지정 전에는 배포 기본 아이콘이 뜬다 */}
+      <div className="set-row" style={{ flexWrap: 'wrap' }}>
+        <div className="l"><b>브라우저 탭 아이콘</b><small>탭·즐겨찾기에 표시되는 작은 그림 — 정사각형 PNG 권장, 비우면 기본 아이콘</small></div>
+        <FaviconControl />
+      </div>
+
       <div className="set-row" style={{ flexWrap: 'wrap' }}>
         <div className="l"><b>크롤링 설명 문구</b><small>카톡·디스코드 등에 링크 공유 시 제목 아래 뜨는 한 줄 — 비우면 서브타이틀, 그것도 비었으면 기본 문구</small></div>
         <CrawlDescControl />
@@ -1258,6 +1264,45 @@ function CrawlDescControl() {
     <LiveInput value={site.crawlDesc ?? ''} onValue={v => set({ crawlDesc: v })}
       placeholder="자캐놀이용 개인 아카이브"
       style={{ width: 260, height: 35, boxSizing: 'border-box' }} />
+  );
+}
+
+/** 브라우저 탭 아이콘 (v2.0 사용자 요청) — 지정 전에는 기본 아이콘(배포 기본값)이 뜬다.
+ *  탭 제목 바로 아래에 같은 드래프트/SAVE 흐름으로 둔다. */
+function FaviconControl() {
+  const { site, set } = useSiteDraft();
+  const toast = useToast();
+  const url = useBlobUrl(site.favicon);
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span style={{
+        width: 35, height: 35, borderRadius: 'var(--radius-s)', border: '1px solid var(--line)',
+        background: 'var(--panel)', display: 'grid', placeItems: 'center', overflow: 'hidden', flexShrink: 0,
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          : <span style={{ fontSize: 10, color: 'var(--faint)' }}>기본</span>}
+      </span>
+      <input id="siteFavicon" type="file" accept="image/png,image/x-icon,image/svg+xml,image/webp,.ico"
+        style={{ display: 'none' }}
+        onChange={async e => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (!f) return;
+          // 올리기가 막히면 아무 말 없이 끝나지 않게 (v2.0 — 프로필 사진에서 겪은 것과 같은 이유)
+          try { set({ favicon: await putBlob(f) }); } catch (err) {
+            toast(`아이콘을 저장소에 올리지 못했습니다 — ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }} />
+      <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11 }}
+        onClick={() => document.getElementById('siteFavicon')?.click()}>
+        {site.favicon ? 'CHANGE' : 'UPLOAD'}
+      </button>
+      {site.favicon && (
+        <button className="btn btn-ghost" style={{ height: 35, padding: '0 14px', fontSize: 11 }}
+          onClick={() => set({ favicon: undefined })}>REMOVE</button>
+      )}
+    </div>
   );
 }
 
