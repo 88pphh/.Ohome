@@ -19,7 +19,7 @@ export function PageTitle({ children, href, style }: {
   const router = useRouter();
   const pathname = usePathname();
   const [ms] = useMenuSettings();
-  /* 여러 개로 만든 섹션·게시판은 **같은 경로에 쿼리로** 갈린다 (`/backup?s=fan`).
+  /* 여러 개로 만든 섹션·게시판은 **같은 경로에 쿼리로** 갈린다 (`/gallery?s=fan`).
      예전에는 쿼리를 뺀 경로로만 찾아서, 추가한 메뉴에 붙인 타이틀·이름이 페이지에 안 나왔다
      (v2.0 사용자 발견 — 「메뉴 이름을 바꿔도 큰 글씨가 안 바뀐다」).
      useSearchParams를 쓰면 이 컴포넌트를 쓰는 **모든 페이지**가 Suspense 경계를 요구하므로

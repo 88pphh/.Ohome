@@ -38,7 +38,7 @@ export interface MenuSettings {
 export type ImgProtectArea = 'board' | 'comm' | 'tchar' | 'chars' | 'rels';
 
 export const IMG_PROTECT_AREAS: { key: ImgProtectArea; label: string; paths: string[] }[] = [
-  { key: 'board', label: '게시판 (갤러리·로드비 포함)', paths: ['/board', '/backup', '/roadview'] },
+  { key: 'board', label: '게시판 (갤러리·로드비 포함)', paths: ['/board', '/gallery', '/loadb'] },
   { key: 'comm', label: '커미션', paths: ['/comm', '/comm-apply'] },
   { key: 'tchar', label: 'TRPG 캐릭터', paths: ['/tchars'] },
   { key: 'chars', label: '자캐 (캐릭터)', paths: ['/chars'] },
@@ -107,6 +107,38 @@ export const DEFAULT_MENU_SETTINGS: MenuSettings = {
 
 const KEY = 'ohome.menuset.v1';
 
+/** 주소를 바꾼 메뉴 (v2.0 사용자 요청) — 옛 이름이 그대로였던 것들 */
+const MOVED: Record<string, string> = { '/roadview': '/loadb', '/backup': '/gallery' };
+
+/**
+ * 저장된 메뉴의 옛 주소를 새 주소로 (v2.0).
+ *
+ * 메뉴 트리에는 주소가 **문자열로** 적혀 있어서, 주소를 바꾸면 저장해 둔 배치가
+ * 「없는 기능」으로 취급돼 메뉴에서 통째로 사라진다. 읽을 때 한 번 바꿔 준다 —
+ * 저장은 그다음 SAVE 때 자연히 새 주소로 남는다.
+ * 여러 개로 만든 섹션 주소(`/backup?s=fan`)도 앞부분만 갈아 끼운다.
+ */
+function moveHrefs(p: Partial<MenuSettings>): Partial<MenuSettings> {
+  const mv = (h: string) => {
+    for (const [from, to] of Object.entries(MOVED)) {
+      if (h === from) return to;
+      if (h.startsWith(`${from}?`)) return to + h.slice(from.length);
+    }
+    return h;
+  };
+  return {
+    ...p,
+    ...(p.tree ? {
+      tree: p.tree.map(g => ({
+        ...g,
+        ...(g.href ? { href: mv(g.href) } : {}),
+        items: (g.items ?? []).map(it => ({ ...it, href: mv(it.href) })),
+      })),
+    } : {}),
+    ...(p.removedBoards ? { removedBoards: p.removedBoards.map(mv) } : {}),
+  };
+}
+
 /**
  * 훅 없이 지금 저장된 메뉴 설정 읽기 (v2.0).
  * 저장 시점에 글 공개범위를 정할 때처럼 **렌더 밖에서** 필요하다 — 그쪽은 훅을 쓸 수 없다.
@@ -115,7 +147,7 @@ export function currentMenuSettings(): MenuSettings {
   try {
     const raw = getRawSetting(KEY);
     if (raw) {
-      const p = JSON.parse(raw) as Partial<MenuSettings>;
+      const p = moveHrefs(JSON.parse(raw) as Partial<MenuSettings>);
       return { ...DEFAULT_MENU_SETTINGS, ...p, tree: p.tree ?? migrateTree(p) };
     }
   } catch { /* 기본값 */ }
@@ -129,7 +161,7 @@ export function useMenuSettings(): [MenuSettings, (patch: Partial<MenuSettings>)
     try {
       const raw = getRawSetting(KEY);
       if (raw) {
-        const p = JSON.parse(raw) as Partial<MenuSettings>;
+        const p = moveHrefs(JSON.parse(raw) as Partial<MenuSettings>);
         setSt({
           ...DEFAULT_MENU_SETTINGS,
           ...p,
@@ -142,7 +174,7 @@ export function useMenuSettings(): [MenuSettings, (patch: Partial<MenuSettings>)
     const sync = () => {
       try {
         const raw = getRawSetting(KEY);
-        if (raw) setSt(s => ({ ...s, ...JSON.parse(raw) }));
+        if (raw) setSt(s => ({ ...s, ...moveHrefs(JSON.parse(raw)) }));
       } catch { /* 무시 */ }
     };
     window.addEventListener('ohome-menuset', sync);
@@ -198,7 +230,7 @@ export function menuLabelFor(href: string, extra?: ExtraEntry[]): string | null 
  *
  * · 상세 페이지(`/board/123`)는 목록(`/board`)의 범위를 따른다.
  * · 경계는 `/`와 `?`로 끊는다 — 안 그러면 `/comm-apply`가 `/comm`에 딸려 들어간다.
- * · 여러 곳에 걸려 있으면 **더 구체적인 주소**가 이긴다(`/backup?s=fan` > `/backup`).
+ * · 여러 곳에 걸려 있으면 **더 구체적인 주소**가 이긴다(`/gallery?s=fan` > `/gallery`).
  *   같은 구체성이면 느슨한 쪽 — 그 링크가 실제로 보이는 경로가 하나라도 있다는 뜻이므로.
  */
 export function hrefVis(s: MenuSettings, path: string): MenuVis {

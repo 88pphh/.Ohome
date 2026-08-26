@@ -24,8 +24,8 @@ export type SectionKind =
 
 /** 섹션 종류별 기본 정보 — 설정 탭 이름과 페이지 주소 */
 export const SECTION_META: Record<SectionKind, { label: string; href: string; defName: string }> = {
-  gallery:  { label: '갤러리',    href: '/backup',   defName: '갤러리' },
-  roadview: { label: '로드비',    href: '/roadview', defName: '로드비' },
+  gallery:  { label: '갤러리',    href: '/gallery',   defName: '갤러리' },
+  roadview: { label: '로드비',    href: '/loadb', defName: '로드비' },
   trpg:     { label: '로그 백업', href: '/trpg',     defName: '로그 백업' },
   dotori:   { label: '도토리',    href: '/dotori',   defName: '도토리' },
   playlog:  { label: '플레이기록', href: '/playlog', defName: '플레이기록' },

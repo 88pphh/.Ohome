@@ -111,7 +111,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
       };
       setPosts([{ ...p, ...secStamp(sec.id) }, ...posts]);
       toast('등록되었습니다 — 이미지는 이 브라우저에 실제 저장됩니다');
-      router.push(`/backup/${p.id}`);
+      router.push(`/gallery/${p.id}`);
     } else {
       setPosts(posts.map(x => x.id === initial.id ? {
         ...x, title: title.trim(), type,
@@ -121,7 +121,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
         fold: foldType === 'none' ? null : { type: foldType, label: foldType === 'custom' ? foldLabel : undefined },
       } : x));
       toast('저장되었습니다');
-      router.push(`/backup/${initial.id}`);
+      router.push(`/gallery/${initial.id}`);
     }
   };
 
@@ -230,7 +230,7 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
           </div>
           <div className="form-actions">
             <button className="btn btn-onbk"
-              onClick={() => router.push(isNew ? '/backup' : `/backup/${initial.id}`)}>CANCEL</button>
+              onClick={() => router.push(isNew ? '/gallery' : `/gallery/${initial.id}`)}>CANCEL</button>
             <button className="btn btn-accent" onClick={post}>
               {isNew ? 'POST' : 'SAVE'}
             </button>

@@ -2081,7 +2081,7 @@ function MenuPane() {
   // 메뉴별 부속 설정 — 기본 탭용 (표시 방식 등)
   const extraFor = (href: string) => {
     switch (href) {
-      case '/backup': return (
+      case '/gallery': return (
         <div className="mini-seg">
           <button className={ms.backupView === 'gal' ? 'on' : ''} onClick={() => patch({ backupView: 'gal' })}>기본: 갤러리</button>
           <button className={ms.backupView === 'list' ? 'on' : ''} onClick={() => patch({ backupView: 'list' })}>기본: 리스트</button>
@@ -2137,7 +2137,7 @@ function MenuPane() {
         </>
       );
     }
-    if (href === '/roadview') {
+    if (href === '/loadb') {
       return (
         <>
           {permSel('업로드', ms.roadUpload, v => patch({ roadUpload: v }))}

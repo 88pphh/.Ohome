@@ -195,26 +195,26 @@ export function LatestWidget() {
      위젯이라 **소스별로** 따진다. 한쪽만 비공개면 나머지는 그대로 나온다. */
   const [menuSet] = useMenuSettings();
   const viewer = { loggedIn: !!user, isAdmin };
-  const seeRoad = canViewHref(menuSet, '/roadview', viewer);
-  const seeGal = canViewHref(menuSet, '/backup', viewer);
+  const seeRoad = canViewHref(menuSet, '/loadb', viewer);
+  const seeGal = canViewHref(menuSet, '/gallery', viewer);
   const latest = [
     ...(seeRoad ? roads : []).filter(it => canViewHref(menuSet, sectionHref('roadview', it.secId ?? MAIN_SEC), viewer)).map(it => ({
       id: `r-${it.id}`, date: it.date, ref: it.imgId ?? it.imgUrl, ph: it.ph,
-      href: '/roadview', tip: `로드비 · No.${String(it.no ?? 0).padStart(3, '0')}`,
+      href: '/loadb', tip: `로드비 · No.${String(it.no ?? 0).padStart(3, '0')}`,
     })),
     // 갤러리 — 전체공개 + 접기 없는 게시물의 대표(첫) 이미지
     ...(seeGal ? backups : [])
       .filter(p => canViewHref(menuSet, sectionHref('gallery', p.secId ?? MAIN_SEC), viewer))
       .filter(p => p.visibility === 'public' && !p.fold).map(p => ({
       id: `b-${p.id}`, date: p.date, ref: p.images[0], ph: p.phList[0] ?? 'cool',
-      href: `/backup/${p.id}`, tip: `갤러리 · ${p.title}`,
+      href: `/gallery/${p.id}`, tip: `갤러리 · ${p.title}`,
     })),
   ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
   const phFallback = ['cool', 'warm', 'red'];
   if (!seeRoad && !seeGal) return null;   // 둘 다 비공개면 위젯 자체를 띄우지 않는다 (v2.0)
   return (
     <div className="panel widget" style={{ margin: 0 }}>
-      <h4>LATEST <span className="more" onClick={() => router.push('/backup')}>더보기 ›</span></h4>
+      <h4>LATEST <span className="more" onClick={() => router.push('/gallery')}>더보기 ›</span></h4>
       <div className="latest-grid">
         {[0, 1, 2].map(i => {
           const it = latest[i];

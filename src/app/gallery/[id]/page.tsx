@@ -68,7 +68,7 @@ export default function BackupDetailPage() {
         <PageTitle>GALLERY</PageTitle>
         <p>{p.category} · {p.author} · {fmtDate(p.date)}{p.madeDate ? ` · 제작 ${p.madeDate}` : ''}</p>
         <div className="head-actions">
-          {canManage && <button className="btn btn-dark" onClick={() => router.push(`/backup/${p.id}/edit`)}>EDIT</button>}
+          {canManage && <button className="btn btn-dark" onClick={() => router.push(`/gallery/${p.id}/edit`)}>EDIT</button>}
           {canManage && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
         </div>
       </div>
@@ -145,7 +145,7 @@ export default function BackupDetailPage() {
       <ConfirmModal open={delAsk} title="게시물을 삭제하시겠습니까?" body="삭제한 게시물은 복구할 수 없습니다."
         onClose={() => setDelAsk(false)}
         buttons={[
-          { label: 'DELETE', kind: 'accent', onClick: () => { setPosts(posts.filter(x => x.id !== p.id)); router.push('/backup'); } },
+          { label: 'DELETE', kind: 'accent', onClick: () => { setPosts(posts.filter(x => x.id !== p.id)); router.push('/gallery'); } },
           { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
         ]} />
     </section>
