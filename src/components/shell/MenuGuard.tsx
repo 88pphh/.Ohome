@@ -13,7 +13,7 @@
 import React, { Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useMenuSettings, hrefVis } from '@/lib/menuStore';
+import { useMenuSettings, hrefAccess } from '@/lib/menuStore';
 import { PageTitle } from '@/components/ui/PageText';
 
 function GuardInner({ children }: { children: React.ReactNode }) {
@@ -32,7 +32,7 @@ function GuardInner({ children }: { children: React.ReactNode }) {
   // 먼저 그려 두면 한 프레임이라도 내용이 비치고, 반대로 관리자에게 「비공개」가 번쩍인다
   if (!loaded || !ready) return <section className="page" />;
 
-  const vis = hrefVis(menuSet, path);
+  const vis = hrefAccess(menuSet, path);
   const ok = vis === 'all' || (vis === 'member' && !!user) || (vis === 'admin' && isAdmin);
   if (ok) return <>{children}</>;
 
@@ -80,7 +80,7 @@ export function useHrefBlock(href?: string): React.ReactElement | null {
   const { user, isAdmin, ready } = useAuth();
   const [menuSet, , loaded] = useMenuSettings();
   if (!href || !loaded || !ready) return null;
-  const vis = hrefVis(menuSet, href);
+  const vis = hrefAccess(menuSet, href);
   if (vis === 'all' || (vis === 'member' && !!user) || (vis === 'admin' && isAdmin)) return null;
   return blockedView(vis);
 }

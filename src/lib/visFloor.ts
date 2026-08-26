@@ -11,7 +11,7 @@
  * 글 자체가 더 좁으면(비공개 글) 그대로 둔다 — **좁히기만 하고 넓히지 않는다.**
  * 글에 `visibility` 칸이 아예 없는 종류(게시판 글 등)도 여기서 정해지므로 타입을 안 고쳐도 된다.
  */
-import { currentMenuSettings, hrefVis } from './menuStore';
+import { currentMenuSettings, hrefAccess } from './menuStore';
 import { MAIN_SEC, sectionHref, type SectionKind } from './sectionStore';
 import { MAIN_BOARD_ID } from './boardStore';
 import type { Visibility } from './charStore';
@@ -55,7 +55,7 @@ export function areaHrefOf(coll: string, item: ListItem): string | null {
 export function visFloorOf(coll: string, item: ListItem): Visibility {
   const href = areaHrefOf(coll, item);
   if (!href) return 'public';
-  const v = hrefVis(currentMenuSettings(), href);
+  const v = hrefAccess(currentMenuSettings(), href);
   return v === 'admin' ? 'private' : v === 'member' ? 'member' : 'public';
 }
 

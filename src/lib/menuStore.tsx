@@ -13,9 +13,9 @@ export type MenuPerm = 'guest' | 'member' | 'admin';
 export type MenuVis = 'all' | 'member' | 'admin';
 
 /** 트리의 하위 메뉴 한 항목 — label 없으면 기본 이름(FEATURES/게시판명) · pageTitle은 페이지 상단 큰 제목 덮어쓰기 */
-export interface MenuLeaf { href: string; label?: string; pageTitle?: string; vis?: MenuVis }
+export interface MenuLeaf { href: string; label?: string; pageTitle?: string; vis?: MenuVis; open?: boolean }
 /** 트리의 상위 한 항목 — href가 있으면 단독 메뉴(하위 없음) */
-export interface MenuGroupNode { id: string; label: string; href?: string; items: MenuLeaf[]; pageTitle?: string; vis?: MenuVis }
+export interface MenuGroupNode { id: string; label: string; href?: string; items: MenuLeaf[]; pageTitle?: string; vis?: MenuVis; open?: boolean }
 
 export interface MenuSettings {
   tree?: MenuGroupNode[];            // 자유 메뉴 트리 (v1.9 — 없으면 v1 설정에서 마이그레이션)
@@ -233,33 +233,65 @@ export function menuLabelFor(href: string, extra?: ExtraEntry[]): string | null 
  * · 여러 곳에 걸려 있으면 **더 구체적인 주소**가 이긴다(`/gallery?s=fan` > `/gallery`).
  *   같은 구체성이면 느슨한 쪽 — 그 링크가 실제로 보이는 경로가 하나라도 있다는 뜻이므로.
  */
-export function hrefVis(s: MenuSettings, path: string): MenuVis {
-  const rank: Record<MenuVis, number> = { all: 0, member: 1, admin: 2 };
+const VIS_RANK: Record<MenuVis, number> = { all: 0, member: 1, admin: 2 };
+
+/** 이 주소에 걸린 메뉴 항목의 공개범위 + 「주소로는 열람 허용」 여부 (v2.0) */
+function hrefEntry(s: MenuSettings, path: string): { vis: MenuVis; open: boolean } {
   const covers = (href: string) =>
     path === href || path.startsWith(`${href}/`) || path.startsWith(`${href}?`);
   let bestLen = -1;
-  let best: MenuVis = 'all';
-  const take = (href: string, v: MenuVis) => {
-    if (href.length > bestLen) { bestLen = href.length; best = v; }
-    else if (href.length === bestLen && rank[v] < rank[best]) best = v;
+  let best: { vis: MenuVis; open: boolean } = { vis: 'all', open: false };
+  const take = (href: string, e: { vis: MenuVis; open: boolean }) => {
+    if (href.length > bestLen) { bestLen = href.length; best = e; }
+    else if (href.length === bestLen && VIS_RANK[e.vis] < VIS_RANK[best.vis]) best = e;
   };
   for (const g of s.tree ?? defaultTree()) {
     const gv = g.vis ?? 'all';
-    if (g.href && covers(g.href)) take(g.href, gv);
+    if (g.href && covers(g.href)) take(g.href, { vis: gv, open: !!g.open });
     // 상위가 더 좁으면 하위는 그 뒤에 숨는다 — 상위가 안 보이면 하위도 안 보이므로
     for (const it of g.items) {
-      if (covers(it.href)) take(it.href, rank[gv] >= rank[it.vis ?? 'all'] ? gv : (it.vis ?? 'all'));
+      if (!covers(it.href)) continue;
+      const iv = it.vis ?? 'all';
+      const narrower = VIS_RANK[gv] >= VIS_RANK[iv];
+      take(it.href, { vis: narrower ? gv : iv, open: narrower ? !!g.open : !!it.open });
     }
   }
   return best;
 }
 
-/** 이 방문자가 그 주소의 내용을 볼 수 있는가 (v2.0) — 위젯·목록이 함께 쓴다 */
+export function hrefVis(s: MenuSettings, path: string): MenuVis {
+  return hrefEntry(s, path).vis;
+}
+
+/**
+ * **들어갈 수 있는가**의 기준 (v2.0 사용자 요청) — 「숨기되 주소로는 열람 허용」.
+ *
+ * 공개범위는 원래 「메뉴에 보이는가」와 「들어갈 수 있는가」를 한꺼번에 정했다.
+ * 그래서 **링크로만 돌리고 싶은 게시판**을 만들 수가 없었다 — 메뉴에서 감추면 남에게
+ * 주소를 줘도 못 열었기 때문. 항목마다 「주소로는 열람 허용」을 켜면 **메뉴·위젯에서는
+ * 그대로 감추되 들어오는 것만 열어 준다.**
+ */
+export function hrefAccess(s: MenuSettings, path: string): MenuVis {
+  const e = hrefEntry(s, path);
+  return e.open ? 'all' : e.vis;
+}
+
+const allows = (v: MenuVis, viewer: { loggedIn: boolean; isAdmin: boolean }) =>
+  v === 'all' || (v === 'member' && viewer.loggedIn) || (v === 'admin' && viewer.isAdmin);
+
+/** 이 방문자에게 **드러내도 되는가** (v2.0) — 메뉴·위젯이 쓴다.
+ *  「주소로는 열람 허용」이어도 여기서는 감춘다 — 링크로만 돌리려는 것이지 알리려는 게 아니다 */
 export function canViewHref(
   s: MenuSettings, path: string, viewer: { loggedIn: boolean; isAdmin: boolean },
 ): boolean {
-  const v = hrefVis(s, path);
-  return v === 'all' || (v === 'member' && viewer.loggedIn) || (v === 'admin' && viewer.isAdmin);
+  return allows(hrefVis(s, path), viewer);
+}
+
+/** 이 방문자가 **들어갈 수 있는가** (v2.0) — 페이지 차단·서버 저장값이 쓴다 */
+export function canAccessHref(
+  s: MenuSettings, path: string, viewer: { loggedIn: boolean; isAdmin: boolean },
+): boolean {
+  return allows(hrefAccess(s, path), viewer);
 }
 
 /** 메뉴 트리에 적힌 이 주소의 이름 (v2.0) — 이름을 따로 준 적이 없으면 null */

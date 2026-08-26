@@ -1923,6 +1923,8 @@ function MenuPane() {
   // 글에도 적용 (v2.0 사용자 요청) — 아래 applyVis 참조
   const { user } = useAuth();
   const [visBusy, setVisBusy] = useState(false);
+  // 「주소로는 열람 허용」을 켤 때 띄우는 확인 (v2.0 사용자 요청)
+  const [openAsk, setOpenAsk] = useState<(() => void) | null>(null);
   const [visAsk, setVisAsk] = useState(false);
   const [commSet, patchComm] = useCommSettings();
   const { boards, loaded: bLoaded, patchBoard } = useBoards();  // 추가 게시판 이름·자동 편입 동기화 + 권한
@@ -2150,6 +2152,16 @@ function MenuPane() {
     return null;
   };
 
+  /* 「주소로는 열람 허용」 (v2.0 사용자 요청) — 메뉴·위젯에서는 감추되 들어오는 것만 열어 준다.
+     링크로만 돌릴 게시판을 만들려는 용도라, 켤 때 **주소를 아는 사람은 누구나 본다**는 점을
+     모달로 분명히 알린다(사용자 요청). 「전부 보임」에서는 이미 열려 있으므로 뜻이 없어 감춘다 */
+  const openChk = (v: MenuVis | undefined, open: boolean | undefined, onChange: (nv: boolean) => void) => (
+    (v ?? 'all') === 'all' ? null : (
+      <KCheck label={<span style={{ fontSize: 11 }}>주소로는 열람 허용</span>} checked={!!open}
+        onChange={nv => { if (nv) setOpenAsk(() => () => onChange(true)); else onChange(false); }} />
+    )
+  );
+
   // 공개범위 셀렉트 (v1.9) — 메뉴 자체 노출: 전부 / 비로그인 숨김 / 관리자만 (드래프트 — SAVE로 적용)
   const visSel = (v: MenuVis | undefined, onChange: (nv: MenuVis) => void) => (
     <KSelect minWidth={128} value={v ?? 'all'} onChange={nv => onChange(nv as MenuVis)}
@@ -2183,7 +2195,11 @@ function MenuPane() {
       {mtab === 'perm' ? (
         /* ---------- 권한 탭 — 메뉴 공개범위 + 메뉴별 권한 부속 ---------- */
         <div>
-          <div className="d">공개범위는 메뉴 노출만 제어(전부 보임 / 비로그인 숨김 / 관리자만) — SAVE를 눌러야 반영 · 글쓰기·댓글 권한은 즉시 반영</div>
+          <div className="d">
+            공개범위는 메뉴 노출을 정합니다(전부 보임 / 비로그인 숨김 / 관리자만) — SAVE를 눌러야 반영 · 글쓰기·댓글 권한은 즉시 반영
+            <br />
+            <b>주소로는 열람 허용</b>을 켜면 메뉴에서는 계속 감춰 두고 <b>주소를 아는 사람만 들어올 수 있는</b> 메뉴가 됩니다 — 링크로 돌릴 게시판에 씁니다
+          </div>
           {tree.map(g => (
             <div key={g.id} style={{ borderBottom: '1px dashed var(--line)', padding: '9px 0' }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2191,7 +2207,8 @@ function MenuPane() {
                 {g.href && <small style={{ color: 'var(--faint)', fontSize: 10.5 }}>{g.href}</small>}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {g.href && extraPerm(g.href)}
-                  {visSel(g.vis, nv => patchGroup(g.id, { vis: nv === 'all' ? undefined : nv }))}
+                  {openChk(g.vis, g.open, nv => patchGroup(g.id, { open: nv || undefined }))}
+                  {visSel(g.vis, nv => patchGroup(g.id, { vis: nv === 'all' ? undefined : nv, ...(nv === 'all' ? { open: undefined } : {}) }))}
                 </div>
               </div>
               {!g.href && g.items.map(it => (
@@ -2200,8 +2217,12 @@ function MenuPane() {
                   <small style={{ color: 'var(--faint)', fontSize: 10.5 }}>{it.href}</small>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     {extraPerm(it.href)}
+                    {openChk(it.vis, it.open, nv => patchGroup(g.id, {
+                      items: g.items.map(x => (x.href === it.href ? { ...x, open: nv || undefined } : x)),
+                    }))}
                     {visSel(it.vis, nv => patchGroup(g.id, {
-                      items: g.items.map(x => (x.href === it.href ? { ...x, vis: nv === 'all' ? undefined : nv } : x)),
+                      items: g.items.map(x => (x.href === it.href
+                        ? { ...x, vis: nv === 'all' ? undefined : nv, ...(nv === 'all' ? { open: undefined } : {}) } : x)),
                     }))}
                   </div>
                 </div>
@@ -2227,6 +2248,15 @@ function MenuPane() {
               </button>
             </div>
           </div>
+          {/* 「주소로는 열람 허용」 확인 (v2.0 사용자 요청) — 켜는 순간 무엇이 열리는지 분명히 */}
+          <ConfirmModal open={!!openAsk} title="주소가 있는 모두에게 공개됩니다"
+            body={'메뉴에서는 계속 감춰지지만, 이 주소를 아는 사람은 로그인하지 않아도 들어와 볼 수 있습니다. 링크를 받은 사람이 다른 곳에 옮겨 적으면 그 사람들도 볼 수 있습니다. 정말 알려지면 안 되는 내용에는 쓰지 마세요.'}
+            onClose={() => setOpenAsk(null)}
+            buttons={[
+              { label: 'CANCEL', kind: 'ghost', onClick: () => setOpenAsk(null) },
+              { label: '알겠습니다', kind: 'dark', onClick: () => { openAsk?.(); setOpenAsk(null); } },
+            ]} />
+
           <ConfirmModal open={visAsk} title="글 공개범위를 서버에 적용할까요?"
             body={'비공개로 둔 메뉴의 글이 서버에서도 가려집니다. 각 글의 공개범위가 바뀌므로, 되돌리려면 글마다 직접 고쳐야 합니다.'}
             onClose={() => setVisAsk(false)}
