@@ -107,6 +107,7 @@ interface FontCtx {
   setFontPair: (id: string, pairId?: string) => void;                            // 한글 페어 지정/해제 (v1.9)
   updateFont: (id: string, patch: { name: string; family: string; cssUrl: string }) => boolean;
   removeFont: (id: string) => void;              // 내장이면 숨김, 커스텀이면 삭제
+  resetFont: (id: string) => void;               // 내장 폰트 수정값 초기화 (v2.0)
   restoreBuiltins: () => void;                   // 숨긴 내장 폰트 전부 복원
   familyOf: (id?: string) => string | undefined; // 숨긴 폰트도 해석 (기존 데이터 보호)
 }
@@ -254,15 +255,43 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
     if (!patch.name.trim() || !patch.family.trim()) return false;
     const p = { name: patch.name.trim(), family: patch.family.trim(), cssUrl: patch.cssUrl.trim() || undefined };
     apply(s => BUILTIN_FONTS.some(f => f.id === id)
-      ? { ...s, overrides: { ...s.overrides, [id]: p } }
+      // 통째로 덮어쓰면 한글 페어가 조용히 사라진다 — 기존 값 위에 얹는다 (v2.0)
+      ? { ...s, overrides: { ...s.overrides, [id]: { ...s.overrides[id], ...p } } }
       : { ...s, custom: s.custom.map(f => (f.id === id ? { ...f, ...p } : f)) });
     return true;
   }, []);
 
   const removeFont = useCallback((id: string) => {
-    apply(s => BUILTIN_FONTS.some(f => f.id === id)
-      ? { ...s, hidden: s.hidden.includes(id) ? s.hidden : [...s.hidden, id] }
-      : { ...s, custom: s.custom.filter(f => f.id !== id) });
+    apply(s => {
+      const builtin = BUILTIN_FONTS.some(f => f.id === id);
+      const base = builtin
+        ? { ...s, hidden: s.hidden.includes(id) ? s.hidden : [...s.hidden, id] }
+        : { ...s, custom: s.custom.filter(f => f.id !== id) };
+      // 내장은 목록에서 숨겨질 뿐 정의가 남으므로(기존 데이터 보호) 가리키던 자리를 건드리지 않는다
+      if (builtin) return base;
+      /* 직접 등록한 폰트는 **정의째 사라진다** — 그것을 가리키던 자리를 함께 정리한다
+         (v2.0 사용자 발견: 「직접 등록한 폰트를 지웠더니 기본 세리프가 망가졌다」).
+         한글 페어로 물려 있으면 없는 짝을 계속 들고 있게 되고, 목록에는 사라진 이름이
+         그대로 남아 무엇이 적용된 것인지 알 수 없게 된다. */
+      const custom = base.custom.map(f => (f.pairId === id ? { ...f, pairId: undefined } : f));
+      const overrides = Object.fromEntries(
+        Object.entries(base.overrides).map(([k, v]) => [k, v.pairId === id ? { ...v, pairId: undefined } : v]),
+      ) as FontState['overrides'];
+      // 역할이 그 폰트를 쓰고 있었으면 그 역할의 기본값으로 (안 그러면 지정이 허공을 가리킨다)
+      const roles = Object.fromEntries((Object.keys(base.roles) as FontRole[]).map(r =>
+        [r, base.roles[r].id === id ? { ...base.roles[r], id: DEFAULT_ROLES[r].id } : base.roles[r]]),
+      ) as Record<FontRole, RoleSetting>;
+      return { ...base, custom, overrides, roles };
+    });
+  }, []);
+
+  /** 내장 폰트를 처음 상태로 (v2.0 사용자 발견) — 수정값(overrides)을 지운다.
+   *  잘못 들어간 값(엉뚱한 family·없는 페어)을 되돌릴 방법이 UI에 아예 없었다. */
+  const resetFont = useCallback((id: string) => {
+    apply(s => {
+      const { [id]: _drop, ...rest } = s.overrides;
+      return { ...s, overrides: rest };
+    });
   }, []);
 
   const restoreBuiltins = useCallback(() => apply(s => ({ ...s, hidden: [] })), []);
@@ -294,7 +323,7 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{
       fonts, hiddenCount: st.hidden.length, roles, setRole, rolesDirty, saveRoles, discardRoles,
-      addFont, addFontFile, setFontPair, updateFont, removeFont, restoreBuiltins, familyOf,
+      addFont, addFontFile, setFontPair, updateFont, removeFont, resetFont, restoreBuiltins, familyOf,
     }}>
       {children}
     </Ctx.Provider>

@@ -2764,7 +2764,7 @@ function BgmPane() {
 
 /** 폰트 목록 한 줄 — CSS URL 표시 · 수정(이름/family/URL, 업로드 폰트는 이름/한글 페어) · 삭제 */
 function FontRow({ f }: { f: FontDef }) {
-  const { fonts, updateFont, removeFont, setFontPair } = useFonts();
+  const { fonts, updateFont, removeFont, resetFont, setFontPair } = useFonts();
   const del = useConfirmDelete();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
@@ -2805,6 +2805,16 @@ function FontRow({ f }: { f: FontDef }) {
               if (updateFont(f.id, { name, family: f.fileId ? f.family : family, cssUrl: f.fileId ? '' : cssUrl })) { setEditing(false); toast('폰트가 수정되었습니다'); }
               else toast('이름과 font-family 값을 입력해 주세요');
             }}>SAVE</button>
+          {/* 내장 폰트를 처음 상태로 (v2.0 사용자 발견) — 이름·family·한글 페어를 한꺼번에 되돌린다.
+              잘못 들어간 값(엉뚱한 family, 지워진 폰트를 가리키는 페어)을 풀 방법이 없었다 */}
+          {f.builtin && (
+            <button className="btn btn-ghost" style={{ whiteSpace: 'nowrap' }}
+              onClick={() => {
+                resetFont(f.id);
+                setEditing(false);
+                toast(`「${f.name}」를 처음 상태로 되돌렸습니다`);
+              }}>기본값으로</button>
+          )}
           <button className="btn btn-ghost" style={{ whiteSpace: 'nowrap' }}
             onClick={() => { setEditing(false); setName(f.name); setFamily(f.family); setCssUrl(fontCssUrl(f) ?? ''); }}>CANCEL</button>
         </div>
@@ -2829,7 +2839,10 @@ function FontRow({ f }: { f: FontDef }) {
         {!f.locked && (
           <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
             onClick={() => del.ask(`폰트 「${f.name}」를 삭제하시겠습니까?`, () => removeFont(f.id),
-                f.builtin ? '기본 폰트는 아래 [복원] 버튼으로 되살릴 수 있습니다.' : '직접 등록한 폰트는 복구할 수 없습니다. 이 폰트를 쓰던 항목 표시는 유지됩니다.')}>DELETE</button>
+                f.builtin
+                  ? '기본 폰트는 목록에서만 빠집니다 — 아래 [복원] 버튼으로 되살릴 수 있고, 이 폰트를 쓰던 항목 표시는 그대로입니다.'
+                  // 직접 등록한 폰트는 정의째 사라지므로 가리키던 자리도 함께 정리된다 (v2.0)
+                  : '직접 등록한 폰트는 복구할 수 없습니다. 이 폰트를 쓰도록 지정해 둔 자리(역할 폰트·한글 페어)는 기본값으로 되돌아갑니다.')}>DELETE</button>
         )}
       </div>
       {del.element}
