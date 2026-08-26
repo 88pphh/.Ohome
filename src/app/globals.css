@@ -604,9 +604,13 @@ a{color:inherit;text-decoration:none}
 
 /* 페이지네이션 (v1.6) */
 .pager{display:flex;justify-content:center;gap:5px;margin-top:18px}
-.pager button{min-width:30px;height:30px;border-radius:8px;font-size:calc(11.5px*var(--fs,1));color:#aab0ba;background:rgba(255,255,255,.08);border:1px solid var(--line-dark);transition:.15s;padding:0 8px}
-.pager button:hover{color:#fff;background:rgba(255,255,255,.16)}
-.pager button.on{background:var(--panel-solid);color:var(--ink);border-color:transparent}
+/* 페이지 전환 버튼은 **탭과 같은 색 설정**을 따른다 (v2.0 사용자 요청).
+   예전에는 어두운 배경을 전제한 값이 박혀 있어(#aab0ba·흰색 반투명) 디자인 탭에서
+   색을 바꿔도 여기만 그대로였다. 선택 안 된 것은 --seg-bg/--seg-fg,
+   선택된 것은 --btn-dark/--btn-dark-fg — 탭(.mini-seg)이 쓰는 바로 그 값들이다 */
+.pager button{min-width:30px;height:30px;border-radius:8px;font-size:calc(11.5px*var(--fs,1));color:var(--seg-fg,#8a8f98);background:var(--seg-bg,#f0f1f3);border:1px solid transparent;transition:.15s;padding:0 8px}
+.pager button:hover{color:var(--btn-dark,var(--ink))}
+.pager button.on{background:var(--btn-dark,var(--ink));color:var(--btn-dark-fg,#fff);border-color:transparent}
 .pager button:disabled{opacity:.35;pointer-events:none}
 
 /* 모달/오버레이 (7장 — alert/confirm 대체) */
