@@ -369,7 +369,7 @@ a{color:inherit;text-decoration:none}
 /* 태그/뱃지 */
 .pill{display:inline-block;padding:4px 11px;border-radius:20px;font-size:calc(10.5px*var(--fs,1));letter-spacing:.04em;background:#eef0f2;color:var(--sub);border:1px solid var(--line);white-space:nowrap}
 .pill.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
-.pill.red{background:rgba(166,58,69,.09);color:var(--accent);border-color:rgba(166,58,69,.25)}
+.pill.red{background:color-mix(in srgb,var(--accent) 9%,transparent);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 25%,transparent)}
 /* 컬러 스와치 */
 .swatches{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .sw{width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line),0 2px 6px rgba(0,0,0,.15);cursor:var(--cur-pointer,pointer);transition:.15s}
@@ -523,7 +523,7 @@ a{color:inherit;text-decoration:none}
 .postit{position:absolute;width:158px;padding:14px 14px 18px;font-size:calc(11.5px*var(--fs,1));line-height:1.65;color:#3c3a33;box-shadow:0 8px 20px rgba(0,0,0,.3);cursor:var(--cur-drag,grab);white-space:pre-line;user-select:none}
 .postit b{display:block;font-size:calc(9.5px*var(--fs,1));letter-spacing:.1em;color:rgba(0,0,0,.4);margin-bottom:6px}
 .postit:active{cursor:grabbing}
-.postit.hl{box-shadow:0 0 0 3px rgba(166,58,69,.5),0 8px 20px rgba(0,0,0,.3)}
+.postit.hl{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 50%,transparent),0 8px 20px rgba(0,0,0,.3)}
 .postit.ro{cursor:default}
 .memo-list-item{display:flex;gap:10px;padding:10px 12px;border-radius:9px;cursor:var(--cur-pointer,pointer);transition:.13s;align-items:flex-start}
 .memo-list-item:hover{background:#f0f1f4}
@@ -563,7 +563,7 @@ a{color:inherit;text-decoration:none}
 .thr-post:hover .hv-actions{opacity:1;pointer-events:auto}
 .thr-post .hv-actions button{font-size:10px;letter-spacing:.06em;color:var(--sub);padding:3px 8px;border-radius:6px}
 .thr-post .hv-actions button:hover{color:var(--ink);background:#fff}
-.thr-post .hv-actions button.del:hover{color:var(--accent);background:rgba(166,58,69,.08)}
+.thr-post .hv-actions button.del:hover{color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .thr-imgs{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:420px;margin-bottom:8px}
 .thr-imgs .im{aspect-ratio:16/10;border-radius:9px;overflow:hidden;cursor:var(--cur-pointer,pointer);position:relative}
 .thr-imgs.one{grid-template-columns:1fr}
@@ -1184,8 +1184,11 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 .cal-side .panel.widget h4{margin-bottom:7px}
 .cal-side .dday-row{padding:4px 0}
 .cal-cell.today{border:1.5px solid var(--ink)}
-/* 지금 고른 날짜 (v2.0) — 오른쪽 카드가 이 날짜의 일정을 보여 준다 */
-.cal-cell.picked{border-color:var(--accent);box-shadow:0 0 0 2px rgba(166,58,69,.16)}
+/* 지금 고른 날짜 (v2.0) — 오른쪽 카드가 이 날짜의 일정을 보여 준다.
+   표시는 **다른 포커스 표시와 같은 설정**(디자인 > 입력 포커스)을 따른다 (v2.0 사용자 발견).
+   예전에는 링 색이 기본 강조색(빨강)으로 박혀 있어, 강조색을 바꾸면 테두리만 바뀌고
+   번지는 링은 빨간 채로 남아 어긋나 보였다 */
+.cal-cell.picked{border-color:var(--focus-bd,var(--accent));box-shadow:var(--focus-ring,0 0 0 2px rgba(166,58,69,.16))}
 /* 달력 칸에는 위에서 3개까지 — 나머지 개수만 표시 */
 .cal-cell .ev.more{background:transparent;color:var(--faint);font-weight:700;padding-left:0}
 .cal-cell .ev{margin-top:4px;font-size:calc(11.5px*var(--fs,1));padding:3px 7px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600} /* 일정 글씨 확대 9.5→11.5 (v1.9 사용자 피드백) */
@@ -1345,7 +1348,7 @@ body.edit-on .main-grid.gridlines .wgt{outline-offset:0}
 /* 카드 관리 버튼 — 이미지 호버 시에만 */
 .dt-actions{position:absolute;top:8px;left:8px;z-index:3;display:flex;gap:5px}
 .dt-actions button{font-size:calc(10px*var(--fs,1));padding:4px 9px;border-radius:999px;background:rgba(15,17,20,.55);color:#dfe2e7}
-.dt-actions button.del{background:rgba(166,58,69,.75);color:#fff}
+.dt-actions button.del{background:color-mix(in srgb,var(--accent) 75%,transparent);color:#fff}
 .dt-card:hover .hv-actions{opacity:1;pointer-events:auto}
 /* 카드 안 태그 — 부모 kw-row의 프로필용 패딩 제거 (좌측 정렬) */
 .dt-card .kw-row{padding:0}
