@@ -178,22 +178,30 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
     // 페어(pairId)가 있으면 "영문 폰트, 한글 페어" 스택으로 합성 (v1.9)
     const deVar = (fam: string) =>
       fam === 'var(--sans)' ? 'var(--sans-base)' : fam === 'var(--serif)' ? 'var(--serif-base)' : fam;
-    const resolve = (id: string): string => {
+    /* 지정한 폰트가 사라졌으면 **그 역할의 기본값**으로 (v2.0 사용자 발견 — 「폰트를 지우니
+       기본 세리프체가 이상해졌다」). 예전에는 무조건 `var(--sans-base)`로 떨어져,
+       타이틀처럼 세리프여야 할 자리가 소리 없이 고딕이 됐다. 내장 폰트는 지워도 pool에 남아
+       (숨김일 뿐) 여기 걸리지 않는다 — 직접 등록했다 지운 폰트만 해당된다. */
+    const resolve = (id: string, role?: FontRole): string => {
       if (id === FOLLOW_MENU) return 'var(--font-menu)';   // 드롭다운: 메뉴 폰트 따라감
       if (id === FOLLOW_TITLE) return 'var(--serif)';      // 메뉴 타이틀: 타이틀 폰트 따라감
       const f = pool.find(x => x.id === id);
-      if (!f) return 'var(--sans-base)';
+      if (!f) {
+        const back = role ? DEFAULT_ROLES[role].id : 'default';
+        // 기본값이 또 「따라가기」이거나 자기 자신이면 더 파고들지 않는다 (무한 재귀 방지)
+        return back === id ? 'var(--sans-base)' : resolve(back);
+      }
       const p = f.pairId ? pool.find(x => x.id === f.pairId) : undefined;
       return p ? `${deVar(f.family)}, ${deVar(p.family)}` : deVar(f.family);
     };
     const root = document.documentElement.style;
-    root.setProperty('--sans', resolve(roles.body.id));
-    root.setProperty('--serif', resolve(roles.title.id));
-    root.setProperty('--font-menu', resolve(roles.menu.id));
-    root.setProperty('--font-dropdown', resolve(roles.dropdown.id));
-    root.setProperty('--font-pagetitle', resolve(roles.pagetitle.id));
-    root.setProperty('--font-subtitle', resolve(roles.subtitle.id));
-    root.setProperty('--font-logosub', resolve(roles.logosub.id));
+    root.setProperty('--sans', resolve(roles.body.id, 'body'));
+    root.setProperty('--serif', resolve(roles.title.id, 'title'));
+    root.setProperty('--font-menu', resolve(roles.menu.id, 'menu'));
+    root.setProperty('--font-dropdown', resolve(roles.dropdown.id, 'dropdown'));
+    root.setProperty('--font-pagetitle', resolve(roles.pagetitle.id, 'pagetitle'));
+    root.setProperty('--font-subtitle', resolve(roles.subtitle.id, 'subtitle'));
+    root.setProperty('--font-logosub', resolve(roles.logosub.id, 'logosub'));
     (Object.keys(roles) as FontRole[]).forEach(r => {
       const cfg = roles[r];
       root.setProperty(`--fs-${r}`, String((cfg.scale ?? 100) / 100));
