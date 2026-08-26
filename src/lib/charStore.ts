@@ -33,6 +33,9 @@ export interface Character {
   tabs: CharTab[];       // 기본 정보 외 추가 탭
   basicHtml: string;     // 기본 정보 탭의 소개 본문 (HTML)
   visibility: Visibility;
+  /** 어느 캐릭터 목록 것인지 (v2.0 사용자 요청) — 없으면 기본 목록.
+   *  **자관·역극이 캐릭터를 찾을 때는 소속을 보지 않는다** — 목록 화면에서만 갈린다 */
+  secId?: string;
   thumbClass: string;    // 데모 플레이스홀더 클래스
   thumbId?: string;      // 리스트 썸네일 (IndexedDB, 3:4 크롭)
   thumbCrop?: import("@/components/ui/CropEditor").CropValue;

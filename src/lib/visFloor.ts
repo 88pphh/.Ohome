@@ -32,7 +32,7 @@ const AREA: Record<string, { kind?: SectionKind; href?: string; board?: boolean 
   guestbook: { href: '/guest' },
   memos: { href: '/memo' },
   rp_rooms: { href: '/rp' },
-  characters: { href: '/chars' },
+  characters: { kind: 'chars' },
   relations: { href: '/rels' },
   trpg_chars: { href: '/tchars' },
   applicants: { href: '/comm-apply' },
