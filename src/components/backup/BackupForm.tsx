@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLocalList, newId, FoldType } from '@/lib/postStore';
 import { useSectionParam, secStamp, secQuery } from '@/lib/sectionStore';
 import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
-import { useBoardSettings, DEFAULT_GALLERY_CATS } from '@/lib/boardStore';
+import { useBoardSettings, DEFAULT_GALLERY_CATS, galleryCatsOf } from '@/lib/boardStore';
 import { useConfirmDelete } from '@/components/ui/Modal';
 import { Visibility } from '@/lib/charStore';
 import { KInput, KSelect, KRadio, KCheck, KDate } from '@/components/ui/Kit';
@@ -62,7 +62,9 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
   const del = useConfirmDelete();   // 이미지 제거도 되돌릴 수 없어 경고를 거친다
   // 갤러리 말머리 — 환경설정 > 게시판 관리에서 관리 (v2.0)
   const { st: boardSet } = useBoardSettings();
-  const galleryCats = boardSet.galleryCats.length ? boardSet.galleryCats : DEFAULT_GALLERY_CATS;
+  // 갤러리마다 말머리가 다르다 (v2.0 사용자 요청) — 보고 있는 갤러리 것을 쓴다
+  const secCats = galleryCatsOf(boardSet, sec.id);
+  const galleryCats = secCats.length ? secCats : DEFAULT_GALLERY_CATS;
   const [category, setCategory] = useState(initial?.category ?? '');
   // 목록이 로드되면 첫 말머리를 기본값으로 (등록 화면)
   useEffect(() => {
