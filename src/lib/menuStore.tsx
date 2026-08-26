@@ -230,6 +230,15 @@ export function canViewHref(
   return v === 'all' || (v === 'member' && viewer.loggedIn) || (v === 'admin' && viewer.isAdmin);
 }
 
+/** 메뉴 트리에 적힌 이 주소의 이름 (v2.0) — 이름을 따로 준 적이 없으면 null */
+export function menuLabelOf(s: MenuSettings, href: string): string | null {
+  for (const g of s.tree ?? []) {
+    if (g.href === href) return g.label?.trim() || null;
+    for (const it of g.items) if (it.href === href) return it.label?.trim() || null;
+  }
+  return null;
+}
+
 /** 설정을 적용한 실제 메뉴 트리 — 자유 트리(v1.9) 기반.
  *  extraBoards: 추가 생성한 게시판(5.2) — 트리에 아직 없으면 /board가 든 그룹에 자동 배치.
  *  viewer: 공개범위 필터(v1.9) — all/member/admin. 없으면 전부 표시(관리 화면용) */
