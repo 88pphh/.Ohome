@@ -22,6 +22,13 @@ export interface FontDef {
   pairId?: string;     // 영문 폰트일 때 한글 폴백 페어 — 목록의 다른 폰트 id (v1.9)
 }
 
+/** 「기본」·「기본 세리프」의 family는 var(--sans)/var(--serif)인데, 그 두 변수는 **역할 폰트가
+ *  덮어쓰는 자리**다. 그대로 쓰면 「기본 세리프」가 「지금 타이틀에 지정된 폰트」를 뜻하게 된다
+ *  (v2.0 사용자 발견 — 「기본 세리프가 내가 업로드한 폰트를 계속 잡아」).
+ *  원본 스택(--sans-base/--serif-base)으로 풀어 그 별칭 고리를 끊는다. */
+export const deVarFamily = (fam: string): string =>
+  (fam === 'var(--sans)' ? 'var(--sans-base)' : fam === 'var(--serif)' ? 'var(--serif-base)' : fam);
+
 export const BUILTIN_FONTS: FontDef[] = [
   { id: 'default', name: '기본 (프리텐다드)', family: 'var(--sans)', builtin: true, locked: true },
   { id: 'serif', name: '기본 세리프 (Cormorant + Noto Serif KR)', family: 'var(--serif)', builtin: true, locked: true },
@@ -177,8 +184,7 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // '기본'류(family가 var(--sans)/var(--serif))는 원본 스택으로 풀어 순환 참조 방지.
     // 페어(pairId)가 있으면 "영문 폰트, 한글 페어" 스택으로 합성 (v1.9)
-    const deVar = (fam: string) =>
-      fam === 'var(--sans)' ? 'var(--sans-base)' : fam === 'var(--serif)' ? 'var(--serif-base)' : fam;
+    const deVar = deVarFamily;
     /* 지정한 폰트가 사라졌으면 **그 역할의 기본값**으로 (v2.0 사용자 발견 — 「폰트를 지우니
        기본 세리프체가 이상해졌다」). 예전에는 무조건 `var(--sans-base)`로 떨어져,
        타이틀처럼 세리프여야 할 자리가 소리 없이 고딕이 됐다. 내장 폰트는 지워도 pool에 남아
@@ -316,7 +322,8 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
     const f = pool.find(x => x.id === id);
     if (!f) return undefined;
     const p = f.pairId ? pool.find(x => x.id === f.pairId) : undefined;
-    return p ? `${f.family}, ${p.family}` : f.family;
+    // 원본 스택으로 풀어 준다 — 안 그러면 「기본 세리프」가 지금 타이틀 폰트를 뜻하게 된다 (v2.0)
+    return p ? `${deVarFamily(f.family)}, ${deVarFamily(p.family)}` : deVarFamily(f.family);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st]);
 
