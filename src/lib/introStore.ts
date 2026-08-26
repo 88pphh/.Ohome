@@ -12,11 +12,14 @@ import { getRawSetting, setSetting } from './settingStore';
 const KEY = 'ohome.intro.v1';
 
 export interface IntroDoc {
-  /** 에디터로 쓴 본문 HTML */
+  /** 본문 HTML — 에디터로 쓰든 HTML로 직접 쓰든 저장 형태는 같다 */
   html: string;
+  /** 어느 쪽으로 쓰고 있었는지 (v2.0 사용자 요청) — 다음에 열 때 그 모드로 연다.
+   *  HTML로 짜 둔 글이 에디터로 열리면서 태그가 깎이는 일이 없게 하려는 것이다. */
+  mode?: 'editor' | 'html';
 }
 
-const EMPTY: IntroDoc = { html: '' };
+const EMPTY: IntroDoc = { html: '', mode: 'editor' };
 
 export function useIntro(): [IntroDoc, (next: IntroDoc) => void, boolean] {
   const [doc, setDoc] = useState<IntroDoc>(EMPTY);
