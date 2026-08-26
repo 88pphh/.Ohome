@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { boardEntries, useMenuSettings, buildMenu } from '@/lib/menuStore';
 import { useBoards } from '@/lib/boardStore';
 import { useSections, sectionMenuEntries } from '@/lib/sectionStore';
+import { useCustomLinks, linkEntries } from '@/lib/linkStore';
 import { useSiteSettings } from '@/lib/siteStore';
 import { useAuth } from '@/lib/auth';
 import { useMainStore } from '@/lib/mainStore';
@@ -36,11 +37,12 @@ export function TopBar() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [menuSet, , menuLoaded] = useMenuSettings(); // 메뉴 관리 (5.2) — 노출·순서·이름
   const { boards, loaded: boardsLoaded } = useBoards(); // 다중 게시판 (5.2) — 게시판 그룹에 동적 반영
-  const { map: secMap } = useSections();                 // 여러 개로 만든 섹션 (v2.0) — 갤러리·다이어리 등
+  const { map: secMap } = useSections();
+  const { links } = useCustomLinks();                    // 커스텀 링크 (v2.0 사용자 요청)                 // 여러 개로 만든 섹션 (v2.0) — 갤러리·다이어리 등
   // 저장 설정 로드 전에는 메뉴·로고를 그리지 않음 — 새로고침 시 기본 구성이 깜빡이는 것 방지 (v1.9)
   const ready = menuLoaded && boardsLoaded;
   const menu = ready
-    ? buildMenu(menuSet, [...boardEntries(boards), ...sectionMenuEntries(secMap)], { loggedIn: !!user, isAdmin })
+    ? buildMenu(menuSet, [...boardEntries(boards), ...sectionMenuEntries(secMap), ...linkEntries(links)], { loggedIn: !!user, isAdmin })
     : [];
   const [site, , siteLoaded] = useSiteSettings();    // 로고 텍스트/서브/정렬 (5.2)
   const avatarSrc = useBlobUrl(user?.avatarUrl);     // 프로필 이미지 (마이페이지, v1.9)

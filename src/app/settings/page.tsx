@@ -30,6 +30,7 @@ import {
 import { FEATURES } from '@/lib/menu';
 import { SectionsBlock } from '@/components/settings/SectionList';
 import { useSections, sectionMenuEntries, MAIN_SEC, inSection } from '@/lib/sectionStore';
+import { useCustomLinks, linkEntries, toInternalPath } from '@/lib/linkStore';
 import { useSiteDraft } from '@/lib/siteStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCursorSettings, CursorState, CURSOR_STATE_LABEL } from '@/lib/cursorStore';
@@ -1930,7 +1931,8 @@ function MenuPane() {
   const saved = ms.tree ?? defaultTree();
   // 게시판 + 여러 개로 만든 섹션 — 메뉴가 아는 「추가 항목」 전체 (v2.0)
   const { map: secMap } = useSections();
-  const extraAll = [...boardEntries(boards), ...sectionMenuEntries(secMap)];
+  const { links, setLinks, add: addLink } = useCustomLinks();   // 커스텀 링크 (v2.0 사용자 요청)
+  const extraAll = [...boardEntries(boards), ...sectionMenuEntries(secMap), ...linkEntries(links)];
   const defLabel = (href: string) => menuLabelFor(href, extraAll) ?? href;
 
   // 드래프트 — 모든 편집(삭제 포함)은 SAVE를 눌러야 실제 메뉴에 반영 (v1.9 사용자 피드백)
@@ -2333,6 +2335,44 @@ function MenuPane() {
       ))}
       {unplaced.length === 0 && (
         <div style={{ padding: '10px 0', fontSize: 12, color: 'var(--faint)' }}>모든 기능이 메뉴에 배치되어 있습니다</div>
+      )}
+
+      {/* 커스텀 링크 (v2.0 사용자 요청) — 사이트 안의 아무 페이지나 메뉴로.
+          만들면 위 미배치 목록에 나타나고, 거기서 원하는 상위 메뉴에 넣는다 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 22 }}>
+        <h3 style={{ margin: 0 }}>커스텀 링크</h3>
+        <button className="btn btn-ghost" style={{ padding: '4px 11px', fontSize: 10.5, marginLeft: 'auto' }}
+          onClick={addLink}>＋ ADD CUSTOM</button>
+      </div>
+      <div className="d">
+        자관·캐릭터처럼 목록에서 골라야 갈 수 있던 페이지를 메뉴에서 바로 — 주소를 적어 두면 됩니다.
+        <br />
+        풀주소를 붙여 넣어도 <b>사이트 안 이동</b>으로 바뀝니다(예: <code>…/rels/latte</code> → <code>/rels/latte</code>).
+        만든 링크는 위 <b>미배치</b>에 나타나며, 거기서 원하는 상위 메뉴에 넣어 주세요.
+      </div>
+      {links.map(l => (
+        <div key={l.id} className="set-row">
+          <div className="l" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <KInput value={l.name} placeholder="메뉴에 보일 이름"
+              onChange={e => setLinks(links.map(x => (x.id === l.id ? { ...x, name: e.target.value } : x)))}
+              style={{ width: 140 }} />
+            <KInput value={l.href} placeholder="/rels/latte 또는 풀주소"
+              onChange={e => setLinks(links.map(x => (x.id === l.id ? { ...x, href: e.target.value } : x)))}
+              onBlur={e => setLinks(links.map(x => (x.id === l.id ? { ...x, href: toInternalPath(e.target.value) } : x)))}
+              style={{ width: 260 }} />
+          </div>
+          <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5 }}
+            onClick={() => del.ask(`커스텀 링크 「${l.name}」를 지우시겠습니까?`,
+              () => {
+                setLinks(links.filter(x => x.id !== l.id));
+                // 메뉴에 배치돼 있었으면 그 자리도 함께 비운다 — 없는 주소가 남으면 눌러도 아무 일도 안 난다
+                setTree(tree.map(g => ({ ...g, items: g.items.filter(i => i.href !== l.href) })).filter(g => g.href !== l.href));
+              },
+              '메뉴에 배치해 두었다면 그 자리도 함께 비워집니다. 가리키던 페이지 자체는 그대로입니다.')}>DELETE</button>
+        </div>
+      ))}
+      {links.length === 0 && (
+        <div style={{ padding: '10px 0', fontSize: 12, color: 'var(--faint)' }}>아직 없습니다 — ＋ ADD CUSTOM으로 만들어 주세요</div>
       )}
       </>
       )}
