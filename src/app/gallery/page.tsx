@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useSectionParam, filterSection, sectionSetter, secQuery } from '@/lib/sectionStore';
 import { useLocalList, fmtDate } from '@/lib/postStore';
 import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
-import { SearchBar } from '@/components/ui/Kit';
+import { SearchBar, Pager } from '@/components/ui/Kit';
 import { CroppedBlobImg } from '@/components/ui/CropEditor';
 import { EditableDesc, PageTitle } from '@/components/ui/PageText';
 import { useBoardSettings, boardBadgeStyle } from '@/lib/boardStore';
@@ -46,6 +46,16 @@ function BackupPageInner() {
   // 편집모드 카드 드래그 정렬 (v1.9 — 갤러리 보기)
   const sort = useCardSort(visible, next => setPosts(mergeOrder(posts, next)), editOn && isAdmin);
 
+  /* 게시물이 쌓이면 페이지로 (v2.0 사용자 요청) — 보기에 따라 한 장 분량이 다르다.
+     갤러리 보기는 한 줄에 3개라 12개(4줄), 리스트 보기는 글 목록과 같은 20개. */
+  const PER = view === 'gal' ? 12 : 20;
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(visible.length / PER));
+  const cur = Math.min(page, pages);      // 검색·보기 전환으로 줄면 마지막 장으로 당긴다
+  const start = (cur - 1) * PER;
+  const paged = visible.slice(start, start + PER);
+  useEffect(() => { setPage(1); }, [q, view]);   // 검색어·보기를 바꾸면 첫 장부터
+
   const count = (p: BackupPost) => Math.max(p.images.length, p.phList.length);
   const meta = (p: BackupPost) =>
     `${count(p)}장 · ${fmtDate(p.madeDate ? p.madeDate + 'T00:00:00' : p.date)}`;
@@ -70,7 +80,8 @@ function BackupPageInner() {
       {/* 갤러리/리스트 모두 렌더해 두고 display로만 전환 (v1.9) —
           전환 때마다 재마운트되며 이미지가 다시 로드·등장하던 깜빡임 제거 */}
       <div className="g3" style={{ display: view === 'gal' && visible.length > 0 ? undefined : 'none' }}>
-          {visible.map((p, i) => {
+          {paged.map((p, si) => {
+            const i = start + si;   // 정렬은 전체 기준 위치로
             const folded = p.fold && !unveiled[p.id];
             return (
               <div key={p.id} className="panel g-item" {...sort(i)}
@@ -100,7 +111,7 @@ function BackupPageInner() {
         </div>
       {/* 게시물이 없으면 컨테이너 자체를 숨김 — 빈 패널이 안내문 위에 카드처럼 남던 버그 (v1.9 사용자 발견) */}
       <div className="panel flush" style={{ display: view === 'list' && visible.length > 0 ? undefined : 'none' }}>
-          {visible.map(p => (
+          {paged.map(p => (
             <div key={p.id} className="list-item" onClick={() => router.push(`/gallery/${p.id}`)}>
               <div className="th" style={{ position: 'relative' }}><CroppedBlobImg fileRef={p.images[0]} crop={p.thumbCrop} ph={p.phList[0] ?? 'cool'} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -121,6 +132,7 @@ function BackupPageInner() {
           게시물이 없습니다
         </div>
       )}
+      {visible.length > PER && <Pager page={cur} total={pages} onChange={setPage} />}
     </section>
   );
 }
