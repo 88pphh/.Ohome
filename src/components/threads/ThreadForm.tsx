@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocalList, newId } from '@/lib/postStore';
-import { useSectionParam, secStamp, secQuery } from '@/lib/sectionStore';
+import { useSectionParam, secStamp, secQuery, MAIN_SEC } from '@/lib/sectionStore';
 import { ThreadWork, THREAD_SEED, useThreadSettings, threadCats } from '@/lib/threadStore';
 import { useFonts } from '@/lib/fontStore';
 import { putBlob, useBlobUrl } from '@/lib/blobStore';
@@ -20,10 +20,14 @@ export function ThreadForm({ editId }: { editId?: string }) {
   // 어느 감상타래에서 눌러 왔는지 (v2.0)
   const sec = useSectionParam('threads');
   const [settings] = useThreadSettings();
-  // 분류는 섹션마다 따로 (v2.0 사용자 요청)
-  const cats = threadCats(settings, sec.id);
   const { fonts, familyOf } = useFonts();
   const orig = editId ? works.find(w => w.id === editId) : undefined;
+  /* **수정 중이면 그 글이 속한 곳이 기준이다** (v2.0 사용자 발견 — 포크 사용자 제보).
+     수정 주소에는 `?s=`가 없어서 주소만 보면 늘 기본 섹션으로 읽힌다. 그러면 분류 목록이
+     기본 섹션 것으로 바뀌어, 원래 고른 분류가 목록에 없으니 첫 항목으로 풀려 버린다. */
+  const secId = orig ? (orig.secId ?? MAIN_SEC) : sec.id;
+  // 분류는 섹션마다 따로 (v2.0 사용자 요청)
+  const cats = threadCats(settings, secId);
 
   const [title, setTitle] = useState(orig?.title ?? '');
   const [fontId, setFontId] = useState(orig?.titleFontId ?? 'default');
@@ -84,7 +88,7 @@ export function ThreadForm({ editId }: { editId?: string }) {
       setWorks([{ ...w, ...secStamp(sec.id) }, ...works]);
       toast('타래가 시작되었습니다');
     }
-    router.push('/threads' + secQuery(sec.id));
+    router.push('/threads' + secQuery(secId));
   };
 
   return (
@@ -154,7 +158,7 @@ export function ThreadForm({ editId }: { editId?: string }) {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
-            <button className="btn btn-ghost" onClick={() => router.push('/threads' + secQuery(sec.id))}>CANCEL</button>
+            <button className="btn btn-ghost" onClick={() => router.push('/threads' + secQuery(secId))}>CANCEL</button>
             <button className="btn btn-dark" onClick={save}>{orig ? 'SAVE' : 'ADD'}</button>
           </div>
         </div>

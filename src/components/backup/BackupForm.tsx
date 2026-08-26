@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList, newId, FoldType } from '@/lib/postStore';
-import { useSectionParam, secStamp, secQuery } from '@/lib/sectionStore';
+import { useSectionParam, secStamp, secQuery, MAIN_SEC } from '@/lib/sectionStore';
 import { BackupPost, BACKUP_SEED } from '@/lib/galleryStore';
 import { useBoardSettings, DEFAULT_GALLERY_CATS, galleryCatsOf } from '@/lib/boardStore';
 import { useConfirmDelete } from '@/components/ui/Modal';
@@ -62,8 +62,12 @@ export function BackupForm({ initial }: { initial: BackupPost | null }) {
   const del = useConfirmDelete();   // 이미지 제거도 되돌릴 수 없어 경고를 거친다
   // 갤러리 말머리 — 환경설정 > 게시판 관리에서 관리 (v2.0)
   const { st: boardSet } = useBoardSettings();
+  /* **수정 중이면 그 글이 속한 곳이 기준이다** (v2.0 사용자 발견 — 포크 사용자 제보).
+     수정 주소에는 `?s=`가 없어서 주소만 보면 늘 기본 섹션으로 읽힌다. 그러면 분류 목록이
+     기본 섹션 것으로 바뀌어, 원래 고른 분류가 목록에 없으니 첫 항목으로 풀려 버린다. */
+  const secId = initial ? (initial.secId ?? MAIN_SEC) : sec.id;
   // 갤러리마다 말머리가 다르다 (v2.0 사용자 요청) — 보고 있는 갤러리 것을 쓴다
-  const secCats = galleryCatsOf(boardSet, sec.id);
+  const secCats = galleryCatsOf(boardSet, secId);
   const galleryCats = secCats.length ? secCats : DEFAULT_GALLERY_CATS;
   const [category, setCategory] = useState(initial?.category ?? '');
   // 목록이 로드되면 첫 말머리를 기본값으로 (등록 화면)
