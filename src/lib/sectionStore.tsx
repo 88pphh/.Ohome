@@ -40,7 +40,17 @@ export const SECTION_KINDS = Object.keys(SECTION_META) as SectionKind[];
 /** 기본 섹션 id — 이 id는 만들지도 지우지도 않는다(원래 있던 그 페이지) */
 export const MAIN_SEC = 'main';
 
-export interface SectionItem { id: string; name: string }
+export interface SectionItem {
+  id: string;
+  name: string;
+  /** 주소에 쓸 별명 (v2.0 사용자 요청) — 없으면 id가 그대로 주소에 나온다(`?s=mt9ipt`처럼 안 예쁘다).
+   *  **소속 표시(secId)는 언제나 id로 저장한다** — 별명을 바꿔도 글이 떨어져 나가지 않는다. */
+  slug?: string;
+}
+
+/** 주소·별명으로 쓸 수 있는 형태만 남긴다 — 영소문자·숫자·하이픈·밑줄 */
+export const cleanSlug = (v: string) =>
+  v.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
 
 type SectionMap = Partial<Record<SectionKind, SectionItem[]>>;
 
@@ -56,9 +66,16 @@ export function sectionsOf(map: SectionMap, kind: SectionKind): SectionItem[] {
   return [named ? { ...base, ...named } : base, ...extra];
 }
 
-/** 이 섹션의 주소 — 기본은 원래 주소 그대로, 나머지는 ?s=id */
+/** 주소에 쓸 값 — 별명을 정했으면 그것, 아니면 id (v2.0) */
+export function secKeyOf(kind: SectionKind, id: string): string {
+  load();
+  const s = (cache[kind] ?? []).find(x => x.id === id);
+  return s?.slug?.trim() || id;
+}
+
+/** 이 섹션의 주소 — 기본은 원래 주소 그대로, 나머지는 ?s=별명(없으면 id) */
 export const sectionHref = (kind: SectionKind, id: string) =>
-  (id === MAIN_SEC ? SECTION_META[kind].href : `${SECTION_META[kind].href}?s=${id}`);
+  (id === MAIN_SEC ? SECTION_META[kind].href : `${SECTION_META[kind].href}?s=${secKeyOf(kind, id)}`);
 
 /** 항목이 이 섹션 것인가 — 예전 데이터(secId 없음)는 전부 기본 섹션 소속 */
 export const inSection = (secId: string | undefined, cur: string) =>
@@ -130,7 +147,8 @@ export function useSectionParam(kind: SectionKind): { id: string; name: string; 
   const { list } = useSections();
   const items = list(kind);
   const want = sp.get('s') ?? MAIN_SEC;
-  const found = items.find(s => s.id === want) ?? items[0];
+  // 별명으로도 찾는다 (v2.0) — 예전에 공유한 id 주소도 그대로 열려야 한다
+  const found = items.find(s => s.id === want || (s.slug ?? '') === want) ?? items[0];
   return { id: found.id, name: found.name, items };
 }
 

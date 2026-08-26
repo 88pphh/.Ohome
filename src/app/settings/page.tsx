@@ -2007,7 +2007,8 @@ function MenuPane() {
     setTimeout(() => el?.click(), 30);   // 보류했던 클릭 재실행 → 원래 목적지로
   };
 
-  // 트리 정규화(저장본 대상) — 사라진 기능(삭제된 게시판) 제거 + 새 게시판을 /board가 든 그룹에 자동 편입
+  /* 트리 정규화(저장본 대상) — 사라진 기능(삭제된 게시판) 제거.
+     **새로 만든 것을 자동으로 넣지는 않는다** (v2.0 사용자 확정) — 미배치에 머물게 둔다 */
   useEffect(() => {
     if (!msLoaded || !bLoaded) return;
     let next: MenuGroupNode[] = saved
@@ -2015,19 +2016,6 @@ function MenuPane() {
         ? (menuLabelFor(g.href, extraAll) === null ? null : g)
         : { ...g, items: g.items.filter(it => menuLabelFor(it.href, extraAll) !== null) }))
       .filter((g): g is MenuGroupNode => !!g);
-    const placed = new Set(next.flatMap(g => (g.href ? [g.href] : g.items.map(i => i.href))));
-    for (const b of extraAll) {
-      const href = b.href;
-      if (placed.has(href) || ms.removedBoards.includes(href)) continue;
-      const hi = next.findIndex(g => !g.href && g.items.some(i => i.href === b.anchor));
-      if (hi >= 0) {
-        const at = next[hi].items.findIndex(i => i.href === b.anchor);
-        next = next.map((g, i) => (i === hi
-          ? { ...g, items: [...g.items.slice(0, at + 1), { href }, ...g.items.slice(at + 1)] } : g));
-      } else {
-        next = [...next, { id: newGroupId(), label: b.name, href, items: [] }];
-      }
-    }
     if (JSON.stringify(next) !== JSON.stringify(saved)) patch({ tree: next });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [msLoaded, bLoaded, boards, ms.tree]);
@@ -2036,8 +2024,8 @@ function MenuPane() {
   const placedSet = new Set(tree.flatMap(g => (g.href ? [g.href] : g.items.map(i => i.href))));
   const unplaced = [
     ...FEATURES.filter(f => !placedSet.has(f.href)),
-    // 게시판·갤러리·다이어리 등 여러 개로 만든 것도 여기 뜬다 (v2.0 사용자 요청) —
-    // 자동 배치된 자리가 마음에 안 들면 빼서 원하는 상위 메뉴로 다시 넣을 수 있다
+    // 게시판·갤러리·다이어리 등 여러 개로 만든 것도 여기 뜬다 (v2.0 사용자 요청).
+    // 자동 배치를 없앴으므로 **만들면 여기 머문다** — 원하는 상위 메뉴에 직접 넣는다
     ...extraAll.map(b => ({ href: b.href, label: b.name })).filter(x => !placedSet.has(x.href)),
   ];
 

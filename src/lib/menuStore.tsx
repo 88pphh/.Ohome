@@ -271,18 +271,10 @@ export function buildMenu(
     })
     .filter((m): m is MenuItem => !!m);
 
-  // 새로 만든 섹션 자동 배치 — 트리에 없고 사용자가 뺀 적도 없으면 원래 메뉴(anchor) 뒤에
-  for (const b of extra ?? []) {
-    const href = b.href;
-    if (placed.has(href) || s.removedBoards.includes(href)) continue;
-    const host = menu.find(m => m.children?.some(c => c.href === b.anchor));
-    if (host?.children) {
-      const at = host.children.findIndex(c => c.href === b.anchor);
-      host.children.splice(at + 1, 0, { href, label: b.name });
-    } else {
-      menu.push({ label: b.name, href });
-    }
-  }
+  /* 새로 만든 섹션·게시판은 **자동으로 배치하지 않는다** (v2.0 사용자 확정).
+     예전에는 원래 메뉴 뒤에 저절로 끼워 넣었는데, 그러면 메뉴 관리의 「미배치」에
+     한 번 보였다가 다음에 들어가면 사라져 있어 어디로 갔는지 알 수 없었다.
+     이제 만들면 미배치에 머물고, 원하는 상위 메뉴에 직접 넣어야 메뉴에 나온다. */
 
   // 하위가 하나도 없는 그룹은 통째로 숨김
   return menu.filter(m => !m.children || m.children.length > 0);
